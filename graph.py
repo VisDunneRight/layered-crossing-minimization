@@ -1,19 +1,20 @@
-class Node:
-    def __init__(self, node_name, node_layer):
+class LayeredNode:
+    def __init__(self, node_name, node_layer, is_anchor=False):
         self.name = node_name
         self.layer = node_layer
-        self.v = 0
+        self.y = 0
+        self.is_anchor_node = is_anchor
 
 
-class Edge:
-    def __init__(self, node1: Node, node2: Node):
+class LayeredEdge:
+    def __init__(self, node1: LayeredNode, node2: LayeredNode):
         self.n1 = node1
         self.n2 = node2
         self.length = abs(self.n1.layer - self.n2.layer)
         self.same_layer_edge = self.n1.layer == self.n2.layer
 
     def get_bendiness(self):
-        return abs(self.n1.v - self.n2.v)
+        return abs(self.n1.y - self.n2.y)
 
 
 class LayeredGraph:
@@ -24,12 +25,6 @@ class LayeredGraph:
         self.edges = []
         self.node_names = {}
         self.edge_names = {}
-
-    # def is_name_available(self, name):
-    #     for n in self.nodes:
-    #         if n.name == name:
-    #             return False
-    #     return True
 
     def get_names(self):
         names = []
@@ -54,8 +49,8 @@ class LayeredGraph:
                 edge_list[edge.n1.layer].append((edge.n1.name, edge.n2.name))
         return edge_list
 
-    def add_node(self, name, layer):
-        x = Node(name, layer)
+    def add_node(self, name, layer, is_anchor=False):
+        x = LayeredNode(name, layer, is_anchor=is_anchor)
         if layer not in self.layers:
             self.layers[layer] = []
             self.n_layers += 1
@@ -73,11 +68,11 @@ class LayeredGraph:
             print(f"failed to add edge ({n1}, {n2}): node DNE")
             return
         if self.node_names[n1].layer > self.node_names[n2].layer:
-            e = Edge(self.node_names[n2], self.node_names[n1])
+            e = LayeredEdge(self.node_names[n2], self.node_names[n1])
             self.edges.append(e)
             self.edge_names[n2, n1] = e
         else:
-            e = Edge(self.node_names[n1], self.node_names[n2])
+            e = LayeredEdge(self.node_names[n1], self.node_names[n2])
             self.edges.append(e)
             self.edge_names[n1, n2] = e
         return e
@@ -100,10 +95,10 @@ class LayeredGraph:
         for edge in self.edges:
             if edge.length > 1:
                 to_remove.append(edge)
-                last_node = self.add_node(f"{edge.n1.name}-{edge.n2.name}a1", edge.n1.layer + 1)
+                last_node = self.add_node(f"{edge.n1.name}-{edge.n2.name}a1", edge.n1.layer + 1, is_anchor=True)
                 to_add.append((edge.n1.name, last_node.name))
                 for i in range(edge.length-2):
-                    next_node = self.add_node(f"{edge.n1.name}-{edge.n2.name}a{i+2}", i + edge.n1.layer + 2)
+                    next_node = self.add_node(f"{edge.n1.name}-{edge.n2.name}a{i+2}", i + edge.n1.layer + 2, is_anchor=True)
                     to_add.append((last_node.name, next_node.name))
                     last_node = next_node
                 to_add.append((last_node.name, edge.n2.name))

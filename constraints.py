@@ -47,23 +47,116 @@ def optimize_layout(g: graph.LayeredGraph):
                     m.addConstr(x[comb[0]]+x[comb[1]]-x[comb[2]] >= 0, f"1t{comb[0]},{comb[1]},{comb[2]}")
                     m.addConstr(-1*x[comb[0]]-x[comb[1]]+x[comb[2]] >= -1, f"2t{comb[0]},{comb[1]},{comb[2]}")
 
-        # simple edge crossing
         for c_var in c_vars:
+            x1_rev, x2_rev, x3_rev = 1, 1, 1
+
+            # simple edge crossing
             if not g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
-                if (c_var[0][0],c_var[1][0]) in x:
-                    if (c_var[0][1],c_var[1][1]) in x:
-                        m.addConstr((1-x[c_var[0][0],c_var[1][0]])+x[c_var[0][1],c_var[1][1]]+c[c_var] >= 1, f"1se{c_var}")
-                        m.addConstr(x[c_var[0][0], c_var[1][0]]+(1-x[c_var[0][1], c_var[1][1]]) + c[c_var] >= 1,f"2se{c_var}")
-                    else:  # this block for (2,4),(9,3) TODO: fix this
-                        m.addConstr((1-x[c_var[0][0],c_var[1][0]]) + x[c_var[1][1],c_var[0][1]] + c[c_var] >= 1, f"1se{c_var}")
-                        m.addConstr(x[c_var[0][0], c_var[1][0]] +(1-x[c_var[1][1], c_var[0][1]]) + c[c_var] >= 1,f"2se{c_var}")
+                if (c_var[0][0], c_var[1][0]) in x:
+                    x1 = (c_var[0][0], c_var[1][0])
                 else:
-                    if (c_var[0][1], c_var[1][1]) in x:
-                        m.addConstr((1-x[c_var[1][0],c_var[0][0]]) + x[c_var[0][1],c_var[1][1]] + c[c_var] >= 1, f"1se{c_var}")
-                        m.addConstr(x[c_var[1][0], c_var[0][0]] +(1-x[c_var[0][1], c_var[1][1]]) + c[c_var] >= 1,f"2se{c_var}")
-                    else:
-                        m.addConstr((1-x[c_var[1][0],c_var[0][0]]) + x[c_var[1][1],c_var[0][1]] + c[c_var] >= 1, f"1se{c_var}")
-                        m.addConstr(x[c_var[1][0], c_var[0][0]] +(1-x[c_var[1][1], c_var[0][1]]) + c[c_var] >= 1,f"2se{c_var}")
+                    x1 = (c_var[1][0], c_var[0][0])
+                    x1_rev = -1
+                if (c_var[0][1], c_var[1][1]) in x:
+                    x2 = (c_var[0][1], c_var[1][1])
+                else:
+                    x2 = (c_var[1][1], c_var[0][1])
+                    x2_rev = -1
+                print(f"(1-{x1_rev}*x[{x1}]) + {x2_rev}*x[{x2}] + c[c_var] + {(1-x1_rev)/2} >= 1")
+                m.addConstr((1-x1_rev*x[x1]) + x2_rev*x[x2] + c[c_var] - (1-x1_rev)/2 + (1-x2_rev)/2 >= 1, f"1se{c_var}")
+                m.addConstr(x1_rev*x[x1] + (1-x2_rev*x[x2]) + c[c_var] + (1-x1_rev)/2 - (1-x2_rev)/2 >= 1, f"2se{c_var}")
+                # if (c_var[0][0],c_var[1][0]) in x:
+                #     if (c_var[0][1],c_var[1][1]) in x:
+                #         printf"(1-x[{c_var[0][0],c_var[1][0]}])+x[{c_var[0][1],c_var[1][1]}]+c[c_var] >= 1")
+                #         m.addConstr((1-x[c_var[0][0],c_var[1][0]])+x[c_var[0][1],c_var[1][1]]+c[c_var] >= 1, f"1se{c_var}")
+                #         m.addConstr(x[c_var[0][0], c_var[1][0]]+(1-x[c_var[0][1], c_var[1][1]]) + c[c_var] >= 1,f"2se{c_var}")
+                #     else:
+                #         print(f"(1-x[{c_var[0][0],c_var[1][0]}]) + (1-x[{c_var[1][1],c_var[0][1]}]) + c[c_var] >= 1")
+                #         m.addConstr((1-x[c_var[0][0],c_var[1][0]]) + (1-x[c_var[1][1],c_var[0][1]]) + c[c_var] >= 1, f"1se{c_var}")
+                #         m.addConstr(x[c_var[0][0], c_var[1][0]] +x[c_var[1][1], c_var[0][1]] + c[c_var] >= 1,f"2se{c_var}")
+                # else:
+                #     if (c_var[0][1], c_var[1][1]) in x:
+                #         m.addConstr(x[c_var[1][0],c_var[0][0]] + x[c_var[0][1],c_var[1][1]] + c[c_var] >= 1, f"1se{c_var}")
+                #         m.addConstr((1-x[c_var[1][0], c_var[0][0]]) +(1-x[c_var[0][1], c_var[1][1]]) + c[c_var] >= 1,f"2se{c_var}")
+                #     else:
+                #         m.addConstr(x[c_var[1][0],c_var[0][0]] + (1-x[c_var[1][1],c_var[0][1]]) + c[c_var] >= 1, f"1se{c_var}")
+                #         m.addConstr((1-x[c_var[1][0], c_var[0][0]]) +x[c_var[1][1], c_var[0][1]] + c[c_var] >= 1,f"2se{c_var}")
+
+            # same-layer/2-layer edge crossing
+            elif g.edge_names[c_var[0]].same_layer_edge:
+                if (c_var[0][0], c_var[1][0]) in x:
+                    x1 = (c_var[0][0], c_var[1][0])
+                else:
+                    x1 = (c_var[1][0], c_var[0][0])
+                    x1_rev = -1
+                if (c_var[0][1], c_var[1][0]) in x:
+                    x2 = (c_var[0][1], c_var[1][0])
+                else:
+                    x2 = (c_var[1][0], c_var[0][1])
+                    x2_rev = -1
+                m.addConstr(-x1_rev*x[x1] + x2_rev*x[x2] + c[c_var] - (1-x1_rev)/2 + (1-x2_rev)/2 >= 0, f"1hy{c_var}")
+                m.addConstr(x1_rev*x[x1] - x2_rev*x[x2] + c[c_var] + (1-x1_rev)/2 - (1-x2_rev)/2 >= 0, f"2hy{c_var}")
+            #     if (c_var[0][0],c_var[1][0]) in x:
+            #         if (c_var[0][1],c_var[1][1]) in x:
+            #             m.addConstr(-x[c_var[0][0],c_var[1][0]]+x[c_var[0][1],c_var[1][1]]+c[c_var] >= 0, f"1hy{c_var}")
+            #             m.addConstr(x[c_var[0][0], c_var[1][0]]-x[c_var[0][1], c_var[1][1]] + c[c_var] >= 0,f"2hy{c_var}")
+            #         else:
+            #             m.addConstr(-x[c_var[0][0],c_var[1][0]] + (1-x[c_var[1][1],c_var[0][1]]) + c[c_var] >= 0, f"1hy{c_var}")
+            #             m.addConstr(x[c_var[0][0], c_var[1][0]] -(1-x[c_var[1][1], c_var[0][1]]) + c[c_var] >= 0,f"2hy{c_var}")
+            #     else:
+            #         if (c_var[0][1], c_var[1][1]) in x:
+            #             m.addConstr(-(1-x[c_var[1][0],c_var[0][0]]) + x[c_var[0][1],c_var[1][1]] + c[c_var] >= 0, f"1hy{c_var}")
+            #             m.addConstr((1-x[c_var[1][0], c_var[0][0]]) - x[c_var[0][1], c_var[1][1]] + c[c_var] >= 0,f"2hy{c_var}")
+            #         else:
+            #             m.addConstr(-(1-x[c_var[1][0],c_var[0][0]]) + (1-x[c_var[1][1],c_var[0][1]]) + c[c_var] >= 0, f"1hy{c_var}")
+            #             m.addConstr((1-x[c_var[1][0], c_var[0][0]]) - (1-x[c_var[1][1], c_var[0][1]]) + c[c_var] >= 0,f"2hy{c_var}")
+
+            elif g.edge_names[c_var[1]].same_layer_edge:
+                if (c_var[0][0], c_var[1][0]) in x:
+                    x1 = (c_var[0][0], c_var[1][0])
+                else:
+                    x1 = (c_var[1][0], c_var[0][0])
+                    x1_rev = -1
+                if (c_var[0][1], c_var[1][0]) in x:
+                    x2 = (c_var[0][1], c_var[1][0])
+                else:
+                    x2 = (c_var[1][0], c_var[0][1])
+                    x2_rev = -1
+                m.addConstr(-x1_rev*x[x1] + x2_rev*x[x2] + c[c_var] - (1-x1_rev)/2 + (1-x2_rev)/2 >= 0, f"1hy{c_var}")
+                m.addConstr(x1_rev*x[x1] - x2_rev*x[x2] + c[c_var] + (1-x1_rev)/2 - (1-x2_rev)/2 >= 0, f"2hy{c_var}")
+
+            # same layer edge crossing
+            # else:
+            #     n_backwards = 0
+            #     x1_rev, x2_rev, x3_rev, x4_rev = 1, 1, 1, 1
+            #     if (c_var[0][0], c_var[1][0]) in x:
+            #         x1 = (c_var[0][0], c_var[1][0])
+            #     else:
+            #         x1 = (c_var[1][0], c_var[0][0])
+            #         x1_rev = -1
+            #         n_backwards += 1
+            #     if (c_var[0][1], c_var[1][1]) in x:
+            #         x2 = (c_var[0][1], c_var[1][1])
+            #     else:
+            #         x2 = (c_var[1][1], c_var[0][1])
+            #         x2_rev = -1
+            #         n_backwards += 1
+            #     m.addConstr(x1_rev*x[x1] + x[c_var[0][1], c_var[1][1]] + c[c_var] >= 1,f"1sl{c_var}")
+            #     if (c_var[0][0],c_var[1][0]) in x:
+            #         if (c_var[0][1],c_var[1][1]) in x:
+            #             m.addConstr((1-x[c_var[0][0],c_var[1][0]])+x[c_var[0][1],c_var[1][1]]+c[c_var] >= 1, f"1sl{c_var}")
+            #             m.addConstr(x[c_var[0][0], c_var[1][0]]+(1-x[c_var[0][1], c_var[1][1]]) + c[c_var] >= 1,f"2se{c_var}")
+            #         else:
+            #             m.addConstr((1-x[c_var[0][0],c_var[1][0]]) + (1-x[c_var[1][1],c_var[0][1]]) + c[c_var] >= 1, f"1se{c_var}")
+            #             m.addConstr(x[c_var[0][0], c_var[1][0]] +x[c_var[1][1], c_var[0][1]] + c[c_var] >= 1,f"2se{c_var}")
+            #     else:
+            #         if (c_var[0][1], c_var[1][1]) in x:
+            #             m.addConstr(x[c_var[1][0],c_var[0][0]] + x[c_var[0][1],c_var[1][1]] + c[c_var] >= 1, f"1se{c_var}")
+            #             m.addConstr((1-x[c_var[1][0], c_var[0][0]]) +(1-x[c_var[0][1], c_var[1][1]]) + c[c_var] >= 1,f"2se{c_var}")
+            #         else:
+            #             m.addConstr(x[c_var[1][0],c_var[0][0]] + (1-x[c_var[1][1],c_var[0][1]]) + c[c_var] >= 1, f"1se{c_var}")
+            #             m.addConstr((1-x[c_var[1][0], c_var[0][0]]) +x[c_var[1][1], c_var[0][1]] + c[c_var] >= 1,f"2se{c_var}")
+
 
         # vertical position
         for x_var in x_vars:
@@ -93,6 +186,8 @@ def optimize_layout(g: graph.LayeredGraph):
 
         for v in m.getVars():
             print('%s %g' % (v.varName, v.x))
+            if v.varName[:1] == "y":
+                g.node_names[v.varName[2:v.varName.index(']')]].y = int(v.x)
         print('Obj: %g' % m.objVal)
 
     except gp.GurobiError as e:

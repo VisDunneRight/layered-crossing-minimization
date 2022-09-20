@@ -1,6 +1,7 @@
 import sys
 import constraints
 import graph
+import vis
 from graph import *
 
 
@@ -33,3 +34,4 @@ if __name__ == '__main__':
     else:
         graph_to_draw = make_graph(choice=int(sys.argv[1]))
     run_optimizer(graph_to_draw)
+    vis.draw(graph_to_draw, "eex")
