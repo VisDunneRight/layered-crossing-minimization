@@ -26,6 +26,16 @@ class LayeredGraph:
         self.node_names = {}
         self.edge_names = {}
 
+    def get_node(self, node_name):
+        if node_name in self.node_names:
+            return self.node_names[node_name]
+        return None
+
+    def get_edge(self, node1_name, node2_name):
+        if (node1_name, node2_name) in self.edge_names:
+            return self.edge_names[node1_name, node2_name]
+        return None
+
     def get_names(self):
         names = []
         for n in self.nodes:
