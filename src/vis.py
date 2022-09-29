@@ -1,3 +1,5 @@
+import sys
+
 import cairo
 from src import graph
 import math
@@ -9,6 +11,9 @@ def draw(g: graph.LayeredGraph, svg_name, node_x_distance=100, node_y_distance=1
     line_width = 4
     font_size = 12
     width = (g.n_layers - 1) * node_x_distance + offset * 2
+    min_y = min((n.y for n in g.nodes))
+    for n in g.nodes:
+        n.y -= min_y
     height = max((n.y for n in g.nodes)) * node_y_distance + offset * 2
     surface = cairo.SVGSurface(f"Images/{svg_name}.svg", width, height)
     ctx = cairo.Context(surface)
@@ -21,7 +26,7 @@ def draw(g: graph.LayeredGraph, svg_name, node_x_distance=100, node_y_distance=1
     for edge in g.edges:  # curve_to(c1x, c1y, c2x, c2y, ex, ey), control points c1, c2, end point e
         ctx.move_to((edge.n1.layer - 1) * node_x_distance + offset, edge.n1.y * node_y_distance + offset)
         if edge.same_layer_edge:
-            ctx.curve_to((edge.n1.layer - 1) * node_x_distance + offset + node_x_distance//2, edge.n1.y * node_y_distance + offset, (edge.n1.layer - 1) * node_x_distance + offset + node_x_distance//2, edge.n2.y * node_y_distance + offset, (edge.n1.layer - 1) * node_x_distance + offset, edge.n2.y * node_y_distance + offset)
+            ctx.curve_to((edge.n1.layer - 1) * node_x_distance + offset + node_x_distance//1.5 - (node_x_distance//2)//(abs(edge.n1.y-edge.n2.y)), edge.n1.y * node_y_distance + offset, (edge.n1.layer - 1) * node_x_distance + offset + node_x_distance//1.5 - (node_x_distance//2)//(abs(edge.n1.y-edge.n2.y)), edge.n2.y * node_y_distance + offset, (edge.n1.layer - 1) * node_x_distance + offset, edge.n2.y * node_y_distance + offset)
         elif edge.n1.y == edge.n2.y:
             ctx.line_to((edge.n2.layer - 1)*node_x_distance + offset, edge.n2.y*node_y_distance + offset)
         else:

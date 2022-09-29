@@ -6,7 +6,7 @@ import random
 def create_bfs_layered_graph(s_g):
     visited = {n: False for n in s_g}
     bfs_q = set()
-    # first = 11
+    # first = 1
     first = random.randint(1, len(s_g))
     bfs_q.add(first)
     visited[first] = True

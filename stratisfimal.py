@@ -1,6 +1,6 @@
 import os
 import sys
-from src import constraints, vis, read_rome_data
+from src import constraints, vis, read_rome_data, motifs
 from src.graph import *
 
 
@@ -28,7 +28,8 @@ def run_all_rome_lib(num_nodes, num_graphs, num_drawings, bendiness_reduction):
     outputs = []
     for file in os.listdir(f"Rome-Lib/graficon{num_nodes}nodi")[:num_graphs]:
         g = read_rome_data.create_layered_graph(f"graficon{num_nodes}nodi/{file}")
-        print(f"\n\n{file} ({i}/{num_graphs}):\n")
+        print(f"\n\n{file} ({i}/{num_graphs}):")
+        print("Number of butterflies: ", motifs.count_butterflies(g))
         outputs.append(f"{num_nodes}\t{bendiness_reduction}\t" + run_optimizer(g, bendiness_reduction))
         i += 1
         if num_drawings > 0:
@@ -39,8 +40,8 @@ def run_all_rome_lib(num_nodes, num_graphs, num_drawings, bendiness_reduction):
 
 
 def run_optimizer(g: LayeredGraph, bendiness_reduction):
-    res = constraints.optimize_layout(g, 5, 1, bendiness_reduction)
-    return '\t'.join(str(e) for e in res[0] + [res[1], res[2]])
+    res = constraints.optimize_layout(g, 5, 1, bendiness_reduction, cutoff_time=60)
+    return '\t'.join(str(e) for e in res[0] + [res[1], res[2], res[3]])
 
 
 if __name__ == '__main__':

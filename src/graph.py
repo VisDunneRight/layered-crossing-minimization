@@ -25,6 +25,7 @@ class LayeredGraph:
         self.edges = []
         self.node_names = {}
         self.edge_names = {}
+        self.adj_list = {}
 
     def get_node(self, node_name):
         if node_name in self.node_names:
@@ -116,3 +117,17 @@ class LayeredGraph:
             self.edges.remove(v)
         for e in to_add:
             self.add_edge(e[0], e[1])
+
+    def print_layer_counts(self):
+        layer_counts = [len(lay) for lay in self.layers.values()]
+        print("Max height:", max(layer_counts), " layer counts:", layer_counts)
+
+    def create_double_adj_list(self):
+        for edge in self.edges:
+            if edge.n1.name not in self.adj_list:
+                self.adj_list[edge.n1.name] = [[], []]
+            if edge.n2.name not in self.adj_list:
+                self.adj_list[edge.n2.name] = [[], []]
+            self.adj_list[edge.n1.name][1].append(edge.n2.name)
+            self.adj_list[edge.n2.name][0].append(edge.n1.name)
+        return self.adj_list
