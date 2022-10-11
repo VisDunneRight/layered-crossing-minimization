@@ -1,11 +1,9 @@
-import sys
-
 import cairo
 from src import graph
 import math
 
 
-def draw(g: graph.LayeredGraph, svg_name, node_x_distance=100, node_y_distance=100):
+def draw(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100):
     offset = 40
     node_radius = 15
     line_width = 4
@@ -46,12 +44,13 @@ def draw(g: graph.LayeredGraph, svg_name, node_x_distance=100, node_y_distance=1
             ctx.arc((node.layer - 1) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius, 0, 2 * math.pi)
             ctx.stroke()
             ctx.set_source_rgb(0.1, 0.1, 0.1)
-            if len(node.name) == 1:
+            if len(str(node.name)) == 1:
                 ctx.move_to((node.layer - 1)*node_x_distance + offset - 3, node.y*node_y_distance + offset + 4)
             else:
                 ctx.move_to((node.layer - 1) * node_x_distance + offset - 7, node.y * node_y_distance + offset + 4)
-            ctx.show_text(node.name)
+            ctx.show_text(str(node.name))
         else:
             ctx.set_source_rgb(0.2, 0.2, 0.2)
-            ctx.arc((node.layer - 1)*node_x_distance + offset, node.y*node_y_distance + offset, line_width * 2, 0, 2 * math.pi)
+            ctx.arc((node.layer - 1)*node_x_distance + offset, node.y*node_y_distance + offset, line_width//2, 0, 2 * math.pi)
+            # ctx.arc((node.layer - 1)*node_x_distance + offset, node.y*node_y_distance + offset, line_width * 2, 0, 2 * math.pi)
             ctx.fill()

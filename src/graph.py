@@ -2,7 +2,7 @@ class LayeredNode:
     def __init__(self, node_name, node_layer, is_anchor=False):
         self.name = node_name
         self.layer = node_layer
-        self.y = 0
+        self.y = node_name
         self.is_anchor_node = is_anchor
 
 
@@ -16,10 +16,15 @@ class LayeredEdge:
     def get_bendiness(self):
         return abs(self.n1.y - self.n2.y)
 
+    def update(self):
+        self.length = abs(self.n1.layer - self.n2.layer)
+        self.same_layer_edge = self.n1.layer == self.n2.layer
+
 
 class LayeredGraph:
     def __init__(self):
         self.n_layers = 0
+        self.n_nodes = 0
         self.nodes = []
         self.layers = {}
         self.edges = []
@@ -68,6 +73,7 @@ class LayeredGraph:
         self.nodes.append(x)
         self.layers[layer].append(x)
         self.node_names[name] = x
+        self.n_nodes += 1
         return x
 
     def add_nodes(self, names_and_layers):
@@ -106,10 +112,10 @@ class LayeredGraph:
         for edge in self.edges:
             if edge.length > 1:
                 to_remove.append(edge)
-                last_node = self.add_node(f"{edge.n1.name}-{edge.n2.name}a1", edge.n1.layer + 1, is_anchor=True)
+                last_node = self.add_node(self.n_nodes + 1, edge.n1.layer + 1, is_anchor=True)
                 to_add.append((edge.n1.name, last_node.name))
                 for i in range(edge.length-2):
-                    next_node = self.add_node(f"{edge.n1.name}-{edge.n2.name}a{i+2}", i + edge.n1.layer + 2, is_anchor=True)
+                    next_node = self.add_node(self.n_nodes + 1, i + edge.n1.layer + 2, is_anchor=True)
                     to_add.append((last_node.name, next_node.name))
                     last_node = next_node
                 to_add.append((last_node.name, edge.n2.name))
@@ -123,11 +129,9 @@ class LayeredGraph:
         print("Max height:", max(layer_counts), " layer counts:", layer_counts)
 
     def create_double_adj_list(self):
+        for node in self.nodes:
+            self.adj_list[node.name] = [[], []]
         for edge in self.edges:
-            if edge.n1.name not in self.adj_list:
-                self.adj_list[edge.n1.name] = [[], []]
-            if edge.n2.name not in self.adj_list:
-                self.adj_list[edge.n2.name] = [[], []]
             self.adj_list[edge.n1.name][1].append(edge.n2.name)
             self.adj_list[edge.n2.name][0].append(edge.n1.name)
         return self.adj_list
