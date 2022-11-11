@@ -67,14 +67,17 @@ def create_better_layered_graph(rome_file, w, c):
         to_remove = cycle_removal(simple_g)
         for edge in to_remove:
             simple_g[edge[0]].remove(edge[1])
-        g = min_width(simple_g, w, c)
+        g, tvert = min_width(simple_g, w, c)
         for edge in to_remove:
             g.add_edge(edge[0], edge[1])
         # print("removed edges", to_remove)
         for edge in g.edges:
             edge.update()
         g.add_anchors()
-        return g
+        g.relayer()
+        g.y_val_setup()
+        # vis.draw(g, "example3")
+        return g, tvert
 
 
 def cycle_removal(s_g):
@@ -164,8 +167,7 @@ def min_width(s_g, w, c):
             g.add_edge(k, j)
     t = time.time()
     vertex_promotion(g)
-    print("vertex promotion time: ", time.time() - t)
-    return g
+    return g, time.time() - t
 
 
 def promote_vertex(layering, g_dl, v):
