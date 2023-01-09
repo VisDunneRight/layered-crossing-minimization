@@ -13,7 +13,7 @@ def create_bfs_layered_graph(s_g):
     bfs_q.add(first)
     visited[first] = True
     g = graph.LayeredGraph()
-    g.add_node(first, 1)
+    g.add_node(1, name=first)
     layer = 1
     while bfs_q:
         to_explore = bfs_q.copy()
@@ -23,7 +23,7 @@ def create_bfs_layered_graph(s_g):
             for adj in s_g[n]:
                 if not visited[adj]:
                     visited[adj] = True
-                    g.add_node(adj, layer)
+                    g.add_node(layer, name=adj)
                     bfs_q.add(adj)
                     g.add_edge(n, adj)
                 elif adj in bfs_q:
@@ -147,7 +147,7 @@ def min_width(s_g, w, c):
             if all(z_list[v] is True for v in s_g[node]):
                 chosen = True
                 selected = node
-                g.add_node(node, cur_layer)
+                g.add_node(cur_layer, name=node)
                 v_minus_u.remove(node)
                 u_list.append(node)
                 width_cur -= len(s_g[node]) - 1
