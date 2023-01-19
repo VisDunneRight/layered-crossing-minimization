@@ -1,4 +1,6 @@
 import itertools
+import math
+from src.helpers import *
 
 
 class LayeredNode:
@@ -28,39 +30,23 @@ class LayeredEdge:
 
 
 def find_closest(val, taken_vals: set):
-    if round(val) not in taken_vals:
-        return round(val)
+    if round(val, 1) not in taken_vals:
+        return round(val, 1)
     i = 1
-    if abs(val-round(val)) == 0.5:
-        val += 0.001
-    if val < round(val):
+    if val < round(val, 1):
         while True:
-            if round(val - i) not in taken_vals and round(val - i) > 0:
-                return round(val - i)
+            if round(val - i, 1) not in taken_vals and round(val - i, 1) > 0:
+                return round(val - i, 1)
             if round(val + i) not in taken_vals:
-                return round(val + i)
+                return round(val + i, 1)
             i += 1
     else:
         while True:
-            if round(val + i) not in taken_vals:
-                return round(val + i)
-            if round(val - i) not in taken_vals and round(val - i) > 0:
-                return round(val - i)
+            if round(val + i, 1) not in taken_vals:
+                return round(val + i, 1)
+            if round(val - i, 1) not in taken_vals and round(val - i, 1) > 0:
+                return round(val - i, 1)
             i += 1
-
-
-def get_x_var(x_vars_dict, u1, u2):
-    if (u1, u2) in x_vars_dict:
-        return x_vars_dict[u1, u2]
-    else:
-        return 1 - x_vars_dict[u2, u1]
-
-
-def set_x_var(x_vars_dict, u1, u2, val):
-    if (u1, u2) in x_vars_dict:
-        x_vars_dict[u1, u2] = val
-    else:
-        x_vars_dict[u2, u1] = 1 - val
 
 
 class LayeredGraph:
@@ -132,7 +118,7 @@ class LayeredGraph:
         if name is None:
             name = self.n_nodes + 1
         elif name in self.node_names:
-            raise Exception("Name already exists in graph")
+            raise Exception(f"node {name} already exists in graph")
         x = LayeredNode(name, layer, is_anchor=is_anchor, stacked=stacked)
         if layer not in self.layers:
             self.layers[layer] = []
@@ -269,7 +255,7 @@ class LayeredGraph:
         :return: new stacked graph object G', mapping of node ID -> stack node ID in G'
         """
         new_g = LayeredGraph()
-        subgraphs = [[i + 1 for i, asgn in enumerate(subgraph_assignments) if asgn == j] for j in range(max(subgraph_assignments) + 1)]
+        subgraphs = [[i + 1 for i, asgn in enumerate(subgraph_assignments[1:]) if asgn == j] for j in range(max(subgraph_assignments) + 1)]
         # node_to_group = {}
         node_to_stack_node = {}
         stack_node_to_nodelist = {}
@@ -295,7 +281,7 @@ class LayeredGraph:
                 node_to_stack_node[node] = starting_node + (self.node_names[node].layer - min_l)
                 stack_node_to_nodelist[starting_node + (self.node_names[node].layer - min_l)].add(node)
         for edge in self.edges:
-            if subgraph_assignments[edge.n1.name - 1] != subgraph_assignments[edge.n2.name - 1]:
+            if subgraph_assignments[edge.n1.name] != subgraph_assignments[edge.n2.name]:
                 if (node_to_stack_node[edge.n1.name], node_to_stack_node[edge.n2.name]) in new_g.edge_names:
                     new_g.edge_names[node_to_stack_node[edge.n1.name], node_to_stack_node[edge.n2.name]].weight += 1    # TODO fix handling of crossing edges between same stack nodes
                 else:
@@ -305,8 +291,8 @@ class LayeredGraph:
                 if edge.n1.name not in crossing_edges:
                     crossing_edges[edge.n1.name] = []
                 crossing_edges[edge.n1.name].append(edge.n2.name)
-                contact_nodes[subgraph_assignments[edge.n1.name - 1]].append(edge.n1.name)
-                contact_nodes[subgraph_assignments[edge.n2.name - 1]].append(edge.n2.name)
+                contact_nodes[subgraph_assignments[edge.n1.name]].append(edge.n1.name)
+                contact_nodes[subgraph_assignments[edge.n2.name]].append(edge.n2.name)
             else:
                 new_g.edge_names[node_to_stack_node[edge.n1.name], node_to_stack_node[edge.n2.name]].weight += 1
 
@@ -420,6 +406,20 @@ class LayeredGraph:
 
     def barycentric_reordering(self, n_iter):
         adjacency = self.create_normal_adj_list()
+        min_y = min((n.y for n in self.nodes))
+        for node_list in self.layers.values():
+            min_l_y = min((n.y for n in node_list))
+            if min_l_y > min_y:
+                for n in node_list:
+                    n.y -= min_l_y + min_y
+        max_n_nodes = max((len(lay) for lay in self.layers.values()))
+        for node_list in self.layers.values():
+            for n in node_list:
+                n.y += (max_n_nodes - len(node_list)) // 2
+        # print(max(round(((max_n_nodes // 3) + 1) * (math.log10(n_iter)/2)), 1))
+        for node in self.nodes:
+            # node.y *= max(round(((max_n_nodes // 2) + 1) * (math.log(n_iter)/2)), 1)
+            node.y *= 3
         # self.relayer()
         # self.y_val_setup()
         for level in self.layers:
@@ -457,3 +457,28 @@ class LayeredGraph:
                     elif (e1.n1.y > e2.n1.y and e1.n2.y < e2.n2.y) or (e1.n1.y < e2.n1.y and e1.n2.y > e2.n2.y):
                         n_ec += 1
         return n_ec
+
+    def num_edge_crossings_from_xvars_no_sl(self, x_vars):
+        e_b_l = self.get_edges_by_layer()
+        n_ec = 0
+        for edge_list in e_b_l.values():
+            for e1, e2 in itertools.combinations(edge_list, 2):
+                if len({e1.n1, e1.n2, e2.n1, e2.n2}) == 4:
+                    if (get_x_var(x_vars, e1.n1.name, e2.n1.name) and not get_x_var(x_vars, e1.n2.name, e2.n2.name)) or (not get_x_var(x_vars, e1.n1.name, e2.n1.name) and get_x_var(x_vars, e1.n2.name, e2.n2.name)):
+                        n_ec += 1
+        return n_ec
+
+    def assign_y_vals_given_x_vars(self, x_vars):
+        for nd in self.nodes:
+            nd.y = 0
+        for x_var, val in x_vars.items():
+            self[x_var[val]].y += 1
+
+    def wiggle_node(self, x_vars, edge_b_l, node, pos_or_neg):
+        best_seen_n_cr = 0
+        start_x_vars = x_vars.copy()
+        x_vars_changed = x_vars
+        relevant_x_vars = {}
+        for n_other in self.layers[self[node].layer]:
+            if n_other.name != node:
+                relevant_x_vars[node, n_other.name] = get_x_var(x_vars, node, n_other.name)

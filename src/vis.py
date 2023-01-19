@@ -1,9 +1,11 @@
 import cairo
 from src import graph
 import math
+import altair as alt
+from altair_saver import save
 
 
-def draw(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, gravity=False):
+def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, gravity=False):
     offset = 40
     node_radius = 15
     line_width = 4
@@ -20,6 +22,10 @@ def draw(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=1
             if min_l_y > min_y:
                 for n in node_list:
                     n.y -= min_l_y + min_y
+        max_n_nodes = max((len(lay) for lay in g.layers.values()))
+        for node_list in g.layers.values():
+            for n in node_list:
+                n.y += (max_n_nodes - len(node_list)) // 2
     height = max((n.y for n in g.nodes)) * node_y_distance + offset * 2
     if nested:
         surface = cairo.SVGSurface(f"../Images/{svg_name}.svg", width, height)
@@ -52,7 +58,7 @@ def draw(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=1
             if node.stacked:
                 ctx.set_source_rgb(222/256, 23/256, 56/256)
             elif groups is not None:
-                ctx.set_source_rgb(palette[groups[node.name-1]][0], palette[groups[node.name-1]][1], palette[groups[node.name-1]][2])
+                ctx.set_source_rgb(palette[groups[node.name]][0], palette[groups[node.name]][1], palette[groups[node.name]][2])
             else:
                 ctx.set_source_rgb(163/256, 185/256, 182/256)  # light gray-cyan
             if node.is_anchor_node:
@@ -76,6 +82,29 @@ def draw(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=1
                 ctx.show_text(str(node.name))
         else:
             ctx.set_source_rgb(0.2, 0.2, 0.2)
-            ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, line_width//2, 0, 2 * math.pi)
-            # ctx.arc((node.layer - 1)*node_x_distance + offset, node.y*node_y_distance + offset, line_width * 2, 0, 2 * math.pi)
+            # ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, line_width//2, 0, 2 * math.pi)
+            # ctx.fill()
+
+            ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset,
+                    node_radius // 3, 0, 2 * math.pi)
             ctx.fill()
+
+            ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset,
+                    node_radius // 3, 0, 2 * math.pi)
+            ctx.stroke()
+
+
+# data = alt.Data(values=[{'x': 'A', 'y': 5, 'col': 'red'},
+#                         {'x': 'B', 'y': 3, 'col': 'red'},
+#                         {'x': 'C', 'y': 6, 'col': 'blue'},
+#                         {'x': 'D', 'y': 7, 'col': 'blue'},
+#                         {'x': 'E', 'y': 2, 'col': 'red'}])
+
+def draw_altair_scatter(data_points, x_axis, y_axis, color_field, chart_name):
+    data = alt.Data(values=data_points)
+    chart = alt.Chart(data).mark_circle(size=60).encode(
+        x=f'{x_axis}:Q',
+        y=alt.Y(f'{y_axis}:Q'),
+        color=alt.Color(f'{color_field}:N', scale=alt.Scale(scheme='dark2'))
+    )
+    save(chart, f"{chart_name}.svg")

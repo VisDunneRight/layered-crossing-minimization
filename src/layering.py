@@ -3,6 +3,7 @@ import time
 from src import graph, vis
 import re
 import random
+import networkx as nx
 
 
 def create_bfs_layered_graph(s_g):
@@ -76,8 +77,30 @@ def create_better_layered_graph(rome_file, w, c):
         g.add_anchors()
         g.relayer()
         g.y_val_setup()
-        # vis.draw(g, "example3")
+        # vis.draw_graph(g, "example3")
         return g, tvert
+
+
+def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
+    simple_g = {}
+    for node in nxg:
+        simple_g[int(node[1:])+1] = []
+        for adj in nxg[node]:
+            simple_g[int(node[1:])+1].append(int(adj[1:])+1)
+    to_remove = cycle_removal(simple_g)
+    print(to_remove)
+    print(simple_g)
+    for edge in to_remove:
+        simple_g[edge[0]].remove(edge[1])
+    g = min_width(simple_g, w, c)[0]
+    for edge in to_remove:
+        g.add_edge(edge[0], edge[1])
+    for edge in g.edges:
+        edge.update()
+    g.add_anchors()
+    g.relayer()
+    g.y_val_setup()
+    return g
 
 
 def cycle_removal(s_g):
