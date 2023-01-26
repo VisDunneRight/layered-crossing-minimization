@@ -1,7 +1,7 @@
 import os
 import pickle
 import csv
-from src import optimization, read_data
+from src import optimization, read_data, vis
 
 
 def get_list_of_files(storage_file):
@@ -32,15 +32,17 @@ def insert_data(name, entries):
             # f.write(','.join(str(e) for e in entry) + '\n')
 
 
-def read_data_from_file(name):
+def read_data_from_file(name, split_char, header_select=None):
     data = []
     with open("data storage/" + name, 'r') as f:
         l1 = f.readline().removesuffix('\n')
-        for val in l1.split(' '):
-            data.append([int(val) if val.isnumeric() else float(val) if not val.isalpha() else val])
+        headers = [head for head in l1.split(split_char)]
+        # data.append([int(val) if val.isnumeric() else float(val) if not val.isalpha() else val])
         for entry in f.readlines():
-            for i, val in enumerate(entry.removesuffix('\n').split(' ')):
-                data[i].append(int(val) if val.isnumeric() else float(val) if not val.isalpha() else val)
+            if header_select is None:
+                data.append({headers[i]: int(val) if val.isnumeric() else float(val) if val.replace('.', '').isnumeric() else val for i, val in enumerate(entry.removesuffix('\n').split(split_char))})
+            else:
+                data.append({headers[i]: int(val) if val.isnumeric() else float(val) if val.replace('.', '').isnumeric() else val for i, val in enumerate(entry.removesuffix('\n').split(split_char)) if i in header_select})
     return data
 
 
@@ -48,18 +50,20 @@ def baseline_experiment(start_idx, list_of_files):
     pass
 
 
-def independent_var_experiment(file_name):
+def independent_var_experiment(file_name, start_ind):
     results = []
-    for i, file in enumerate(get_list_of_files(file_name)):
-        result = [i, file]
+    for i, file in enumerate(get_list_of_files(file_name)[start_ind:]):
+        print(file)
+        result = [i+start_ind, file]
         g = read_data.read(file)
         result.extend((sum(1 for n in g.nodes if not n.is_anchor_node), len(g.nodes), len(g.edges)))
-        opt = optimization.LayeredOptimizer(g, {"return_full_data": True})
+        opt = optimization.LayeredOptimizer(g, {"return_full_data": True, "cutoff_time": 120})
         result.extend(opt.optimize_layout())
         results.append(result)
         if i % 10 == 0:
             insert_data("independent_var_study.csv", results)
             results.clear()
+    insert_data("independent_var_study.csv", results)
 
 
 def fix_1_var_experiment(start_idx, list_of_files):

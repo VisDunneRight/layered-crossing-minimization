@@ -88,8 +88,6 @@ def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
         for adj in nxg[node]:
             simple_g[int(node[1:])+1].append(int(adj[1:])+1)
     to_remove = cycle_removal(simple_g)
-    print(to_remove)
-    print(simple_g)
     for edge in to_remove:
         simple_g[edge[0]].remove(edge[1])
     g = min_width(simple_g, w, c)[0]

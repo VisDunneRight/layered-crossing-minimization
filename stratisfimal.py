@@ -261,29 +261,41 @@ def fix_1_var_experiment():
     print('\t'.join(optvals2))
 
 
-def write_file_name(filename):
-    with open("data storage/independent_var_study_files", 'a') as f:
+def write_file_name(filename, db):
+    with open(f"data storage/{db}", 'a') as f:
         f.write(filename + '\n')
 
 
-def random_selection_ind_var_study_files():
-    dagmar_folders = ["1.6", "2.6"]
-    rome_folders = [f"graficon{n}nodi" for n in (17, 23, 35, 39, 47, 58, 63, 69, 72, 78, 83, 88)]
-    for fold in dagmar_folders:
-        for file in random.sample(os.listdir(f"DAGmar/graphs/{fold}"), 80):
-            if file[11] == '_' and (fold == "1.6" or file[9] != '8'):
-                write_file_name(f"DAGmar/graphs/{fold}/{file}")
-    for fold in rome_folders:
-        for file in random.sample(os.listdir(f"Rome-Lib/{fold}"), 5):
-            write_file_name(f"Rome-Lib/{fold}/{file}")
-    for file in random.sample(os.listdir("north"), 29):
+def randomly_select_files_for_exp(fname):
+    dagmar_file_nums = random.sample(range(45), 8)
+    dagmar_file_nums.extend(random.sample(range(20), 4))
+    dagmar_files = [f"{1.6 if i < 8 else 2.6}/uniform_n{(k//10)*20+20}_e{(k//10)*32+32 if i < 8 else (k//10)*52+52}_i{k%10}" for i, k in enumerate(dagmar_file_nums)]
+    rome_folds = random.choices(range(15, 90), k=25)
+    rome_files = random.sample(range(50), 25)
+    for file in dagmar_files:
+        write_file_name(f"DAGmar/graphs/{file}", fname)
+    for i, fold in enumerate(rome_folds):
+        file = os.listdir(f"Rome-Lib/graficon{fold}nodi")[rome_files[i]]
+        write_file_name(f"Rome-Lib/graficon{fold}nodi/{file}", fname)
+    for file in random.sample(os.listdir("north"), 13):
         if file != "Graph.log":
-            write_file_name(f"north/{file}")
-    with open("data storage/independent_var_study_files", 'r') as f:
+            write_file_name(f"north/{file}", fname)
+    with open(f"data storage/{fname}", 'r') as f:
         lines = list(f.readlines())
         random.shuffle(lines)
-    with open("data storage/independent_var_study_files", 'w') as f:
+    with open(f"data storage/{fname}", 'w') as f:
         f.writelines(lines)
+
+
+def make_altair_chart_for_ind_var():
+    data = experiments.read_data_from_file("independent_var_study.csv", ',')
+    data = [dat for dat in data if dat["opttime"] < 120 and dat["iterations"] > 0]
+    print(len(data))
+    for dat in data:
+        dat['file'] = dat['file'][:dat['file'].index('/')]
+        dat['xpc'] = dat['xvars'] + dat['cvars']
+    vis.draw_altair_scatter(data, "xpc", "opttime", "file", "X-vars + c-vars", "Time (s)", "Decision variables vs time to optimize")
+    vis.draw_altair_scatter(data, "xpc", "iterations", "file", "X-vars + c-vars", "Simplex iterations", "Decision variables vs iterations")
 
 
 def starting_assignment_experiment():
@@ -292,18 +304,21 @@ def starting_assignment_experiment():
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        # g = read_data.read("DAGmar/graphs/2.6/uniform_n20_e52_i0.graphml")
+        # g = read_data.read("DAGmar/graphs/2.6/uniform_n60_e156_i2.graphml")
+        # g = read_data.read("Rome-Lib/graficon47nodi/grafo7310.47")
         # vis.draw_graph(g, "asdlfjkasldj", gravity=True)
-        # opt = optimization.LayeredOptimizer(g, {"draw_graph": True})
+        # opt = optimization.LayeredOptimizer(g, {})
         # opt.optimize_layout()
+
+        # make_altair_chart_for_ind_var()
+
+        # randomly_select_files_for_exp("experiment_set_50")
 
         # run_my_algorithm()
 
         # transitivity_experiment()
 
-        # experiments.independent_var_experiment("independent_var_study_files")
-
-        random_selection_ind_var_study_files()
+        # experiments.independent_var_experiment("independent_var_study_files", 80)
 
         # run_standard_version()
         # run_test_fix_x_vars()

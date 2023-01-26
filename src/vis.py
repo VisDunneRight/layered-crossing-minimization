@@ -100,11 +100,11 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
 #                         {'x': 'D', 'y': 7, 'col': 'blue'},
 #                         {'x': 'E', 'y': 2, 'col': 'red'}])
 
-def draw_altair_scatter(data_points, x_axis, y_axis, color_field, chart_name):
+def draw_altair_scatter(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name):
     data = alt.Data(values=data_points)
     chart = alt.Chart(data).mark_circle(size=60).encode(
-        x=f'{x_axis}:Q',
-        y=alt.Y(f'{y_axis}:Q'),
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
+        y=alt.Y(f'{y_axis}:Q', scale=alt.Scale(type="log"), axis=alt.Axis(title=y_title)),
         color=alt.Color(f'{color_field}:N', scale=alt.Scale(scheme='dark2'))
     )
-    save(chart, f"{chart_name}.svg")
+    save(chart, f"charts/{chart_name}.svg")

@@ -15,7 +15,7 @@ class LayeredOptimizer:
 		self.bendiness_reduction = parameters["bendiness_reduction"] if "bendiness_reduction" in parameters else False
 		self.gamma_1 = parameters["gamma_1"] if "gamma_1" in parameters else 1
 		self.gamma_2 = parameters["gamma_2"] if "gamma_2" in parameters else 1
-		self.m_val = parameters["m_val"] if "m_val" in parameters else 50
+		self.m_val = parameters["m_val"] if "m_val" in parameters else max(len(layer) for layer in self.g.layers.values())
 		self.sequential_bendiness = parameters["sequential_bendiness"] if "sequential_bendiness" in parameters else True
 		self.transitivity_constraints = parameters["transitivity_constraints"] if "transitivity_constraints" in parameters else False
 		self.return_full_data = parameters["return_full_data"] if "return_full_data" in parameters else False
@@ -23,7 +23,7 @@ class LayeredOptimizer:
 		self.do_subg_reduction = parameters["do_subg_reduction"] if "do_subg_reduction" in parameters else False
 		self.return_x_vars = parameters["return_x_vars"] if "return_x_vars" in parameters else False
 		self.butterfly_reduction = parameters["butterfly_reduction"] if "butterfly_reduction" in parameters else False
-		self.verbose = parameters["verbose"] if "verbose" in parameters else True
+		self.verbose = parameters["verbose"] if "verbose" in parameters else False
 		self.subg_verbose = parameters["subg_verbose"] if "subg_verbose" in parameters else True
 		self.draw_graph = parameters["draw_graph"] if "draw_graph" in parameters else False
 		self.fix_one_var = parameters["fix_one_var"] if "fix_one_var" in parameters else False
@@ -354,6 +354,35 @@ class LayeredOptimizer:
 				n_constr_2 += 8
 		return n_constr_0, n_constr_1, n_constr_2, x_var_usage
 
+	def edge_crossings_junger(self, model: gp.Model, c_vars, x, c, graph_arg=None, track_x_var_usage=False, butterflies=None):
+		g = self.g if graph_arg is None else graph_arg
+		n_constraints = 0
+		x_var_usage = {}
+		for c_var in c_vars:
+			if butterflies is None or c_var not in butterflies:
+				if c_var[0][1] < c_var[1][1]:
+					model.addConstr(c[c_var] + x[c_var[0][1], c_var[1][1]] - x[c_var[0][0], c_var[1][0]] >= 0)
+					model.addConstr(c[c_var] - x[c_var[0][1], c_var[1][1]] + x[c_var[0][0], c_var[1][0]] >= 0)
+					if track_x_var_usage:
+						if (c_var[0][1], c_var[1][1]) not in x_var_usage:
+							x_var_usage[c_var[0][1], c_var[1][1]] = 0
+						if (c_var[0][0], c_var[1][0]) not in x_var_usage:
+							x_var_usage[c_var[0][0], c_var[1][0]] = 0
+						x_var_usage[c_var[0][1], c_var[1][1]] += 1
+						x_var_usage[c_var[0][0], c_var[1][0]] += 1
+				else:
+					model.addConstr(c[c_var] + x[c_var[1][1], c_var[0][1]] + x[c_var[0][0], c_var[1][0]] - 1 >= 0)
+					model.addConstr(c[c_var] - x[c_var[1][1], c_var[0][1]] - x[c_var[0][0], c_var[1][0]] + 1 >= 0)
+					if track_x_var_usage:
+						if (c_var[0][0], c_var[1][0]) not in x_var_usage:
+							x_var_usage[c_var[0][0], c_var[1][0]] = 0
+						if (c_var[1][1], c_var[0][1]) not in x_var_usage:
+							x_var_usage[c_var[1][1], c_var[0][1]] = 0
+						x_var_usage[c_var[0][0], c_var[1][0]] += 1
+						x_var_usage[c_var[1][1], c_var[0][1]] += 1
+				n_constraints += 2
+		return n_constraints, track_x_var_usage
+
 	def compute_variable_assignments(self, x_vars, c_vars):
 		x_assignments = {}
 		c_assignments = {}
@@ -522,7 +551,7 @@ class LayeredOptimizer:
 		# TODO return x_vars (or use self.x_var_assign?), n_crossings, subgraph LayeredGraph objects
 		return n_ec, opt_vals, unconstrained_opt_vals, top_level_optval
 
-	def optimize_layout_standard(self, graph_arg=None, bendiness_reduction=False, assignment=None, return_x_vars=False, heuristic_start=False, transitivity=False, presolve=0, name="graph1", fix_x_vars=None, start_x_vars=None, fix_1_xvar=False, is_subgraph=False, verbose=False, use_top_level_params=False):
+	def optimize_layout_standard(self, graph_arg=None, bendiness_reduction=False, assignment=None, return_x_vars=False, heuristic_start=False, transitivity=False, presolve=0, name="graph1", fix_x_vars=None, start_x_vars=None, fix_1_xvar=False, branch_on_x_vars=False, is_subgraph=False, verbose=False, use_top_level_params=False):
 		g = self.g if graph_arg is None else graph_arg
 
 		t1 = time.time()
@@ -537,15 +566,15 @@ class LayeredOptimizer:
 		""" Add all variables """
 		x_vars = []
 		x_vars_layers = {}
-		# z_vars = []
+		z_vars = []
 		for i, name_list in nodes_by_layer.items():
 			x_vars += list(itertools.combinations(name_list, 2))
-			# z_vars += list(itertools.permutations(name_list, 2))
+			z_vars += list(itertools.permutations(name_list, 2))
 			x_vars_layers[i] = list(itertools.combinations(name_list, 2))
 		# x = m.addVars(x_vars, vtype=GRB.CONTINUOUS, name="x")
 		# k = m.addVars(x_vars, vtype=GRB.CONTINUOUS, name="k")
 		x = m.addVars(x_vars, vtype=GRB.BINARY, name="x")
-		# z = m.addVars(z_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="z")
+		z = m.addVars(z_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="z")
 		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer)
 		c = m.addVars(c_vars, vtype=GRB.CONTINUOUS, name="c")
 		if not (transitivity or (use_top_level_params and self.transitivity_constraints)):
@@ -603,6 +632,13 @@ class LayeredOptimizer:
 		# 			var.start = 1
 		# 		else:
 		# 			var.start = 0
+
+		if branch_on_x_vars:
+			for v in m.getVars():
+				if v.varName[:1] == "x":
+					v.BranchPriority = 1
+				else:
+					v.BranchPriority = 0
 	
 		""" Butterfly reduction """
 		butterfly_c_vars = set()
@@ -667,6 +703,7 @@ class LayeredOptimizer:
 			m.getVarByName(f"x[{most_used_x[0]},{most_used_x[1]}]").ub = 0
 
 		""" Vertical position, implication version """
+		# Uses big-M method: https://support.gurobi.com/hc/en-us/articles/4414392016529-How-do-I-model-conditional-statements-in-Gurobi-
 		if not (transitivity or (use_top_level_params and self.transitivity_constraints)):
 			for x_var in x_vars:
 				m.addGenConstrIndicator(x[x_var], True, y[x_var[0]] + 1 <= y[x_var[1]])
@@ -692,7 +729,7 @@ class LayeredOptimizer:
 		# 	# m.addSOS(GRB.SOS_TYPE1, [k[x_var], x[x_var]])
 		#
 		# 	n_constraints_generated[3] += 10
-	
+
 		""" Non-sequential bendiness reduction, original Stratisfimal version"""
 		if not self.sequential_bendiness and self.bendiness_reduction and not (transitivity or (use_top_level_params and self.transitivity_constraints)):
 			for b_var in b_vars:
@@ -715,6 +752,7 @@ class LayeredOptimizer:
 			self.print_info.append(f"{pre_sym}Constraint counts: {n_constraints_generated}")
 		t2 = time.time()
 		m.optimize()
+		print(m.status)
 		t2 = time.time() - t2
 		if verbose or (use_top_level_params and self.verbose):
 			self.print_info.append(f"{pre_sym}Objective: {m.objVal}")
@@ -761,7 +799,7 @@ class LayeredOptimizer:
 			self.print_info.append(f"{pre_sym}Number of constraints: {n_constraints_generated}")
 			self.print_info.append(f"{pre_sym}{round(t1, 3)}, {round(t2, 3)}, {round(t3, 3)}, {round(t1 + t2 + t3, 3)}")
 
-		print(m.objVal, round(t1 + t2 + t3 + t3, 3), g.num_edge_crossings())
+		print(m.objVal, round(t1 + t2 + t3 + t3, 3))
 
 		if use_top_level_params and self.return_x_vars:
 			return int(m.objVal), self.x_var_assign
