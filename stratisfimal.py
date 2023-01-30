@@ -7,8 +7,10 @@ from pstats import SortKey
 
 import networkx as nx
 
-from src import optimization, vis, layering, motifs, read_data, experiments
+from src import vis, layering, motifs, experiments
 from src.graph import *
+from src.read_data import *
+from src.optimization import LayeredOptimizer
 
 
 def run_all_rome_lib(num_nodes, num_graphs, num_drawings, bendiness_reduction, seq_bend, timelimit, save, savefile=None, shuffle=False, target=None, subgraph_reduction=False):
@@ -44,7 +46,7 @@ def run_optimizer(g: LayeredGraph, bendiness_reduction, sequential, timelimit, s
     params = {"bendiness_raduction": bendiness_reduction, "sequential_bendiness": sequential, "do_subg_reduction": subgraph}
     if len(timelimit) > 0 and int(timelimit) > 0:
         params["cutoff_time"] = int(timelimit)
-    optimizer = optimization.LayeredOptimizer(g, params)
+    optimizer = LayeredOptimizer(g, params)
     optimizer.optimize_layout()
     # return ','.join(str(e) for e in res[0] + res[1])
 
@@ -75,7 +77,7 @@ def run_test_relative_1_to_n():
     to_optimize = os.listdir(f"Rome-Lib/graficon{n_nodes}nodi")[:10]
     for to_opt in to_optimize:
         g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = optimization.LayeredOptimizer(g, {"return_x_vars": True})
+        optimizer = LayeredOptimizer(g, {"return_x_vars": True})
         save_vars, t_orig = optimizer.optimize_layout()
         if t_orig < 55:
             times = []
@@ -100,7 +102,7 @@ def run_test_start_assignments():
     to_optimize = os.listdir(f"Rome-Lib/graficon{n_nodes}nodi")[:10]
     for to_opt in to_optimize:
         g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = optimization.LayeredOptimizer(g, {"return_x_vars": True, "name": to_opt})
+        optimizer = LayeredOptimizer(g, {"return_x_vars": True, "name": to_opt})
         t_orig, save_vars = optimizer.optimize_layout()
         if t_orig < 50:
             times = []
@@ -112,12 +114,12 @@ def run_test_start_assignments():
             while i < len(order) - 30:
                 for j in range(i, min(i + 20, len(order))):
                     current_vars_started[order[j]] = save_vars[order[j]]
-                optimizer = optimization.LayeredOptimizer(g, {})
+                optimizer = LayeredOptimizer(g, {})
                 times.append(optimizer.optimize_with_starting_assignments(current_vars_started))
                 i += 20
             for j in range(i, len(order)):
                 current_vars_started[order[j]] = save_vars[order[j]]
-                optimizer = optimization.LayeredOptimizer(g, {})
+                optimizer = LayeredOptimizer(g, {})
                 times.append(optimizer.optimize_with_starting_assignments(current_vars_started))
             with open("1toN_varstart_experiment.txt", 'a') as f:
                 f.write(str(n_nodes) + " " + str(to_opt[5:9]) + " " + str(t_orig) + " " + " ".join([str(i) for i in times]) + "\n")
@@ -129,12 +131,12 @@ def run_test_start_assignments_with_misleading():
     timeprint = []
     for to_opt in to_optimize:
         g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt})
+        optimizer = LayeredOptimizer(g, {"name": to_opt})
         t_orig = optimizer.optimize_layout()
         print(to_opt, t_orig)
     # for to_opt in to_optimize:
     #     g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-    #     optimizer = optimization.LayeredOptimizer(g, {"return_x_vars": True, "name": to_opt})
+    #     optimizer = LayeredOptimizer(g, {"return_x_vars": True, "name": to_opt})
     #     t_orig, save_vars = optimizer.optimize_layout()
     #     optimizer.return_x_vars = False
     #     optimizer.name = f"{to_opt} full start"
@@ -149,7 +151,7 @@ def run_test_fix_x_vars():
     to_optimize = os.listdir(f"Rome-Lib/graficon{n_nodes}nodi")[:10]
     for to_opt in to_optimize:
         g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt})
+        optimizer = LayeredOptimizer(g, {"name": to_opt})
         t_orig, optval = optimizer.optimize_layout()
         times = []
         vals = []
@@ -167,7 +169,7 @@ def run_my_algorithm():
     to_optimize = os.listdir(f"Rome-Lib/graficon{n_nodes}nodi")[:1]
     for to_opt in to_optimize:
         g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "verbose": True, "do_subg_reduction": True})
+        optimizer = LayeredOptimizer(g, {"name": to_opt, "verbose": True, "do_subg_reduction": True})
         optimizer.optimize_layout()
 
 
@@ -176,7 +178,7 @@ def run_standard_version():
     to_optimize = os.listdir(f"Rome-Lib/graficon{n_nodes}nodi")[22:23]
     for to_opt in to_optimize:
         g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt})
+        optimizer = LayeredOptimizer(g, {"name": to_opt})
         optimizer.optimize_layout()
 
 
@@ -192,7 +194,7 @@ def butterfly_experiment():
     optvals2 = []
     for i, to_opt in enumerate(to_optimize):
         g = layering.create_better_layered_graph(f"graficon{n_nodes[i]}nodi/{to_opt}", 4, 2)[0]
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "butterfly_reduction": True, "verbose": False, "cutoff_time": 100})
+        optimizer = LayeredOptimizer(g, {"name": to_opt, "butterfly_reduction": True, "verbose": False, "cutoff_time": 100})
         a, b = optimizer.optimize_layout()
         times1.append(str(a))
         optvals1.append(str(b))
@@ -218,7 +220,7 @@ def transitivity_experiment():
     optvals2 = []
     for i, to_opt in enumerate(to_optimize):
         g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "transitivity_constraints": True, "verbose": False, "cutoff_time": 100})
+        optimizer = LayeredOptimizer(g, {"name": to_opt, "transitivity_constraints": True, "verbose": False, "cutoff_time": 100})
         a, b = optimizer.optimize_layout()
         times1.append(str(a))
         optvals1.append(str(b))
@@ -244,7 +246,7 @@ def fix_1_var_experiment():
     optvals2 = []
     for to_opt in to_optimize:
         g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "butterfly_reduction": False, "verbose": False, "cutoff_time": 100, "fix_one_var": True})
+        optimizer = LayeredOptimizer(g, {"name": to_opt, "butterfly_reduction": False, "verbose": False, "cutoff_time": 100, "fix_one_var": True})
         a, b = optimizer.optimize_layout()
         times1.append(str(a))
         optvals1.append(str(b))
@@ -269,7 +271,7 @@ def write_file_name(filename, db):
 def randomly_select_files_for_exp(fname):
     dagmar_file_nums = random.sample(range(45), 8)
     dagmar_file_nums.extend(random.sample(range(20), 4))
-    dagmar_files = [f"{1.6 if i < 8 else 2.6}/uniform_n{(k//10)*20+20}_e{(k//10)*32+32 if i < 8 else (k//10)*52+52}_i{k%10}" for i, k in enumerate(dagmar_file_nums)]
+    dagmar_files = [f"{1.6 if i < 8 else 2.6}/uniform_n{(k//10)*20+20}_e{(k//10)*32+32 if i < 8 else (k//10)*52+52}_i{k%10}.graphml" for i, k in enumerate(dagmar_file_nums)]
     rome_folds = random.choices(range(15, 90), k=25)
     rome_files = random.sample(range(50), 25)
     for file in dagmar_files:
@@ -302,13 +304,32 @@ def starting_assignment_experiment():
     pass
 
 
+def record_baseline_info(filename):
+    with open(f"data storage/{filename}", 'r') as f:
+        i = -1
+        for line in f.readlines():
+            i += 1
+            g = read(line.removesuffix('\n'))
+            opt = LayeredOptimizer(g, {})
+            opt.return_full_data = True
+            opt.fix_one_var = True
+            opt.bendiness_reduction = False
+            opt.aggro_presolve = True
+            opt.xvar_branch_priority = True
+            tup = opt.optimize_layout()
+            with open(f"data storage/{filename}_info", 'a') as f2:
+                f2.write(','.join(str(j) for j in [i, line.removesuffix('\n'), sum(1 for nd in g.nodes if not nd.is_anchor_node), len(g.nodes), len(g.edges), round(g.calculate_connectedness(), 3), tup[3], tup[4]]) + '\n')
+
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         # g = read_data.read("DAGmar/graphs/2.6/uniform_n60_e156_i2.graphml")
         # g = read_data.read("Rome-Lib/graficon47nodi/grafo7310.47")
         # vis.draw_graph(g, "asdlfjkasldj", gravity=True)
-        # opt = optimization.LayeredOptimizer(g, {})
+        # opt = LayeredOptimizer(g, {})
         # opt.optimize_layout()
+
+        record_baseline_info("experiment_set_50")
 
         # make_altair_chart_for_ind_var()
 

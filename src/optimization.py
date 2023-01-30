@@ -17,7 +17,7 @@ class LayeredOptimizer:
 		self.gamma_2 = parameters["gamma_2"] if "gamma_2" in parameters else 1
 		self.m_val = parameters["m_val"] if "m_val" in parameters else max(len(layer) for layer in self.g.layers.values())
 		self.sequential_bendiness = parameters["sequential_bendiness"] if "sequential_bendiness" in parameters else True
-		self.transitivity_constraints = parameters["transitivity_constraints"] if "transitivity_constraints" in parameters else False
+		# self.transitivity_constraints = parameters["transitivity_constraints"] if "transitivity_constraints" in parameters else False
 		self.return_full_data = parameters["return_full_data"] if "return_full_data" in parameters else False
 		self.cutoff_time = parameters["cutoff_time"] if "cutoff_time" in parameters else 0
 		self.do_subg_reduction = parameters["do_subg_reduction"] if "do_subg_reduction" in parameters else False
@@ -27,6 +27,14 @@ class LayeredOptimizer:
 		self.subg_verbose = parameters["subg_verbose"] if "subg_verbose" in parameters else True
 		self.draw_graph = parameters["draw_graph"] if "draw_graph" in parameters else False
 		self.fix_one_var = parameters["fix_one_var"] if "fix_one_var" in parameters else False
+		self.heuristic_start = parameters["heuristic_start"] if "heuristic_start" in parameters else False
+		self.aggro_presolve = parameters["presolve"] if "presolve" in parameters else False
+		self.mip_relax = parameters["mip_relax"] if "mip_relax" in parameters else False
+		self.xvar_branch_priority = parameters["priority"] if "priority" in parameters else False
+		self.junger_ec = parameters["junger_ec"] if "junger_ec" in parameters else False
+		self.mirror_vars = parameters["mirror_vars"] if "mirror_vars" in parameters else False
+		self.stratisfimal_y_vars = parameters["stratisfimal_yvars"] if "stratisfimal_yvars" in parameters else False
+		self.indicator_y_constraints = not self.junger_ec and not self.mirror_vars and not self.stratisfimal_y_vars
 		self.name = parameters["name"] if "name" in parameters else "graph1"
 		self.print_info = []
 
@@ -218,7 +226,7 @@ class LayeredOptimizer:
 					n_constr_2 += 8
 		return n_constr_0, n_constr_1, n_constr_2, x_var_usage
 
-	def edge_crossings_2(self, model: gp.Model, c_vars, x, c, graph_arg=None, track_x_var_usage=False, butterflies=None):
+	def edge_crossings_equal_butterfly(self, model: gp.Model, c_vars, x, c, graph_arg=None, track_x_var_usage=False, butterflies=None):
 		g = self.g if graph_arg is None else graph_arg
 		n_constr_0, n_constr_1, n_constr_2 = 0, 0, 0
 		x_var_usage = {}
@@ -565,21 +573,27 @@ class LayeredOptimizer:
 	
 		""" Add all variables """
 		x_vars = []
-		x_vars_layers = {}
+		# x_vars_layers = {}
 		z_vars = []
+		relax_type = GRB.INTEGER if use_top_level_params and not self.mip_relax else GRB.CONTINUOUS
 		for i, name_list in nodes_by_layer.items():
-			x_vars += list(itertools.combinations(name_list, 2))
-			z_vars += list(itertools.permutations(name_list, 2))
-			x_vars_layers[i] = list(itertools.combinations(name_list, 2))
+			if self.mirror_vars:
+				x_vars += list(itertools.permutations(name_list, 2))
+			else:
+				x_vars += list(itertools.combinations(name_list, 2))
+			if self.stratisfimal_y_vars:
+				z_vars += list(itertools.permutations(name_list, 2))
+			# x_vars_layers[i] = list(itertools.combinations(name_list, 2))
 		# x = m.addVars(x_vars, vtype=GRB.CONTINUOUS, name="x")
 		# k = m.addVars(x_vars, vtype=GRB.CONTINUOUS, name="k")
 		x = m.addVars(x_vars, vtype=GRB.BINARY, name="x")
-		z = m.addVars(z_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="z")
+		if self.stratisfimal_y_vars:
+			z = m.addVars(z_vars, vtype=relax_type, lb=0, ub=self.m_val, name="z")
 		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer)
-		c = m.addVars(c_vars, vtype=GRB.CONTINUOUS, name="c")
-		if not (transitivity or (use_top_level_params and self.transitivity_constraints)):
+		c = m.addVars(c_vars, vtype=relax_type, name="c")
+		if self.stratisfimal_y_vars or self.indicator_y_constraints:
 			y_vars = [n.name for n in g]
-			y = m.addVars(y_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="y")
+			y = m.addVars(y_vars, vtype=relax_type, lb=0, ub=self.m_val, name="y")
 		m.update()
 	
 		""" Fix variables """
@@ -604,7 +618,7 @@ class LayeredOptimizer:
 			# 	else:
 			# 		m.getVarByName(f"x[{k[1]},{k[0]}]").Start = 1 - v
 
-		if heuristic_start:
+		if heuristic_start or (use_top_level_params and self.heuristic_start):
 			g_igraph = type_conversions.layered_graph_to_igraph(g)
 			heuristic_layout = g_igraph.layout_sugiyama(layers=g_igraph.vs["layer"])
 			for i, coord in enumerate(heuristic_layout.coords[:g.n_nodes]):
@@ -633,7 +647,7 @@ class LayeredOptimizer:
 		# 		else:
 		# 			var.start = 0
 
-		if branch_on_x_vars:
+		if branch_on_x_vars or (use_top_level_params and self.xvar_branch_priority):
 			for v in m.getVars():
 				if v.varName[:1] == "x":
 					v.BranchPriority = 1
@@ -686,7 +700,8 @@ class LayeredOptimizer:
 			m.setObjective(opt, GRB.MINIMIZE)
 
 		""" Transitivity constraints """
-		if transitivity or (use_top_level_params and self.transitivity_constraints):
+		# if transitivity or (use_top_level_params and self.transitivity_constraints):
+		if self.junger_ec or self.mirror_vars:
 			self.transitivity(m, nodes_by_layer, x_vars, x)
 
 		""" Long-version crossing reduction code """
@@ -704,31 +719,31 @@ class LayeredOptimizer:
 
 		""" Vertical position, implication version """
 		# Uses big-M method: https://support.gurobi.com/hc/en-us/articles/4414392016529-How-do-I-model-conditional-statements-in-Gurobi-
-		if not (transitivity or (use_top_level_params and self.transitivity_constraints)):
+		if self.indicator_y_constraints and not self.stratisfimal_y_vars:
 			for x_var in x_vars:
 				m.addGenConstrIndicator(x[x_var], True, y[x_var[0]] + 1 <= y[x_var[1]])
 				m.addGenConstrIndicator(x[x_var], False, y[x_var[0]] >= 1 + y[x_var[1]])
 				n_constraints_generated[3] += 2
 	
 		""" Original vertical position constraints """
-		# for x_var in x_vars:
-		# 	m.addConstr(z[x_var] - self.m_val * x[x_var] <= 0, f"1.1z{x_var}")
-		# 	m.addConstr(z[x_var] - y[x_var[0]] - (self.m_val * x[x_var]) >= -1 * self.m_val, f"1.2z{x_var}")
-		# 	m.addConstr(y[x_var[1]] - z[x_var] - x[x_var] >= 0, f"1.3z{x_var}")
-		# 	m.addConstr(z[x_var] <= y[x_var[0]], f"1.4z{x_var}")
-		# 	# m.addConstr(z[x_var] >= 0, f"1.5z{x_var}")	# print(f"z{x_var}-{self.m_val}*x{x_var} <= 0"), print(f"y{x_var[1]} - z{x_var} - x{x_var} >= 0")
-		#
-		# 	m.addConstr(z[x_var[1], x_var[0]] - self.m_val * (1 - x[x_var]) <= 0, f"2.1z{x_var}")
-		# 	m.addConstr(z[x_var[1], x_var[0]] - y[x_var[1]] - self.m_val * (1 - x[x_var]) >= -1 * self.m_val,
-		# 				f"2.2z{x_var}")
-		# 	m.addConstr(y[x_var[0]] - z[x_var[1], x_var[0]] - (1 - x[x_var]) >= 0, f"2.3z{x_var}")
-		# 	m.addConstr(z[x_var[1], x_var[0]] <= y[x_var[1]], f"2.4z{x_var}")
-		# 	# m.addConstr(z[x_var[1],x_var[0]] >= 0, f"2.5z{x_var}")	# print(f"z[{x_var[1],x_var[0]}]-{self.m_val}*(1-x{x_var}) <= 0"), print(f"y{x_var[0]} - z[{x_var[1],x_var[0]}] - (1-x{x_var}) >= 0")
-		#
-		# 	# m.addConstr(k[x_var] + x[x_var] - 1 >= 0)  # SOS-constraint version. Use with full LP relaxation
-		# 	# m.addSOS(GRB.SOS_TYPE1, [k[x_var], x[x_var]])
-		#
-		# 	n_constraints_generated[3] += 10
+		if self.stratisfimal_y_vars:
+			for x_var in x_vars:
+				m.addConstr(z[x_var] - self.m_val * x[x_var] <= 0, f"1.1z{x_var}")
+				m.addConstr(z[x_var] - y[x_var[0]] - (self.m_val * x[x_var]) >= -1 * self.m_val, f"1.2z{x_var}")
+				m.addConstr(y[x_var[1]] - z[x_var] - x[x_var] >= 0, f"1.3z{x_var}")
+				m.addConstr(z[x_var] <= y[x_var[0]], f"1.4z{x_var}")
+				# m.addConstr(z[x_var] >= 0, f"1.5z{x_var}")	# print(f"z{x_var}-{self.m_val}*x{x_var} <= 0"), print(f"y{x_var[1]} - z{x_var} - x{x_var} >= 0")
+
+				m.addConstr(z[x_var[1], x_var[0]] - self.m_val * (1 - x[x_var]) <= 0, f"2.1z{x_var}")
+				m.addConstr(z[x_var[1], x_var[0]] - y[x_var[1]] - self.m_val * (1 - x[x_var]) >= -1 * self.m_val, f"2.2z{x_var}")
+				m.addConstr(y[x_var[0]] - z[x_var[1], x_var[0]] - (1 - x[x_var]) >= 0, f"2.3z{x_var}")
+				m.addConstr(z[x_var[1], x_var[0]] <= y[x_var[1]], f"2.4z{x_var}")
+				# m.addConstr(z[x_var[1],x_var[0]] >= 0, f"2.5z{x_var}")	# print(f"z[{x_var[1],x_var[0]}]-{self.m_val}*(1-x{x_var}) <= 0"), print(f"y{x_var[0]} - z[{x_var[1],x_var[0]}] - (1-x{x_var}) >= 0")
+
+				# m.addConstr(k[x_var] + x[x_var] - 1 >= 0)  # SOS-constraint version. Use with full LP relaxation
+				# m.addSOS(GRB.SOS_TYPE1, [k[x_var], x[x_var]])
+
+				n_constraints_generated[3] += 10
 
 		""" Non-sequential bendiness reduction, original Stratisfimal version"""
 		if not self.sequential_bendiness and self.bendiness_reduction and not (transitivity or (use_top_level_params and self.transitivity_constraints)):
@@ -743,8 +758,8 @@ class LayeredOptimizer:
 		m.setParam("OutputFlag", 0)
 		# m.setParam("LogFile", "standard_log")
 		# m.setParam("LogToConsole", 0)
-		if presolve > 0:
-			m.setParam("Presolve", presolve)
+		if self.aggro_presolve:
+			m.setParam("Presolve", 2)
 		n_constraints_generated[5] = sum(n_constraints_generated[:5])
 		t1 = time.time() - t1
 		if verbose or (use_top_level_params and self.verbose):
@@ -752,7 +767,7 @@ class LayeredOptimizer:
 			self.print_info.append(f"{pre_sym}Constraint counts: {n_constraints_generated}")
 		t2 = time.time()
 		m.optimize()
-		print(m.status)
+		# print(m.status)
 		t2 = time.time() - t2
 		if verbose or (use_top_level_params and self.verbose):
 			self.print_info.append(f"{pre_sym}Objective: {m.objVal}")
@@ -781,18 +796,17 @@ class LayeredOptimizer:
 				self.print_info.append(f"{pre_sym}Time to perform bendiness reduction: {t3}")
 		else:
 			t3 = 0
+			# if transitivity or (use_top_level_params and self.transitivity_constraints):
+			# 	if use_top_level_params:
+			# 		g.assign_y_vals_given_x_vars(self.x_var_assign)
+			# 	else:
+			# 		g.assign_y_vals_given_x_vars(x_vars_opt)
 			for v in m.getVars():
 				if v.varName[:1] == "y":
 					g[int(v.varName[2:v.varName.index(']')])].y = float(v.x)
 
 		if self.draw_graph:
 			vis.draw_graph(g, "interim")
-
-		if transitivity or (use_top_level_params and self.transitivity_constraints):
-			if use_top_level_params:
-				g.assign_y_vals_given_x_vars(self.x_var_assign)
-			else:
-				g.assign_y_vals_given_x_vars(x_vars_opt)
 
 		if verbose or (use_top_level_params and self.verbose):
 			self.print_info.append(f"{pre_sym}Final edge crossing count: {g.num_edge_crossings()}")

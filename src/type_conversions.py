@@ -29,5 +29,5 @@ def dagmar_nx_to_layered_graph(nxg: nx.Graph):
 	return g
 
 
-def north_nx_to_layered_graph(nxg: nx.Graph):
-	return layering.create_layered_graph_from_directed_nx_graph(nxg, 4, 2)
+def north_nx_to_layered_graph(nxg: nx.Graph, w, c):
+	return layering.create_layered_graph_from_directed_nx_graph(nxg, w, c)

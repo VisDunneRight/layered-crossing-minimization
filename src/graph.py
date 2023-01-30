@@ -474,6 +474,12 @@ class LayeredGraph:
         for x_var, val in x_vars.items():
             self[x_var[val]].y += 1
 
+    def calculate_connectedness(self):
+        max_connectedness = 0
+        for l_num in sorted(list(self.layers.keys()))[:-1]:
+            max_connectedness += len(self.layers[l_num]) * len(self.layers[l_num + 1])
+        return len(self.edges) / max_connectedness
+
     def wiggle_node(self, x_vars, edge_b_l, node, pos_or_neg):
         best_seen_n_cr = 0
         start_x_vars = x_vars.copy()
