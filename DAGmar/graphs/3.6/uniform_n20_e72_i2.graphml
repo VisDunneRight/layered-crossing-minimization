@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+    <key id="level" for="node" attr.name="hierarchy.level" attr.type="int" />
+    <graph edgedefault="directed">
+        <node id="n0">
+            <data key="level">1</data>
+        </node>
+        <node id="n1">
+            <data key="level">3</data>
+        </node>
+        <node id="n2">
+            <data key="level">1</data>
+        </node>
+        <node id="n3">
+            <data key="level">2</data>
+        </node>
+        <node id="n4">
+            <data key="level">3</data>
+        </node>
+        <node id="n5">
+            <data key="level">0</data>
+        </node>
+        <node id="n6">
+            <data key="level">3</data>
+        </node>
+        <node id="n7">
+            <data key="level">2</data>
+        </node>
+        <node id="n8">
+            <data key="level">0</data>
+        </node>
+        <node id="n9">
+            <data key="level">0</data>
+        </node>
+        <node id="n10">
+            <data key="level">1</data>
+        </node>
+        <node id="n11">
+            <data key="level">3</data>
+        </node>
+        <node id="n12">
+            <data key="level">2</data>
+        </node>
+        <node id="n13">
+            <data key="level">3</data>
+        </node>
+        <node id="n14">
+            <data key="level">1</data>
+        </node>
+        <node id="n15">
+            <data key="level">0</data>
+        </node>
+        <node id="n16">
+            <data key="level">3</data>
+        </node>
+        <node id="n17">
+            <data key="level">2</data>
+        </node>
+        <node id="n18">
+            <data key="level">1</data>
+        </node>
+        <node id="n19">
+            <data key="level">2</data>
+        </node>
+        <edge source="n0" target="n12" />
+        <edge source="n0" target="n13" />
+        <edge source="n0" target="n19" />
+        <edge source="n0" target="n7" />
+        <edge source="n0" target="n3" />
+        <edge source="n0" target="n4" />
+        <edge source="n2" target="n19" />
+        <edge source="n2" target="n6" />
+        <edge source="n2" target="n11" />
+        <edge source="n2" target="n17" />
+        <edge source="n2" target="n4" />
+        <edge source="n2" target="n13" />
+        <edge source="n3" target="n11" />
+        <edge source="n3" target="n16" />
+        <edge source="n3" target="n1" />
+        <edge source="n3" target="n13" />
+        <edge source="n5" target="n12" />
+        <edge source="n5" target="n14" />
+        <edge source="n5" target="n3" />
+        <edge source="n5" target="n13" />
+        <edge source="n7" target="n11" />
+        <edge source="n7" target="n16" />
+        <edge source="n8" target="n2" />
+        <edge source="n8" target="n0" />
+        <edge source="n8" target="n19" />
+        <edge source="n8" target="n1" />
+        <edge source="n8" target="n4" />
+        <edge source="n8" target="n10" />
+        <edge source="n8" target="n14" />
+        <edge source="n8" target="n6" />
+        <edge source="n9" target="n2" />
+        <edge source="n9" target="n17" />
+        <edge source="n9" target="n19" />
+        <edge source="n9" target="n7" />
+        <edge source="n9" target="n1" />
+        <edge source="n9" target="n16" />
+        <edge source="n9" target="n0" />
+        <edge source="n10" target="n6" />
+        <edge source="n10" target="n19" />
+        <edge source="n10" target="n17" />
+        <edge source="n10" target="n3" />
+        <edge source="n10" target="n11" />
+        <edge source="n10" target="n1" />
+        <edge source="n12" target="n1" />
+        <edge source="n12" target="n11" />
+        <edge source="n12" target="n4" />
+        <edge source="n12" target="n13" />
+        <edge source="n14" target="n16" />
+        <edge source="n14" target="n3" />
+        <edge source="n14" target="n12" />
+        <edge source="n14" target="n6" />
+        <edge source="n14" target="n17" />
+        <edge source="n15" target="n12" />
+        <edge source="n15" target="n6" />
+        <edge source="n15" target="n18" />
+        <edge source="n15" target="n7" />
+        <edge source="n15" target="n17" />
+        <edge source="n15" target="n2" />
+        <edge source="n15" target="n1" />
+        <edge source="n17" target="n13" />
+        <edge source="n17" target="n1" />
+        <edge source="n17" target="n16" />
+        <edge source="n18" target="n11" />
+        <edge source="n18" target="n7" />
+        <edge source="n18" target="n12" />
+        <edge source="n18" target="n19" />
+        <edge source="n18" target="n16" />
+        <edge source="n18" target="n3" />
+        <edge source="n18" target="n6" />
+        <edge source="n19" target="n11" />
+        <edge source="n19" target="n13" />
+        <edge source="n19" target="n6" />
+    </graph>
+</graphml>
