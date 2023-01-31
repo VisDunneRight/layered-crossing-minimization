@@ -304,10 +304,10 @@ def starting_assignment_experiment():
     pass
 
 
-def record_baseline_info(filename):
+def record_baseline_info(filename, start_idx):
     with open(f"data storage/{filename}", 'r') as f:
-        i = -1
-        for line in f.readlines():
+        i = start_idx - 1
+        for line in f.readlines()[start_idx:]:
             i += 1
             g = read(line.removesuffix('\n'))
             opt = LayeredOptimizer(g, {})
@@ -329,7 +329,7 @@ if __name__ == '__main__':
         # opt = LayeredOptimizer(g, {})
         # opt.optimize_layout()
 
-        record_baseline_info("experiment_set_50")
+        record_baseline_info("experiment_set_50", 50)
 
         # make_altair_chart_for_ind_var()
 

@@ -29,7 +29,6 @@ def insert_data(name, entries):
         wrt = csv.writer(f)
         for entry in entries:
             wrt.writerow(entry)
-            # f.write(','.join(str(e) for e in entry) + '\n')
 
 
 def read_data_from_file(name, split_char, header_select=None):
@@ -46,8 +45,20 @@ def read_data_from_file(name, split_char, header_select=None):
     return data
 
 
-def baseline_experiment(start_idx, list_of_files):
-    pass
+def baseline_experiment(start_idx, filename):
+    with open(filename, 'r') as f:
+        gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
+    for to_opt in gfiles[start_idx:]:
+        g = read_data.read(to_opt)
+        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "cutoff_time": 600, "return_experiment_data": True, "stratisfimal_yvars": True})
+        result = optimizer.optimize_layout()
+        insert_data("strat_baseline.csv", [result])
+        optimizer.junger_ec, optimizer.stratisfimal_y_vars = True, False
+        result = optimizer.optimize_layout()
+        insert_data("junger_baseline.csv", [result])
+        optimizer.mirror_vars, optimizer.junger_ec = True, False
+        result = optimizer.optimize_layout()
+        insert_data("sankey_baseline.csv", [result])
 
 
 def independent_var_experiment(file_name, start_ind):
@@ -66,33 +77,44 @@ def independent_var_experiment(file_name, start_ind):
     insert_data("independent_var_study.csv", results)
 
 
-def fix_1_var_experiment(start_idx, list_of_files):
-    n_nodes = 67
-    to_optimize = os.listdir(f"Rome-Lib/graficon{n_nodes}nodi")[:10]
-    times1 = []
-    optvals1 = []
-    times2 = []
-    optvals2 = []
-    e_by_n = []
-    for to_opt in list_of_files:
+def fix_1_var_experiment(start_idx, filename):
+    with open(filename, 'r') as f:
+        gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
+    for to_opt in gfiles[start_idx:]:
         g = read_data.read(to_opt)
-        e_by_n.append(len(g.edges) / len(g.nodes))
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "butterfly_reduction": False, "verbose": False, "cutoff_time": 100, "fix_one_var": True})
-        a, b = optimizer.optimize_layout()
-        times1.append(a)
-        optvals1.append(b)
-        optimizer.fix_one_var = False
-        a, b = optimizer.optimize_layout()
-        times2.append(a)
-        optvals2.append(b)
-    values = []
-    for i, v in enumerate(times1):
-        values.append({'#edges/#nodes': e_by_n[i], 'Runtime': v, 'Fix 1 Var': 'Yes'})
-        values.append({'#edges/#nodes': e_by_n[i], 'Runtime': times2[i], 'Fix 1 Var': 'No'})
-    # data = alt.Data(values=values)
-    # chart = alt.Chart(data).mark_circle(size=60).encode(
-    #     x='#edges/#nodes:Q',
-    #     y=alt.Y('Runtime:Q', scale=alt.Scale(type='log')),
-    #     color=alt.Color('Fix 1 Var:N', scale=alt.Scale(scheme='dark2'))
-    # )
-    # save(chart, "testing1234.svg")
+        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "cutoff_time": 600, "fix_one_var": True, "return_experiment_data": True, "stratisfimal_yvars": True})
+        result = optimizer.optimize_layout()
+        insert_data("strat_fix1.csv", [result])
+        optimizer.junger_ec, optimizer.stratisfimal_y_vars = True, False
+        result = optimizer.optimize_layout()
+        insert_data("junger_fix1.csv", [result])
+        optimizer.mirror_vars, optimizer.junger_ec = True, False
+        result = optimizer.optimize_layout()
+        insert_data("sankey_fix1.csv", [result])
+
+
+def run_experiment(start_idx, graphs_file, exp_name, param_to_set, increment_var):
+    with open(graphs_file, 'r') as f:
+        gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
+    for to_opt in gfiles[start_idx:]:
+        g = read_data.read(to_opt)
+        optimizer = optimization.LayeredOptimizer(g, {"cutoff_time": 600, "return_experiment_data": True, "stratisfimal_yvars": True, param_to_set: True})
+        result = optimizer.optimize_layout()
+        insert_data(f"strat_{exp_name}.csv", [result])
+        optimizer.junger_ec, optimizer.stratisfimal_y_vars = True, False
+        result = optimizer.optimize_layout()
+        insert_data(f"junger_{exp_name}.csv", [result])
+        optimizer.mirror_vars, optimizer.junger_ec = True, False
+        result = optimizer.optimize_layout()
+        insert_data(f"sankey_{exp_name}.csv", [result])
+        increment_var += 1
+
+
+def experiment():
+    n_complete = 0
+    while n_complete < 50:
+        try:
+            run_experiment(n_complete, "data storage/experiment_set_50", "", "", n_complete)
+        except Exception:
+            print(f"Skipping {n_complete}")
+            n_complete += 1

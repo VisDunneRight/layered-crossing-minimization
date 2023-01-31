@@ -35,6 +35,7 @@ class LayeredOptimizer:
 		self.mirror_vars = parameters["mirror_vars"] if "mirror_vars" in parameters else False
 		self.stratisfimal_y_vars = parameters["stratisfimal_yvars"] if "stratisfimal_yvars" in parameters else False
 		self.indicator_y_constraints = not self.junger_ec and not self.mirror_vars and not self.stratisfimal_y_vars
+		self.return_experiment_data = parameters["return_experiment_data"] if "return_experiment_data" in parameters else False
 		self.name = parameters["name"] if "name" in parameters else "graph1"
 		self.print_info = []
 
@@ -84,12 +85,16 @@ class LayeredOptimizer:
 
 	def transitivity(self, model: gp.Model, names_by_layer, x_vars, x):
 		for x_vars_list in names_by_layer.values():
-			for x_1, x_2, x_3 in itertools.permutations(x_vars_list, 3):
-				x1const, x11, x12 = get_x_var_consts(x_vars, x_1, x_2)
-				x2const, x21, x22 = get_x_var_consts(x_vars, x_2, x_3)
-				x3const, x31, x32 = get_x_var_consts(x_vars, x_1, x_3)
-				model.addConstr(x1const * x[x11, x12] + x2const * x[x21, x22] - x3const * x[x31, x32] + (1 - x1const)//2 + (1 - x2const)//2 - (1 - x3const)//2 >= 0)
-				# model.addConstr(-1 * x1const * x[x11, x12] - x2const * x[x21, x22] + x3const * x[x31, x32] - (1 - x1const)//2 - (1 - x2const)//2 + (1 - x3const)//2 >= -1)
+			for x_1, x_2, x_3 in itertools.combinations(x_vars_list, 3):
+				if self.mirror_vars:
+					model.addConstr(x[x_1, x_2] + x[x_2, x_3] - x[x_1, x_3] >= 0)
+					model.addConstr(x[x_1, x_3] - x[x_1, x_2] - x[x_2, x_3] >= -1)
+				else:
+					x1const, x11, x12 = get_x_var_consts(x_vars, x_1, x_2)
+					x2const, x21, x22 = get_x_var_consts(x_vars, x_2, x_3)
+					x3const, x31, x32 = get_x_var_consts(x_vars, x_1, x_3)
+					model.addConstr(x1const * x[x11, x12] + x2const * x[x21, x22] - x3const * x[x31, x32] + (1 - x1const)//2 + (1 - x2const)//2 - (1 - x3const)//2 >= 0)
+					model.addConstr(-1 * x1const * x[x11, x12] - x2const * x[x21, x22] + x3const * x[x31, x32] - (1 - x1const)//2 - (1 - x2const)//2 + (1 - x3const)//2 >= -1)
 
 	def edge_crossings(self, model: gp.Model, c_vars, x, c, graph_arg=None, track_x_var_usage=False, butterflies=None):
 		g = self.g if graph_arg is None else graph_arg
@@ -746,7 +751,8 @@ class LayeredOptimizer:
 				n_constraints_generated[3] += 10
 
 		""" Non-sequential bendiness reduction, original Stratisfimal version"""
-		if not self.sequential_bendiness and self.bendiness_reduction and not (transitivity or (use_top_level_params and self.transitivity_constraints)):
+		# if not self.sequential_bendiness and self.bendiness_reduction and not (transitivity or (use_top_level_params and self.transitivity_constraints)):
+		if not self.sequential_bendiness and self.bendiness_reduction:
 			for b_var in b_vars:
 				m.addConstr(y[b_var[0]] - y[b_var[1]] <= b[b_var], f"1bend{b_var}")
 				m.addConstr(y[b_var[1]] - y[b_var[0]] <= b[b_var], f"2bend{b_var}")
@@ -819,6 +825,9 @@ class LayeredOptimizer:
 			return int(m.objVal), self.x_var_assign
 		elif return_x_vars:
 			return int(m.objVal), x_vars_opt
+
+		if self.return_experiment_data:
+			return len(x_vars), len(c_vars), m.numVars, m.numConstrs, round(m.objVal), round(m.runtime, 3), m.nodeCount
 
 		if self.return_full_data:
 			return len(x_vars), len(c_vars), n_cs[0], motifs.count_butterflies(g), round(m.objVal), round(t1 + t2 + t3 + t3, 3), round(m.runtime, 3), int(m.iterCount)
