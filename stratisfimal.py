@@ -323,13 +323,18 @@ def record_baseline_info(filename, start_idx):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        # g = read_data.read("DAGmar/graphs/2.6/uniform_n60_e156_i2.graphml")
-        # g = read_data.read("Rome-Lib/graficon47nodi/grafo7310.47")
-        # vis.draw_graph(g, "asdlfjkasldj", gravity=True)
-        # opt = LayeredOptimizer(g, {})
-        # opt.optimize_layout()
+        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="fix1var", param_to_set="fix_one_var", clear_files=True)
+        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="heuristic_start", param_to_set="heuristic_start", clear_files=True)
+        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="butterfly", param_to_set="butterfly_reduction", clear_files=True)
+        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="presolve", param_to_set="presolve", clear_files=True)
+        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="xvar_branch", param_to_set="priority", clear_files=True)
+        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="mip_relax", param_to_set="mip_relax", clear_files=True)
 
-        record_baseline_info("experiment_set_50", 50)
+        g = read("Rome-Lib/graficon17nodi/grafo224.17")
+        opt = LayeredOptimizer(g, {"priority": True, "strat_big_m": True})
+        opt.optimize_layout()
+
+        # record_baseline_info("experiment_set_50", 50)
 
         # make_altair_chart_for_ind_var()
 

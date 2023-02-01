@@ -31,6 +31,17 @@ def insert_data(name, entries):
             wrt.writerow(entry)
 
 
+def insert_one(name, entry):
+    with open("data storage/" + name, 'a', newline='') as f:
+        wrt = csv.writer(f)
+        wrt.writerow(entry)
+
+
+def clear_file(name):
+    f = open(f"data storage/{name}", 'w')
+    f.close()
+
+
 def read_data_from_file(name, split_char, header_select=None):
     data = []
     with open("data storage/" + name, 'r') as f:
@@ -93,28 +104,36 @@ def fix_1_var_experiment(start_idx, filename):
         insert_data("sankey_fix1.csv", [result])
 
 
-def run_experiment(start_idx, graphs_file, exp_name, param_to_set, increment_var):
+def run_experiment(start_idx, graphs_file, exp_name, param_to_set, clear_files):
     with open(graphs_file, 'r') as f:
         gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
-    for to_opt in gfiles[start_idx:]:
+    if clear_files:
+        clear_file(f"junger_basic/{exp_name}.csv")
+        clear_file(f"strat_big_m/{exp_name}.csv")
+        clear_file(f"redundancy/{exp_name}.csv")
+        insert_one(f"junger_basic/{exp_name}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Nodes visited"])
+        insert_one(f"strat_big_m/{exp_name}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Nodes visited"])
+        insert_one(f"redundancy/{exp_name}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Nodes visited"])
+    for i, to_opt in enumerate(gfiles[start_idx:]):
+        print(f"{i+start_idx+1} / {len(gfiles)}")
         g = read_data.read(to_opt)
-        optimizer = optimization.LayeredOptimizer(g, {"cutoff_time": 600, "return_experiment_data": True, "stratisfimal_yvars": True, param_to_set: True})
+        optimizer = optimization.LayeredOptimizer(g, {"cutoff_time": 300, "return_experiment_data": True, "junger_trans": True, param_to_set: True})
         result = optimizer.optimize_layout()
-        insert_data(f"strat_{exp_name}.csv", [result])
-        optimizer.junger_ec, optimizer.stratisfimal_y_vars = True, False
+        insert_one(f"junger_basic/{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
+        optimizer.junger_trans, optimizer.strat_big_m = False, True
         result = optimizer.optimize_layout()
-        insert_data(f"junger_{exp_name}.csv", [result])
-        optimizer.mirror_vars, optimizer.junger_ec = True, False
+        insert_one(f"strat_big_m/{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
+        optimizer.junger_trans = True
         result = optimizer.optimize_layout()
-        insert_data(f"sankey_{exp_name}.csv", [result])
-        increment_var += 1
+        insert_one(f"redundancy/{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
 
 
-def experiment():
-    n_complete = 0
-    while n_complete < 50:
-        try:
-            run_experiment(n_complete, "data storage/experiment_set_50", "", "", n_complete)
-        except Exception:
-            print(f"Skipping {n_complete}")
-            n_complete += 1
+def make_altair_chart_for_ind_var():
+    data = read_data_from_file("independent_var_study.csv", ',')
+    data = [dat for dat in data if dat["opttime"] > 0]
+    print(len(data))
+    for dat in data:
+        dat['file'] = dat['file'][:dat['file'].index('/')]
+        dat['xpc'] = dat['xvars'] + dat['cvars']
+    vis.draw_altair_scatter(data, "xpc", "opttime", "file", "X-vars + c-vars", "Time (s)", "Decision variables vs time to optimize")
+    vis.draw_altair_scatter(data, "xpc", "iterations", "file", "X-vars + c-vars", "Simplex iterations", "Decision variables vs iterations")
