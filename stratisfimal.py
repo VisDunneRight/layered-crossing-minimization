@@ -329,10 +329,13 @@ if __name__ == '__main__':
         # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="presolve", param_to_set="presolve", clear_files=True)
         # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="xvar_branch", param_to_set="priority", clear_files=True)
         # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="mip_relax", param_to_set="mip_relax", clear_files=True)
+        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="mirror_vars", param_to_set="mirror_vars", clear_files=True)
 
-        g = read("Rome-Lib/graficon17nodi/grafo224.17")
-        opt = LayeredOptimizer(g, {"priority": True, "strat_big_m": True})
-        opt.optimize_layout()
+        experiments.make_altair_chart_all_three("baseline")
+
+        # g = read("Rome-Lib/graficon17nodi/grafo224.17")
+        # opt = LayeredOptimizer(g, {"priority": True, "strat_big_m": True})
+        # opt.optimize_layout()
 
         # record_baseline_info("experiment_set_50", 50)
 

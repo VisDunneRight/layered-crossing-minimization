@@ -3,14 +3,20 @@ import itertools
 from src import graph
 
 
-def normal_c_vars(g: graph.LayeredGraph, edges_by_layer):
+def normal_c_vars(g: graph.LayeredGraph, edges_by_layer, mirror_vars):
     c_vars = []
     constants = []
     for i, edge_list in edges_by_layer.items():
-        for pr in itertools.combinations(edge_list, 2):
-            if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
-                c_vars.append(pr)
-                constants.append(g.edge_names[pr[0]].weight * g.edge_names[pr[1]].weight)
+        if mirror_vars:
+            for pr in itertools.permutations(edge_list, 2):
+                if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
+                    c_vars.append(pr)
+                    constants.append(g.edge_names[pr[0]].weight * g.edge_names[pr[1]].weight)
+        else:
+            for pr in itertools.combinations(edge_list, 2):
+                if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
+                    c_vars.append(pr)
+                    constants.append(g.edge_names[pr[0]].weight * g.edge_names[pr[1]].weight)
     return c_vars, constants
 
 

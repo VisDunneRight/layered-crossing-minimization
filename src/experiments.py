@@ -56,6 +56,11 @@ def read_data_from_file(name, split_char, header_select=None):
     return data
 
 
+def tag_data(data_list, tagname, tag):
+    for data in data_list:
+        data[tagname] = tag
+
+
 def baseline_experiment(start_idx, filename):
     with open(filename, 'r') as f:
         gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
@@ -128,12 +133,40 @@ def run_experiment(start_idx, graphs_file, exp_name, param_to_set, clear_files):
         insert_one(f"redundancy/{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
 
 
-def make_altair_chart_for_ind_var():
-    data = read_data_from_file("independent_var_study.csv", ',')
-    data = [dat for dat in data if dat["opttime"] > 0]
-    print(len(data))
-    for dat in data:
-        dat['file'] = dat['file'][:dat['file'].index('/')]
-        dat['xpc'] = dat['xvars'] + dat['cvars']
-    vis.draw_altair_scatter(data, "xpc", "opttime", "file", "X-vars + c-vars", "Time (s)", "Decision variables vs time to optimize")
-    vis.draw_altair_scatter(data, "xpc", "iterations", "file", "X-vars + c-vars", "Simplex iterations", "Decision variables vs iterations")
+def run_multi_param_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_files):
+    with open(graphs_file, 'r') as f:
+        gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
+    if clear_files:
+        clear_file(f"junger_basic/{exp_name}.csv")
+        clear_file(f"strat_big_m/{exp_name}.csv")
+        clear_file(f"redundancy/{exp_name}.csv")
+        insert_one(f"junger_basic/{exp_name}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Nodes visited"])
+        insert_one(f"strat_big_m/{exp_name}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Nodes visited"])
+        insert_one(f"redundancy/{exp_name}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Nodes visited"])
+    for i, to_opt in enumerate(gfiles[start_idx:]):
+        print(f"{i+start_idx+1} / {len(gfiles)}")
+        g = read_data.read(to_opt)
+        params = {param: True for param in params_to_set}
+        params.update({"cutoff_time": 300, "return_experiment_data": True, "junger_trans": True})
+        optimizer = optimization.LayeredOptimizer(g, params)
+        result = optimizer.optimize_layout()
+        insert_one(f"junger_basic/{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
+        optimizer.junger_trans, optimizer.strat_big_m = False, True
+        result = optimizer.optimize_layout()
+        insert_one(f"strat_big_m/{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
+        optimizer.junger_trans = True
+        result = optimizer.optimize_layout()
+        insert_one(f"redundancy/{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
+
+
+def make_altair_chart_all_three(experiment_name):
+    full_data = []
+    for formulation in ["junger_basic", "strat_big_m", "redundancy"]:
+        data = read_data_from_file(f"{formulation}/{experiment_name}.csv", ',')
+        data = [dat for dat in data if dat["Opttime"] > 0]
+        tag_data(data, "formulation", formulation)
+        full_data.extend(data)
+    info = read_data_from_file("experiment_set_50_info.csv", ',')
+    for data_pt in full_data:
+        data_pt["Total nodes"] = info[data_pt["Index"] - 1]["Total Nodes"]
+    vis.draw_altair_scatter(data, x_axis="Total nodes", y_axis="Opttime", color_field="formulation", x_title="Nodes", y_title="Time (s)", chart_name="Total nodes vs. time to optimize", log_y_scale=True, plot_loess=True, loess_features=["junger_basic", "strat_big_m", "redundancy"])

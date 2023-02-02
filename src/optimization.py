@@ -651,7 +651,7 @@ class LayeredOptimizer:
 		x = m.addVars(x_vars, vtype=GRB.BINARY, name="x")
 		if self.stratisfimal_y_vars:
 			z = m.addVars(z_vars, vtype=relax_type, lb=0, ub=self.m_val, name="z")
-		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer)
+		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars)
 		c = m.addVars(c_vars, vtype=relax_type, name="c")
 		if self.strat_big_m:
 			y_vars = [n.name for n in g]
