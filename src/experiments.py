@@ -159,6 +159,22 @@ def run_multi_param_experiment(start_idx, graphs_file, exp_name, params_to_set, 
         insert_one(f"redundancy/{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
 
 
+def run_one_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_files):
+    with open(graphs_file, 'r') as f:
+        gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
+    if clear_files:
+        clear_file(f"{exp_name}.csv")
+        insert_one(f"{exp_name}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Nodes visited"])
+    for i, to_opt in enumerate(gfiles[start_idx:]):
+        print(f"{i+start_idx+1} / {len(gfiles)}")
+        g = read_data.read(to_opt)
+        params = {param: True for param in params_to_set}
+        params.update({"cutoff_time": 300, "return_experiment_data": True})
+        optimizer = optimization.LayeredOptimizer(g, params)
+        result = optimizer.optimize_layout()
+        insert_one(f"{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
+
+
 def make_altair_chart_all_three(experiment_name):
     full_data = []
     for formulation in ["junger_basic", "strat_big_m", "redundancy"]:
