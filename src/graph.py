@@ -30,22 +30,22 @@ class LayeredEdge:
 
 
 def find_closest(val, taken_vals: set):
-    if round(val, 1) not in taken_vals:
-        return round(val, 1)
+    if round(val) not in taken_vals:
+        return round(val)
     i = 1
-    if val < round(val, 1):
+    if val < round(val):
         while True:
-            if round(val - i, 1) not in taken_vals and round(val - i, 1) > 0:
-                return round(val - i, 1)
+            if round(val - i) not in taken_vals and round(val - i) > 0:
+                return round(val - i)
             if round(val + i) not in taken_vals:
-                return round(val + i, 1)
+                return round(val + i)
             i += 1
     else:
         while True:
-            if round(val + i, 1) not in taken_vals:
-                return round(val + i, 1)
-            if round(val - i, 1) not in taken_vals and round(val - i, 1) > 0:
-                return round(val - i, 1)
+            if round(val + i) not in taken_vals:
+                return round(val + i)
+            if round(val - i) not in taken_vals and round(val - i) > 0:
+                return round(val - i)
             i += 1
 
 

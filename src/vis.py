@@ -82,16 +82,16 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
                 ctx.show_text(str(node.name))
         else:
             ctx.set_source_rgb(0.2, 0.2, 0.2)
-            # ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, line_width//2, 0, 2 * math.pi)
-            # ctx.fill()
-
-            ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset,
-                    node_radius // 3, 0, 2 * math.pi)
+            ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, line_width//2, 0, 2 * math.pi)
             ctx.fill()
 
-            ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset,
-                    node_radius // 3, 0, 2 * math.pi)
-            ctx.stroke()
+            # ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset,
+            #         node_radius // 3, 0, 2 * math.pi)
+            # ctx.fill()
+            #
+            # ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset,
+            #         node_radius // 3, 0, 2 * math.pi)
+            # ctx.stroke()
 
 
 # data = alt.Data(values=[{'x': 'A', 'y': 5, 'col': 'red'},
@@ -106,10 +106,70 @@ def draw_altair_scatter(data_points, x_axis, y_axis, color_field, x_title, y_tit
         x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
         y=alt.Y(f'{y_axis}:Q', scale=alt.Scale(type="log") if log_y_scale else None, axis=alt.Axis(title=y_title)),
         color=alt.Color(f'{color_field}:N', scale=alt.Scale(scheme='dark2'))
-    )
-    if plot_loess:
-        for feature in loess_features:
-            chart += chart.transform_filter(alt.FieldEqualPredicate(field=color_field, equal=feature)).transform_loess(
-                x_axis, y_axis
-            )
+    ).facet(column=f'{color_field}:N')
+    # if plot_loess:
+    #     for feature in loess_features:
+    #         chart += chart.transform_filter(alt.FieldEqualPredicate(field=color_field, equal=feature)).transform_loess(
+    #             x_axis, y_axis
+    #         )
     save(chart, f"charts/{chart_name}.svg")
+
+
+def draw_altair_line_chart(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name, log_y_scale):
+    data = alt.Data(values=data_points)
+    dom = list(set(dp[f"{color_field}"] for dp in data_points))
+    rng = ["#26547C", "#F0567A", "#E09D00", "#4ACB2A"]
+    chart = alt.Chart(data).mark_line(point={"filled": False, "fill": "white"}).encode(
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
+        y=alt.Y(f'{y_axis}:Q', scale=alt.Scale(type="log") if log_y_scale else None, axis=alt.Axis(title=y_title)),
+        color=alt.Color(f'{color_field}:N', scale=alt.Scale(domain=dom, range=rng))
+    )
+    save(chart, f"charts/{chart_name}.svg")
+
+
+def draw_altair_line_compare(data_points, x_axis, y_axis, facet_field, x_title, y_title, chart_name, log_y_scale, experiment_name):
+    data = alt.Data(values=data_points)
+    # dom = [f"{experiment_name}", "baseline"]
+    rng = ["#26547C", "#F0567A"]
+    chart = alt.Chart(data).mark_circle(size=60).encode(
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
+        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title)),
+        # color=alt.Color(f'Technique:N', scale=alt.Scale(domain=dom, range=rng))
+    )
+
+    horizline = alt.Chart().mark_rule().encode(
+        y='a:Q'
+    )
+
+    save(alt.layer(
+        chart, horizline,
+        data=data
+    ).transform_calculate(
+        a="100"
+    ).facet(
+        column=alt.Column(f'{facet_field}:N', sort=["junger_basic", "strat_big_m", "redundancy"])
+    ), f"charts/{chart_name}.svg")
+
+
+def draw_altair_colored_line_compare(data_points, x_axis, y_axis, facet_field, color_field, x_title, y_title, chart_name):
+    data = alt.Data(values=data_points)
+    # dom = [cat1name, cat2name]
+    rng = ["#26547C", "#F0567A", "#E09D00"]
+    chart = alt.Chart(data).mark_circle(size=60).encode(
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
+        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title)),
+        color=alt.Color(f'{color_field}:N', scale=alt.Scale(range=rng))
+    )
+
+    horizline = alt.Chart().mark_rule().encode(
+        y='a:Q'
+    )
+
+    save(alt.layer(
+        chart, horizline,
+        data=data
+    ).transform_calculate(
+        a="100"
+    ).facet(
+        column=alt.Column(f'{facet_field}:N', sort=["junger_basic", "strat_big_m"])
+    ), f"charts/{chart_name}.svg")

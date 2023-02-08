@@ -331,7 +331,22 @@ if __name__ == '__main__':
         # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="mip_relax", param_to_set="mip_relax", clear_files=True)
         # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="mirror_vars", param_to_set="mirror_vars", clear_files=True)
 
-        experiments.make_altair_chart_all_three("baseline")
+        # experiments.make_altair_chart_all_three("baseline")
+        # experiments.altair_windowed_median_paper_forms("ppapertalk/all_paper_formulations")
+
+        # experiments.compare_to_baseline_presolve_colored("presolve", "ppapertalk/presolve_color")
+        # experiments.compare_to_baseline_butterfly_colored("butterfly", "ppapertalk/butterfly_color")
+
+        # experiments.compare_to_baseline_percent_solved("presolve", "ppapertalk/presolve_%solved")
+        # experiments.compare_to_baseline_percent_solved("fix1var", "ppapertalk/fix1var_%solved")
+
+        # experiments.altair_windowed_median("fix1var", "fix1var_median")
+        # experiments.make_altair_chart_all_three("baseline")
+
+        # experiments.compare_to_baseline_presolve_colored("xvar_branch", "ppapertalk/xvar_branch_speedup")
+        # experiments.compare_to_baseline("mip_relax", "ppapertalk/mip_relax_speedup", just_two=False)
+        # experiments.compare_to_baseline("heuristic_start", "ppapertalk/heuristic_start_speedup", just_two=False)
+        # experiments.compare_to_baseline("fix1var", "ppapertalk/fix1var_speedup", just_two=False)
 
         # g = read("Rome-Lib/graficon17nodi/grafo224.17")
         # opt = LayeredOptimizer(g, {"priority": True, "strat_big_m": True})
@@ -343,7 +358,14 @@ if __name__ == '__main__':
 
         # randomly_select_files_for_exp("experiment_set_50")
 
-        # run_my_algorithm()
+        g = read("Rome-Lib/graficon77nodi/grafo4423.77")
+        opt = LayeredOptimizer(g, {})
+        opt.optimize_layout()
+        opt.fix_one_var = True
+        opt.optimize_layout()
+        opt.optimize_layout()
+        opt.optimize_layout()
+
 
         # transitivity_experiment()
 

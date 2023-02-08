@@ -40,6 +40,8 @@ class LayeredOptimizer:
 		self.return_experiment_data = parameters["return_experiment_data"] if "return_experiment_data" in parameters else False
 		self.name = parameters["name"] if "name" in parameters else "graph1"
 		self.print_info = []
+		if not self.junger_trans and not self.strat_big_m and not self.stratisfimal_y_vars:
+			self.strat_big_m = True
 
 	def sequential_br(self, graph_arg=None, substitute_x_vars=None, subgraph_seq=False):
 		g = self.g if graph_arg is None else graph_arg
@@ -652,6 +654,8 @@ class LayeredOptimizer:
 		if self.stratisfimal_y_vars:
 			z = m.addVars(z_vars, vtype=relax_type, lb=0, ub=self.m_val, name="z")
 		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars)
+		if self.mirror_vars:
+			c_vars_orig = reductions.normal_c_vars(g, edges_by_layer, False)
 		c = m.addVars(c_vars, vtype=relax_type, name="c")
 		if self.strat_big_m or self.stratisfimal_y_vars:
 			y_vars = [n.name for n in g]
@@ -756,8 +760,12 @@ class LayeredOptimizer:
 				m.setObjective(opt, GRB.MINIMIZE)
 		else:
 			opt = gp.LinExpr()
-			for i, c_var in enumerate(c_vars):
-				opt += c_consts[i] * c[c_var]
+			if self.mirror_vars:
+				for i, c_var in enumerate(c_vars_orig):
+					opt += c_consts[i] * c[c_var]
+			else:
+				for i, c_var in enumerate(c_vars):
+					opt += c_consts[i] * c[c_var]
 			opt += len(butterfly_c_vars) // 2
 			m.setObjective(opt, GRB.MINIMIZE)
 
@@ -873,15 +881,16 @@ class LayeredOptimizer:
 			# 		g[int(v.varName[2:v.varName.index(']')])].y = float(v.x)
 
 		if self.draw_graph:
-			if self.junger_trans:
-				if use_top_level_params:
-					g.assign_y_vals_given_x_vars(self.x_var_assign)
+			if not self.bendiness_reduction:
+				if self.junger_trans:
+					if use_top_level_params:
+						g.assign_y_vals_given_x_vars(self.x_var_assign)
+					else:
+						g.assign_y_vals_given_x_vars(x_vars_opt)
 				else:
-					g.assign_y_vals_given_x_vars(x_vars_opt)
-			else:
-				for v in m.getVars():
-					if v.varName[:1] == "y":
-						g[int(v.varName[2:v.varName.index(']')])].y = float(v.x)
+					for v in m.getVars():
+						if v.varName[:1] == "y":
+							g[int(v.varName[2:v.varName.index(']')])].y = float(v.x)
 			vis.draw_graph(g, "interim")
 
 		if verbose or (use_top_level_params and self.verbose):
@@ -900,7 +909,7 @@ class LayeredOptimizer:
 			return len(x_vars), len(c_vars), m.numVars, m.numConstrs, round(m.objVal), round(m.runtime, 3), m.nodeCount
 
 		if self.return_full_data:
-			return len(x_vars), len(c_vars), n_cs[0], motifs.count_butterflies(g), round(m.objVal), round(t1 + t2 + t3 + t3, 3), round(m.runtime, 3), int(m.iterCount)
+			return len(x_vars), len(c_vars), n_cs[0], motifs.count_butterflies(g), round(m.objVal), round(t1 + t2 + t3 + t3, 3), round(m.runtime, 3), round(m.work, 3), int(m.iterCount)
 
 		return round(t1 + t2 + t3 + t3, 3), int(m.objVal)
 

@@ -9,7 +9,7 @@ def count_butterflies(g: graph.LayeredGraph):
         for node_1 in g.layers[i]:
             for adj in adjacency[node_1.name][1]:
                 for node_2 in adjacency[adj][0]:
-                    if node_1.name != node_2:
+                    if node_1.name < node_2:
                         wedges.append((node_1.name, adj, node_2))
         for j, wedge_1 in enumerate(wedges):
             for wedge_2 in wedges[j+1:]:
