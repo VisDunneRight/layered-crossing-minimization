@@ -323,6 +323,15 @@ def record_baseline_info(filename, start_idx):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
+        # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
+        experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)
+        experiments.run_experiment((0,0), cutoff_time=60, exp_name="butterfly", param_to_set="butterfly_reduction", clear_files=True, max_timeout=3)
+        experiments.run_experiment((0,0), cutoff_time=60, exp_name="heuristic", param_to_set="heuristic_start", clear_files=True, max_timeout=3)
+        experiments.run_experiment((0,0), cutoff_time=60, exp_name="presolve", param_to_set="presolve", clear_files=True, max_timeout=3)
+        experiments.run_experiment((0,0), cutoff_time=60, exp_name="xvar_branch", param_to_set="priority", clear_files=True, max_timeout=3)
+        experiments.run_experiment((0,0), cutoff_time=60, exp_name="mip_relax", param_to_set="mip_relax", clear_files=True, max_timeout=3)
+        experiments.run_experiment((0,0), cutoff_time=60, exp_name="symmetry", param_to_set="mirror_vars", clear_files=True, max_timeout=3)
+
         # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="fix1var", param_to_set="fix_one_var", clear_files=True)
         # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="heuristic_start", param_to_set="heuristic_start", clear_files=True)
         # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="butterfly", param_to_set="butterfly_reduction", clear_files=True)
@@ -358,13 +367,13 @@ if __name__ == '__main__':
 
         # randomly_select_files_for_exp("experiment_set_50")
 
-        g = read("Rome-Lib/graficon77nodi/grafo4423.77")
-        opt = LayeredOptimizer(g, {})
-        opt.optimize_layout()
-        opt.fix_one_var = True
-        opt.optimize_layout()
-        opt.optimize_layout()
-        opt.optimize_layout()
+        # g = read("Rome-Lib/graficon77nodi/grafo4423.77")
+        # opt = LayeredOptimizer(g, {})
+        # opt.optimize_layout()
+        # opt.fix_one_var = True
+        # opt.optimize_layout()
+        # opt.optimize_layout()
+        # opt.optimize_layout()
 
 
         # transitivity_experiment()

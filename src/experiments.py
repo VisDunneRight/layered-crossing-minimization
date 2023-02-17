@@ -43,7 +43,7 @@ def clear_file(name):
 
 
 def basic_info(g):
-    return sum(1 for node in g if not node.is_anchor_node), len(g.nodes), motifs.count_butterflies(g)
+    return [sum(1 for node in g if not node.is_anchor_node), len(g.nodes), motifs.count_butterflies(g)]
 
 
 def read_data_from_file(name, split_char, header_select=None):
@@ -119,12 +119,19 @@ def get_all_graphs():
     for i in range(10, 101):
         for file in os.listdir(f"Rome-Lib/graficon{i}nodi"):
             all_g[0].append(f"Rome-Lib/graficon{i}nodi/" + file)
+    daglist = []
     for i in range(1, 11):
         for file in os.listdir(f"DAGmar/graphs/{i}.6"):
-            all_g[1].append(f"DAGmar/graphs/{i}.6/" + file)
+            daglist.append(f"DAGmar/graphs/{i}.6/" + file)
+    g_t_nds = {}
+    for file in daglist:
+        g = read_data.read(file)
+        g_t_nds[file] = len(g.nodes)
+    all_g[1].extend(sorted(daglist, key=lambda x: g_t_nds[x]))
     north_gs = sorted(list(os.listdir("north")), key=lambda fil: int(fil[2:(5 if fil[4] == '0' else 4)]))
     for i in range(len(north_gs)):
-        north_gs[i] = "north/" + north_gs[i]
+        if north_gs[i] != "g.57.26.graphml":  # skip this one graph that takes over an hour to insert the variables and constraints
+            north_gs[i] = "north/" + north_gs[i]
     all_g[2].extend(north_gs)
     return all_g
 
@@ -134,15 +141,15 @@ def run_experiment(start_idx, cutoff_time, exp_name, param_to_set, clear_files, 
     #     gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
     gfiles = get_all_graphs()
     if clear_files:
-        if start_idx != 1:
+        if start_idx != (0, 0):
             print("Something's wrong here...")
             return
         clear_file(f"junger_basic/{exp_name}_{cutoff_time}.csv")
         clear_file(f"strat_big_m/{exp_name}_{cutoff_time}.csv")
         clear_file(f"redundancy/{exp_name}_{cutoff_time}.csv")
-        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited"])
-        insert_one(f"strat_big_m/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited"])
-        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited"])
+        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+        insert_one(f"strat_big_m/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
     for j in range(start_idx[0], 3):
         junger_timedout = 0
         strat_timedout = 0
@@ -150,9 +157,9 @@ def run_experiment(start_idx, cutoff_time, exp_name, param_to_set, clear_files, 
         for i, to_opt in enumerate(gfiles[j][start_idx[1]:]):
             if junger_timedout >= max_timeout and strat_timedout >= max_timeout and redundant_timedout >= max_timeout:
                 break
-            print(f"{i+start_idx[1]} / {len(to_opt)}")
+            print(f"{i+start_idx[1] + 1} / {len(gfiles[j])}")
             g = read_data.read(to_opt)
-            base_info = g.basic_info()
+            base_info = basic_info(g)
             optimizer = optimization.LayeredOptimizer(g, {"cutoff_time": cutoff_time, "return_experiment_data": True, "junger_trans": True, param_to_set: True})
             result = optimizer.optimize_layout()
             insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", [i+start_idx[1], to_opt] + base_info + [j for j in result])
@@ -176,30 +183,55 @@ def run_experiment(start_idx, cutoff_time, exp_name, param_to_set, clear_files, 
                 redundant_timedout = 0
 
 
-def run_multi_param_experiment(start_idx, graphs_file, cutoff_time, exp_name, params_to_set, clear_files):
+def run_multi_param_experiment(start_idx, graphs_file, cutoff_time, exp_name, params_to_set, clear_files, max_timeout):
     with open(graphs_file, 'r') as f:
         gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
     if clear_files:
+        if start_idx != (0, 0):
+            print("Something's wrong here...")
+            return
         clear_file(f"junger_basic/{exp_name}_{cutoff_time}.csv")
         clear_file(f"strat_big_m/{exp_name}_{cutoff_time}.csv")
         clear_file(f"redundancy/{exp_name}_{cutoff_time}.csv")
-        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited"])
-        insert_one(f"strat_big_m/{exp_name}_{cutoff_time}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited"])
-        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", ["Index", "File", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited"])
-    for i, to_opt in enumerate(gfiles[start_idx:]):
-        print(f"{i+start_idx+1} / {len(gfiles)}")
-        g = read_data.read(to_opt)
-        params = {param: True for param in params_to_set}
-        params.update({"cutoff_time": cutoff_time, "return_experiment_data": True, "junger_trans": True})
-        optimizer = optimization.LayeredOptimizer(g, params)
-        result = optimizer.optimize_layout()
-        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", [i+start_idx+1, to_opt] + [j for j in result])
-        optimizer.junger_trans, optimizer.strat_big_m = False, True
-        result = optimizer.optimize_layout()
-        insert_one(f"strat_big_m/{exp_name}_{cutoff_time}.csv", [i+start_idx+1, to_opt] + [j for j in result])
-        optimizer.junger_trans = True
-        result = optimizer.optimize_layout()
-        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", [i+start_idx+1, to_opt] + [j for j in result])
+        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+        insert_one(f"strat_big_m/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+    for j in range(start_idx[0], 3):
+        junger_timedout = 0
+        strat_timedout = 0
+        redundant_timedout = 0
+        for i, to_opt in enumerate(gfiles[j][start_idx[1]:]):
+            if junger_timedout >= max_timeout and strat_timedout >= max_timeout and redundant_timedout >= max_timeout:
+                break
+            print(f"{i + start_idx[1] + 1} / {len(gfiles[j])}")
+            g = read_data.read(to_opt)
+            base_info = basic_info(g)
+            params = {param: True for param in params_to_set}
+            params.update({"cutoff_time": cutoff_time, "return_experiment_data": True, "junger_trans": True})
+            optimizer = optimization.LayeredOptimizer(g, params)
+            result = optimizer.optimize_layout()
+            insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv",
+                       [i + start_idx[1], to_opt] + base_info + [j for j in result])
+            if result[5] >= cutoff_time or junger_timedout >= max_timeout:
+                junger_timedout += 1
+            else:
+                junger_timedout = 0
+            optimizer.junger_trans, optimizer.strat_big_m = False, True
+            result = optimizer.optimize_layout()
+            insert_one(f"strat_big_m/{exp_name}_{cutoff_time}.csv",
+                       [i + start_idx[1], to_opt] + base_info + [j for j in result])
+            if result[5] >= cutoff_time or strat_timedout >= max_timeout:
+                strat_timedout += 1
+            else:
+                strat_timedout = 0
+            optimizer.junger_trans = True
+            result = optimizer.optimize_layout()
+            insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv",
+                       [i + start_idx[1], to_opt] + base_info + [j for j in result])
+            if result[5] >= cutoff_time or redundant_timedout >= max_timeout:
+                redundant_timedout += 1
+            else:
+                redundant_timedout = 0
 
 
 def run_one_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_files):

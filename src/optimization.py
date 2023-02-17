@@ -787,9 +787,13 @@ class LayeredOptimizer:
 		""" Fix key x-var """
 		if fix_1_xvar or (use_top_level_params and self.fix_one_var):
 			x_var_usage = n_cs[-1]
-			most_used_x = max(x_var_usage, key=x_var_usage.get)
-			m.getVarByName(f"x[{most_used_x[0]},{most_used_x[1]}]").lb = 0
-			m.getVarByName(f"x[{most_used_x[0]},{most_used_x[1]}]").ub = 0
+			if x_vars:
+				if x_var_usage != {}:
+					most_used_x = max(x_var_usage, key=x_var_usage.get)
+				else:
+					most_used_x = random.choice(x_vars)
+				m.getVarByName(f"x[{most_used_x[0]},{most_used_x[1]}]").lb = 0
+				m.getVarByName(f"x[{most_used_x[0]},{most_used_x[1]}]").ub = 0
 
 		""" Vertical position, implication version """
 		# Uses big-M method: https://support.gurobi.com/hc/en-us/articles/4414392016529-How-do-I-model-conditional-statements-in-Gurobi-
@@ -842,17 +846,16 @@ class LayeredOptimizer:
 			self.print_info.append(f"{pre_sym}Constraint counts: {n_constraints_generated}")
 		t2 = time.time()
 		m.optimize()
-		# print(m.status)
 		t2 = time.time() - t2
 		if verbose or (use_top_level_params and self.verbose):
 			self.print_info.append(f"{pre_sym}Objective: {m.objVal}")
 			self.print_info.append(f"{pre_sym}Time to optimize: {t2}")
 		x_vars_opt = {}
-		for v in m.getVars():
-			if v.varName[:1] == "x" and use_top_level_params:
-				self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
-			elif v.varName[:1] == "x":
-				x_vars_opt[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+		# for v in m.getVars():
+		# 	if v.varName[:1] == "x" and use_top_level_params:
+		# 		self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+		# 	elif v.varName[:1] == "x":
+		# 		x_vars_opt[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
 
 		""" Draw pre-bendiness graph """
 		# vis.draw_graph(g, "interim")
@@ -906,12 +909,16 @@ class LayeredOptimizer:
 			return int(m.objVal), x_vars_opt
 
 		if self.return_experiment_data:
-			return len(x_vars), len(c_vars), m.numVars, m.numConstrs, round(m.objVal), round(m.runtime, 3), m.nodeCount
+			if m.objVal == float('inf'):
+				objv = "inf"
+			else:
+				objv = round(m.objVal)
+			return len(x_vars), len(c_vars), m.numVars, m.numConstrs, objv, round(m.runtime, 4), round(m.work, 4), int(m.nodeCount), round(t1, 3)
 
 		if self.return_full_data:
-			return len(x_vars), len(c_vars), n_cs[0], motifs.count_butterflies(g), round(m.objVal), round(t1 + t2 + t3 + t3, 3), round(m.runtime, 3), round(m.work, 3), int(m.iterCount)
+			return len(x_vars), len(c_vars), n_cs[0], motifs.count_butterflies(g), round(m.objVal), round(t1 + t2 + t3 + t3, 3), round(m.runtime, 3), round(m.work, 3), int(m.iterCount), round(t1, 3)
 
-		return round(t1 + t2 + t3 + t3, 3), int(m.objVal)
+		return round(t1 + t2 + t3, 3), int(m.objVal)
 
 	""" Return min possible num crossings, given by my formula """
 	def bound_on_optimality(self, subg_assign, top_lv_g, cr_num, cr_num_tuple, opt_cr_num_tuple, top_ov):
