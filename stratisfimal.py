@@ -4,9 +4,7 @@ import random
 import cProfile
 import pstats
 from pstats import SortKey
-
 import networkx as nx
-
 from src import vis, layering, motifs, experiments
 from src.graph import *
 from src.read_data import *
@@ -49,6 +47,42 @@ def run_optimizer(g: LayeredGraph, bendiness_reduction, sequential, timelimit, s
     optimizer = LayeredOptimizer(g, params)
     optimizer.optimize_layout()
     # return ','.join(str(e) for e in res[0] + res[1])
+
+
+def run_stratisfimal_layout(graph_file):
+    optimizer = LayeredOptimizer(graph_file)
+    optimizer.strat_big_m = True
+    optimizer.junger_trans = True
+    optimizer.optimize_layout()
+
+
+def run_optimal_sankey_layout(graph_file):
+    optimizer = LayeredOptimizer(graph_file)
+    optimizer.strat_big_m = False
+    optimizer.junger_trans = True
+    optimizer.mirror_vars = True
+    optimizer.butterfly_reduction = True
+    optimizer.xvar_branch_priority = True
+    optimizer.optimize_layout()
+
+
+def run_junger_polyhedral_layout(graph_file):
+    optimizer = LayeredOptimizer(graph_file)
+    optimizer.strat_big_m = False
+    optimizer.junger_trans = True
+    optimizer.mirror_vars = True
+    optimizer.symmetry_constraints = False
+    optimizer.optimize_layout()
+
+
+def run_my_layout_algorithm(graph_file):
+    optimizer = LayeredOptimizer(graph_file)
+    optimizer.fix_one_var = True
+    optimizer.butterfly_reduction = True
+    optimizer.heuristic_start = True
+    optimizer.mip_relax = True
+    optimizer.xvar_branch_priority = True
+    optimizer.optimize_layout()
 
 
 def run_test_pos_1_to_n():
@@ -289,21 +323,6 @@ def randomly_select_files_for_exp(fname):
         f.writelines(lines)
 
 
-def make_altair_chart_for_ind_var():
-    data = experiments.read_data_from_file("independent_var_study.csv", ',')
-    data = [dat for dat in data if dat["opttime"] < 120 and dat["iterations"] > 0]
-    print(len(data))
-    for dat in data:
-        dat['file'] = dat['file'][:dat['file'].index('/')]
-        dat['xpc'] = dat['xvars'] + dat['cvars']
-    vis.draw_altair_scatter(data, "xpc", "opttime", "file", "X-vars + c-vars", "Time (s)", "Decision variables vs time to optimize")
-    vis.draw_altair_scatter(data, "xpc", "iterations", "file", "X-vars + c-vars", "Simplex iterations", "Decision variables vs iterations")
-
-
-def starting_assignment_experiment():
-    pass
-
-
 def record_baseline_info(filename, start_idx):
     with open(f"data storage/{filename}", 'r') as f:
         i = start_idx - 1
@@ -322,76 +341,37 @@ def record_baseline_info(filename, start_idx):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
-        experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)
-        experiments.run_experiment((0,0), cutoff_time=60, exp_name="butterfly", param_to_set="butterfly_reduction", clear_files=True, max_timeout=3)
-        experiments.run_experiment((0,0), cutoff_time=60, exp_name="heuristic", param_to_set="heuristic_start", clear_files=True, max_timeout=3)
-        experiments.run_experiment((0,0), cutoff_time=60, exp_name="presolve", param_to_set="presolve", clear_files=True, max_timeout=3)
-        experiments.run_experiment((0,0), cutoff_time=60, exp_name="xvar_branch", param_to_set="priority", clear_files=True, max_timeout=3)
-        experiments.run_experiment((0,0), cutoff_time=60, exp_name="mip_relax", param_to_set="mip_relax", clear_files=True, max_timeout=3)
-        experiments.run_experiment((0,0), cutoff_time=60, exp_name="symmetry", param_to_set="mirror_vars", clear_files=True, max_timeout=3)
+    opt = LayeredOptimizer("control-flow-graphs/touch/dbg.main.dot")
+    opt.draw_graph = True
+    opt.optimize_layout()
 
-        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="fix1var", param_to_set="fix_one_var", clear_files=True)
-        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="heuristic_start", param_to_set="heuristic_start", clear_files=True)
-        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="butterfly", param_to_set="butterfly_reduction", clear_files=True)
-        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="presolve", param_to_set="presolve", clear_files=True)
-        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="xvar_branch", param_to_set="priority", clear_files=True)
-        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="mip_relax", param_to_set="mip_relax", clear_files=True)
-        # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="mirror_vars", param_to_set="mirror_vars", clear_files=True)
+    # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
+    # experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)
+    # experiments.run_experiment((0,0), cutoff_time=60, exp_name="butterfly", param_to_set="butterfly_reduction", clear_files=True, max_timeout=3)
+    # experiments.run_experiment((0,0), cutoff_time=60, exp_name="heuristic", param_to_set="heuristic_start", clear_files=True, max_timeout=3)
+    # experiments.run_experiment((0,0), cutoff_time=60, exp_name="presolve", param_to_set="presolve", clear_files=True, max_timeout=3)
+    # experiments.run_experiment((0,0), cutoff_time=60, exp_name="xvar_branch", param_to_set="priority", clear_files=True, max_timeout=3)
+    # experiments.run_experiment((0,0), cutoff_time=60, exp_name="mip_relax", param_to_set="mip_relax", clear_files=True, max_timeout=3)
+    # experiments.run_experiment((0,0), cutoff_time=60, exp_name="symmetry", param_to_set="mirror_vars", clear_files=True, max_timeout=3)
 
-        # experiments.make_altair_chart_all_three("baseline")
-        # experiments.altair_windowed_median_paper_forms("ppapertalk/all_paper_formulations")
+    # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="fix1var", param_to_set="fix_one_var", clear_files=True)
+    # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="heuristic_start", param_to_set="heuristic_start", clear_files=True)
+    # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="butterfly", param_to_set="butterfly_reduction", clear_files=True)
+    # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="presolve", param_to_set="presolve", clear_files=True)
+    # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="xvar_branch", param_to_set="priority", clear_files=True)
+    # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="mip_relax", param_to_set="mip_relax", clear_files=True)
+    # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="mirror_vars", param_to_set="mirror_vars", clear_files=True)
 
-        # experiments.compare_to_baseline_presolve_colored("presolve", "ppapertalk/presolve_color")
-        # experiments.compare_to_baseline_butterfly_colored("butterfly", "ppapertalk/butterfly_color")
+    # record_baseline_info("experiment_set_50", 50)
 
-        # experiments.compare_to_baseline_percent_solved("presolve", "ppapertalk/presolve_%solved")
-        # experiments.compare_to_baseline_percent_solved("fix1var", "ppapertalk/fix1var_%solved")
+    # randomly_select_files_for_exp("experiment_set_50")
 
-        # experiments.altair_windowed_median("fix1var", "fix1var_median")
-        # experiments.make_altair_chart_all_three("baseline")
+    # experiments.independent_var_experiment("independent_var_study_files", 80)
 
-        # experiments.compare_to_baseline_presolve_colored("xvar_branch", "ppapertalk/xvar_branch_speedup")
-        # experiments.compare_to_baseline("mip_relax", "ppapertalk/mip_relax_speedup", just_two=False)
-        # experiments.compare_to_baseline("heuristic_start", "ppapertalk/heuristic_start_speedup", just_two=False)
-        # experiments.compare_to_baseline("fix1var", "ppapertalk/fix1var_speedup", just_two=False)
-
-        # g = read("Rome-Lib/graficon17nodi/grafo224.17")
-        # opt = LayeredOptimizer(g, {"priority": True, "strat_big_m": True})
-        # opt.optimize_layout()
-
-        # record_baseline_info("experiment_set_50", 50)
-
-        # make_altair_chart_for_ind_var()
-
-        # randomly_select_files_for_exp("experiment_set_50")
-
-        # g = read("Rome-Lib/graficon77nodi/grafo4423.77")
-        # opt = LayeredOptimizer(g, {})
-        # opt.optimize_layout()
-        # opt.fix_one_var = True
-        # opt.optimize_layout()
-        # opt.optimize_layout()
-        # opt.optimize_layout()
-
-
-        # transitivity_experiment()
-
-        # experiments.independent_var_experiment("independent_var_study_files", 80)
-
-        # run_standard_version()
-        # run_test_fix_x_vars()
-        # cProfile.run("run_my_algorithm()", "my_algo_stats")
-        # p = pstats.Stats("my_algo_stats")
-        # cProfile.run("run_standard_version()", "standard_stats")
-        # p = pstats.Stats("standard_stats")
-        # p.strip_dirs().sort_stats(SortKey.CUMULATIVE).print_stats()
-    elif len(sys.argv) < 10:
-        run_all_rome_lib(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), bool(int(sys.argv[4])), bool(int(sys.argv[5])), sys.argv[6], bool(int(sys.argv[7])), savefile=sys.argv[8])
-    elif len(sys.argv) < 11:
-        run_all_rome_lib(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), bool(int(sys.argv[4])), bool(int(sys.argv[5])), sys.argv[6], bool(int(sys.argv[7])), savefile=sys.argv[8], shuffle=bool(int(sys.argv[9])))
-    elif len(sys.argv) < 12:
-        run_all_rome_lib(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), bool(int(sys.argv[4])), bool(int(sys.argv[5])), sys.argv[6], bool(int(sys.argv[7])), savefile=sys.argv[8], shuffle=bool(int(sys.argv[9])), target=sys.argv[10])
-    else:
-        run_all_rome_lib(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), bool(int(sys.argv[4])), bool(int(sys.argv[5])), sys.argv[6], bool(int(sys.argv[7])), savefile=sys.argv[8], shuffle=bool(int(sys.argv[9])), target=sys.argv[10], subgraph_reduction=bool(int(sys.argv[11])))
+    # run_standard_version()
+    # run_test_fix_x_vars()
+    # cProfile.run("run_my_algorithm()", "my_algo_stats")
+    # p = pstats.Stats("my_algo_stats")
+    # cProfile.run("run_standard_version()", "standard_stats")
+    # p = pstats.Stats("standard_stats")
+    # p.strip_dirs().sort_stats(SortKey.CUMULATIVE).print_stats()

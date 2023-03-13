@@ -81,12 +81,63 @@ def create_better_layered_graph(rome_file, w, c):
         return g, tvert
 
 
+def create_edge_list_layered_graph(filepath, w, c):
+    with open(filepath) as f:
+        simple_g = {}
+        for line in f.readlines():
+            if line == '\n':
+                continue
+            e = re.split('[ ,\n]', line)
+            e = [entry for entry in e if entry.isnumeric()]
+            assert len(e) == 2, "file format incorrect. Each line should be integers of the form: u, v"
+            if int(e[0]) not in simple_g:
+                simple_g[int(e[0])] = []
+            if int(e[1]) not in simple_g:
+                simple_g[int(e[1])] = []
+            simple_g[int(e[0])].append(int(e[1]))
+    # print("s_g", simple_g)
+    to_remove = cycle_removal(simple_g)
+    for edge in to_remove:
+        simple_g[edge[0]].remove(edge[1])
+    g, tvert = min_width(simple_g, w, c)
+    for edge in to_remove:
+        g.add_edge(edge[0], edge[1])
+    # print("removed edges", to_remove)
+    for edge in g.edges:
+        edge.update()
+    g.add_anchors()
+    g.relayer()
+    g.y_val_setup()
+    # vis.draw_graph(g, "example3")
+    return g, tvert
+
+
+def create_edge_list_layered_graph_given_layering(filepath, layer_assign):
+    with open(filepath) as f:
+        g = graph.LayeredGraph()
+        for line in f.readlines():
+            if line == '\n':
+                continue
+            e = re.split('[ ,\n]', line)
+            e = [entry for entry in e if entry.isnumeric()]
+            assert len(e) == 2, "file format incorrect. Each line should be integers of the form: u, v"
+            if int(e[0]) not in g.node_names:
+                g.add_node(layer_assign[int(e[0])], name=int(e[0]))
+            if int(e[1]) not in g.node_names:
+                g.add_node(layer_assign[int(e[1])], name=int(e[1]))
+            g.add_edge(int(e[0]), int(e[1]))
+    g.add_anchors()
+    g.y_val_setup()
+    return g
+
+
 def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
     simple_g = {}
+    names = {nname: i+1 for i, nname in enumerate(nxg)}
     for node in nxg:
-        simple_g[int(node[1:])+1] = []
+        simple_g[names[node]] = []
         for adj in nxg[node]:
-            simple_g[int(node[1:])+1].append(int(adj[1:])+1)
+            simple_g[names[node]].append(names[adj])
     to_remove = cycle_removal(simple_g)
     for edge in to_remove:
         simple_g[edge[0]].remove(edge[1])

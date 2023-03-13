@@ -1,16 +1,23 @@
 import itertools, re, time
+import os.path
 import random
 import gurobipy as gp
 from gurobipy import GRB
 from sklearn.cluster import SpectralClustering
-from src import vis, reductions, motifs, type_conversions
+from src import vis, reductions, motifs, type_conversions, read_data
 from src.graph import *
 from src.helpers import *
 
 
 class LayeredOptimizer:
-	def __init__(self, layered_graph: LayeredGraph, parameters: dict):
-		self.g = layered_graph
+	def __init__(self, layered_graph, parameters=None):
+		if parameters is None:
+			parameters = {}
+		assert os.path.isfile(layered_graph) or type(layered_graph) == LayeredGraph, "input needs to be a path to graph file or a LayeredGraph object"
+		if type(layered_graph) == LayeredGraph:
+			self.g = layered_graph
+		else:
+			self.g = read_data.read(layered_graph)
 		self.x_var_assign = {x_v: 2 for n_l in self.g.get_names_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
 		self.bendiness_reduction = parameters["bendiness_reduction"] if "bendiness_reduction" in parameters else False
 		self.gamma_1 = parameters["gamma_1"] if "gamma_1" in parameters else 1
@@ -851,11 +858,11 @@ class LayeredOptimizer:
 			self.print_info.append(f"{pre_sym}Objective: {m.objVal}")
 			self.print_info.append(f"{pre_sym}Time to optimize: {t2}")
 		x_vars_opt = {}
-		# for v in m.getVars():
-		# 	if v.varName[:1] == "x" and use_top_level_params:
-		# 		self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
-		# 	elif v.varName[:1] == "x":
-		# 		x_vars_opt[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+		for v in m.getVars():
+			if v.varName[:1] == "x" and use_top_level_params:
+				self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+			elif v.varName[:1] == "x":
+				x_vars_opt[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
 
 		""" Draw pre-bendiness graph """
 		# vis.draw_graph(g, "interim")

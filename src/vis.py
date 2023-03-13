@@ -2,10 +2,16 @@ import cairo
 from src import graph
 import math
 import altair as alt
+import os
 from altair_saver import save
 
 
 def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, gravity=False):
+    if nested:
+        if "Images" not in os.listdir(".."):
+            os.mkdir("../Images")
+    elif "Images" not in os.listdir():
+        os.mkdir("Images")
     offset = 40
     node_radius = 15
     line_width = 4

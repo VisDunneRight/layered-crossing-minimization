@@ -373,6 +373,7 @@ class LayeredGraph:
             adjacency_list[edge.n2.name].append(edge.n1.name)
         return adjacency_list
 
+    # Clean up graph by removing empty layers and making sure the first layer has label 1.
     def relayer(self):
         n_removals = min((n.layer for n in self.nodes)) - 1
         levels = sorted(list(self.layers.keys()))
@@ -479,6 +480,9 @@ class LayeredGraph:
         for l_num in sorted(list(self.layers.keys()))[:-1]:
             max_connectedness += len(self.layers[l_num]) * len(self.layers[l_num + 1])
         return len(self.edges) / max_connectedness
+
+    def calculate_csw_constant(self):
+        return round(math.sqrt(sum(len(lay)**2 for lay in self.layers.values())), 3)
 
     def wiggle_node(self, x_vars, edge_b_l, node, pos_or_neg):
         best_seen_n_cr = 0

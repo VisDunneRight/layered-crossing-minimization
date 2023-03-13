@@ -1,0 +1,201 @@
+digraph code {
+	graph [bgcolor=azure fontsize=8 fontname="Courier" splines="ortho"];
+	node [fillcolor=gray style=filled shape=box];
+	edge [arrowhead="normal"];
+	"0x000026c0" [URL="dbg.main/0x000026c0", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="  ;-- main:\l  ; DATA XREF from entry0 @ 0x2c88\l1402: int dbg.main (int argc, char **argv);\l; var _Bool last_tab @ rbp-0x41\l; var size_t tab_index @ rbp-0x40\l; var int64_t var_8h @ rsp+0x8\l; var uint32_t var_17h @ rsp+0x17\l; var void *ptr @ rsp+0x18\l; var uint32_t var_2fh @ rsp+0x2f\l; var int64_t var_30h @ rsp+0x30\l; var int64_t var_38h @ rsp+0x38\l; arg int argc @ rdi\l; arg char **argv @ rsi\l0x000026c0      endbr64                                                ; int main(int argc,char ** argv);\l0x000026c4      push r15\l0x000026c6      xor r15d, r15d\l0x000026c9      push r14\l0x000026cb      lea r14, obj.longopts                                  ; 0xab20 ; \"&q\"\l0x000026d2      push r13\l0x000026d4      lea r13, str._0123456789at:                            ; 0x70f4 ; \",0123456789at:\"\l0x000026db      push r12\l0x000026dd      lea r12, [0x00007087]                                  ; \"coreutils\"\l0x000026e4      push rbp\l0x000026e5      mov ebp, edi                                           ; argc\l0x000026e7      push rbx\l0x000026e8      mov rbx, rsi                                           ; argv\l0x000026eb      sub rsp, 0x48\l0x000026ef      mov rdi, qword [rsi]                                   ; int64_t arg1\l0x000026f2      mov rax, qword fs:[0x28]\l0x000026fb      mov qword [var_38h], rax\l0x00002700      xor eax, eax\l0x00002702      call dbg.set_program_name\l0x00002707      lea rsi, [0x00007c21]                                  ; const char *locale\l0x0000270e      mov edi, 6                                             ; int category\l0x00002713      call sym.imp.setlocale                                 ; char *setlocale(int category, const char *locale)\l0x00002718      lea rsi, str._usr_local_share_locale                   ; 0x70b0 ; \"/usr/local/share/locale\" ; char *dirname\l0x0000271f      mov rdi, r12                                           ; char *domainname\l0x00002722      call sym.imp.bindtextdomain                            ; char *bindtextdomain(char *domainname, char *dirname)\l0x00002727      mov rdi, r12                                           ; char *domainname\l0x0000272a      xor r12d, r12d\l0x0000272d      call sym.imp.textdomain                                ; char *textdomain(char *domainname)\l0x00002732      lea rdi, [dbg.close_stdout]                            ; 0x3a50 ; func function\l0x00002739      call sym.atexit                                        ; int atexit(func function)\l0x0000273e      nop\l"]
+	"0x00002740" [URL="dbg.main/0x00002740", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; XREFS: CODE 0x000027ce  CODE 0x0000281e  CODE 0x00002843  \l; XREFS: CODE 0x00002856  CODE 0x00002867  CODE 0x00002883  \l; XREFS: CODE 0x00002898  \l0x00002740      xor r8d, r8d\l0x00002743      mov rcx, r14\l0x00002746      mov rdx, r13\l0x00002749      mov rsi, rbx\l0x0000274c      mov edi, ebp\l0x0000274e      call sym.imp.getopt_long\l0x00002753      cmp eax, 0xffffffff\l0x00002756      je 0x289d\l"]
+	"0x0000275c" [URL="dbg.main/0x0000275c", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x0000275c      cmp eax, 0x61\l0x0000275f      je 0x2860\l"]
+	"0x00002765" [URL="dbg.main/0x00002765", fillcolor="white",color="#767676", fontname="Courier",label="0x00002765      jg 0x27b8\l"]
+	"0x00002767" [URL="dbg.main/0x00002767", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002767      cmp eax, 0x2c\l0x0000276a      je 0x2840\l"]
+	"0x00002770" [URL="dbg.main/0x00002770", fillcolor="white",color="#767676", fontname="Courier",label="0x00002770      jg 0x2828\l"]
+	"0x00002776" [URL="dbg.main/0x00002776", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002776      cmp eax, 0xffffff7d                                    ; 4294967165\l0x0000277b      jne 0x27d8\l"]
+	"0x0000277d" [URL="dbg.main/0x0000277d", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x0000277d      mov rdi, qword [obj.stdout]                            ; obj.stdout_GLIBC_2.2.5\l                                                                       ; [0xb0a8:8]=0 ; int64_t arg1\l; DATA XREF from sym.quotearg_buffer_restyled @ 0x5076\l0x00002784      mov rcx, qword [obj.Version]                           ; [0xb020:8]=0x77aa ; int64_t arg5\l0x0000278b      xor eax, eax\l0x0000278d      xor r9d, r9d                                           ; int64_t arg_c0h\l0x00002790      lea r8, str.David_MacKenzie                            ; 0x70c8 ; \"David MacKenzie\" ; int64_t arg6\l0x00002797      lea rdx, str.GNU_coreutils                             ; 0x7083 ; \"GNU coreutils\" ; int64_t arg3\l0x0000279e      lea rsi, str.unexpand                                  ; 0x7004 ; \"unexpand\" ; int64_t arg2\l0x000027a5      call dbg.version_etc\l0x000027aa      xor edi, edi                                           ; int status\l0x000027ac      call sym.imp.exit                                      ; void exit(int status)\l"]
+	"0x000027b8" [URL="dbg.main/0x000027b8", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2765\l0x000027b8      cmp eax, 0x74\l0x000027bb      je 0x2870\l"]
+	"0x000027c1" [URL="dbg.main/0x000027c1", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x000027c1      cmp eax, 0x80\l0x000027c6      jne 0x27e3\l"]
+	"0x000027c8" [URL="dbg.main/0x000027c8", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x000027c8      mov r12d, 1\l0x000027ce      jmp 0x2740\l"]
+	"0x000027d8" [URL="dbg.main/0x000027d8", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x277b\l0x000027d8      cmp eax, 0xffffff7e                                    ; 4294967166\l0x000027dd      je 0x2bc8\l"]
+	"0x000027e3" [URL="dbg.main/0x000027e3", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREFS from dbg.main @ 0x27c6, 0x282b\l0x000027e3      test r15b, r15b\l0x000027e6      je 0x2888\l"]
+	"0x000027ec" [URL="dbg.main/0x000027ec", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x000027ec      movabs rsi, 0x1999999999999999\l0x000027f6      mov rcx, qword [var_8h]\l0x000027fb      cmp rcx, rsi\l0x000027fe      ja 0x2c1f\l"]
+	"0x00002804" [URL="dbg.main/0x00002804", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002804      imul rdx, rcx, 0xa\l0x00002808      sub eax, 0x30\l0x0000280b      cdqe\l0x0000280d      add rax, rdx\l0x00002810      cmp rax, rcx\l0x00002813      jb 0x2c1f\l"]
+	"0x00002819" [URL="dbg.main/0x00002819", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002819      mov qword [var_8h], rax\l0x0000281e      jmp 0x2740\l"]
+	"0x00002828" [URL="dbg.main/0x00002828", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2770\l0x00002828      cmp eax, 0x3f\l0x0000282b      jne 0x27e3\l"]
+	"0x0000282d" [URL="dbg.main/0x0000282d", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x0000282d      mov edi, 1                                             ; int64_t arg1\l0x00002832      call dbg.usage\l"]
+	"0x00002840" [URL="dbg.main/0x00002840", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x276a\l0x00002840      test r15b, r15b\l0x00002843      je 0x2740\l"]
+	"0x00002849" [URL="dbg.main/0x00002849", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002849      mov rdi, qword [var_8h]                                ; int64_t arg1\l0x0000284e      xor r15d, r15d\l0x00002851      call dbg.add_tab_stop\l0x00002856      jmp 0x2740\l"]
+	"0x00002860" [URL="dbg.main/0x00002860", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x275f\l0x00002860      mov byte [obj.convert_entire_line], 1                  ; [0xb100:1]=0\l0x00002867      jmp 0x2740\l"]
+	"0x00002870" [URL="dbg.main/0x00002870", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x27bb\l0x00002870      mov rdi, qword [obj.optarg]                            ; obj.optarg_GLIBC_2.2.5\l                                                                       ; [0xb0c0:8]=0 ; int64_t arg1\l0x00002877      mov byte [obj.convert_entire_line], 1                  ; [0xb100:1]=0\l0x0000287e      call dbg.parse_tab_stops\l0x00002883      jmp 0x2740\l"]
+	"0x00002888" [URL="dbg.main/0x00002888", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x27e6\l0x00002888      sub eax, 0x30\l0x0000288b      mov r15d, 1\l0x00002891      cdqe\l0x00002893      mov qword [var_8h], rax\l0x00002898      jmp 0x2740\l"]
+	"0x0000289d" [URL="dbg.main/0x0000289d", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2756\l0x0000289d      test r12b, r12b\l0x000028a0      je 0x28a9\l"]
+	"0x000028a2" [URL="dbg.main/0x000028a2", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x000028a2      mov byte [obj.convert_entire_line], 0                  ; [0xb100:1]=0\l"]
+	"0x000028a9" [URL="dbg.main/0x000028a9", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x28a0\l0x000028a9      test r15b, r15b\l0x000028ac      jne 0x2bb9\l"]
+	"0x000028b2" [URL="dbg.main/0x000028b2", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2bc3\l0x000028b2      call dbg.finalize_tab_stops\l0x000028b7      movsxd rax, dword [obj.optind]                         ; obj.optind_GLIBC_2.2.5\l                                                                       ; [0xb0b8:4]=0\l0x000028be      xor edi, edi\l0x000028c0      cmp eax, ebp\l0x000028c2      jge 0x28c8\l"]
+	"0x000028c4" [URL="dbg.main/0x000028c4", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x000028c4      lea rdi, [rbx + rax*8]\l"]
+	"0x000028c8" [URL="dbg.main/0x000028c8", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x28c2\l0x000028c8      call dbg.set_file_list\l0x000028cd      xor edi, edi                                           ; int64_t arg1\l0x000028cf      call dbg.next_file\l0x000028d4      mov r14, rax\l0x000028d7      test rax, rax\l0x000028da      je 0x2b50\l"]
+	"0x000028e0" [URL="dbg.main/0x000028e0", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x000028e0      mov rdi, qword [obj.max_column_width]                  ; [0xb0f8:8]=0x2700280040000d ; u\"\\r@('\" ; size_t size\l0x000028e7      call sym.xmalloc                                       ;  void *xmalloc(size_t size)\l0x000028ec      mov qword [ptr], rax\l"]
+	"0x000028f1" [URL="dbg.main/0x000028f1", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x29b4\l0x000028f1      mov byte [var_8h], 1\l0x000028f6      xor ebp, ebp\l0x000028f8      xor r12d, r12d\l0x000028fb      mov ebx, 1\l0x00002900      mov qword [var_30h], 0\l0x00002909      mov byte [var_17h], 0\l0x0000290e      jmp 0x29ba\l"]
+	"0x00002918" [URL="dbg.main/0x00002918", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x29f3\l0x00002918      cmp r15d, 8\l0x0000291c      je 0x2ac5\l"]
+	"0x00002922" [URL="dbg.main/0x00002922", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2aba\l0x00002922      add r12, 1\l0x00002926      je 0x2bfb\l"]
+	"0x0000292c" [URL="dbg.main/0x0000292c", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x0000292c      mov ebx, 1\l"]
+	"0x00002931" [URL="dbg.main/0x00002931", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREFS from dbg.main @ 0x2a61, 0x2b2d\l0x00002931      mov byte [var_8h], r13b\l0x00002936      test rbp, rbp\l0x00002939      je 0x2977\l"]
+	"0x0000293b" [URL="dbg.main/0x0000293b", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2ae9\l0x0000293b      cmp rbp, 1\l0x0000293f      jbe 0x2950\l"]
+	"0x00002941" [URL="dbg.main/0x00002941", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002941      cmp byte [var_17h], 0\l0x00002946      je 0x2950\l"]
+	"0x00002948" [URL="dbg.main/0x00002948", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002948      mov rax, qword [ptr]\l0x0000294d      mov byte [rax], 9\l"]
+	"0x00002950" [URL="dbg.main/0x00002950", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREFS from dbg.main @ 0x293f, 0x2946\l0x00002950      mov rcx, qword [obj.stdout]                            ; obj.stdout_GLIBC_2.2.5\l                                                                       ; [0xb0a8:8]=0\l0x00002957      mov rdi, qword [ptr]\l0x0000295c      mov rdx, rbp\l0x0000295f      mov esi, 1\l0x00002964      call sym.imp.fwrite_unlocked\l0x00002969      cmp rax, rbp\l0x0000296c      jne 0x2bcf\l"]
+	"0x00002972" [URL="dbg.main/0x00002972", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002972      mov byte [var_17h], 0\l"]
+	"0x00002977" [URL="dbg.main/0x00002977", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2939\l0x00002977      movzx r10d, byte [obj.convert_entire_line]             ; [0xb100:1]=0\l0x0000297f      or r10d, r13d\l0x00002982      and ebx, r10d\l0x00002985      test r15d, r15d\l0x00002988      js 0x2b46\l"]
+	"0x0000298e" [URL="dbg.main/0x0000298e", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x0000298e      xor ebp, ebp\l"]
+	"0x00002990" [URL="dbg.main/0x00002990", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREFS from dbg.main @ 0x29d6, 0x2b41\l0x00002990      mov rdi, qword [obj.stdout]                            ; obj.stdout_GLIBC_2.2.5\l                                                                       ; [0xb0a8:8]=0\l0x00002997      mov rax, qword [rdi + 0x28]\l0x0000299b      cmp rax, qword [rdi + 0x30]\l0x0000299f      jae 0x2aee\l"]
+	"0x000029a5" [URL="dbg.main/0x000029a5", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x000029a5      lea rdx, [rax + 1]\l0x000029a9      mov qword [rdi + 0x28], rdx\l0x000029ad      mov byte [rax], r15b\l"]
+	"0x000029b0" [URL="dbg.main/0x000029b0", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREFS from dbg.main @ 0x2af9, 0x2bb4\l0x000029b0      cmp r15d, 0xa\l0x000029b4      je 0x28f1\l"]
+	"0x000029ba" [URL="dbg.main/0x000029ba", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREFS from dbg.main @ 0x290e, 0x2a91\l0x000029ba      mov rax, qword [r14 + 8]\l0x000029be      cmp rax, qword [r14 + 0x10]\l0x000029c2      jae 0x2a70\l"]
+	"0x000029c8" [URL="dbg.main/0x000029c8", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x000029c8      lea rdx, [rax + 1]\l0x000029cc      mov qword [r14 + 8], rdx\l0x000029d0      movzx r15d, byte [rax]\l"]
+	"0x000029d4" [URL="dbg.main/0x000029d4", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2a7d\l0x000029d4      test bl, bl\l0x000029d6      je 0x2990\l"]
+	"0x000029d8" [URL="dbg.main/0x000029d8", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x000029d8      call sym.imp.__ctype_b_loc\l0x000029dd      mov r10, rax\l0x000029e0      movsxd rax, r15d\l0x000029e3      mov rdx, qword [r10]\l0x000029e6      movzx eax, word [rdx + rax*2]\l0x000029ea      mov r13d, eax\l0x000029ed      and r13d, 1\l0x000029f1      test al, 1\l0x000029f3      je 0x2918\l"]
+	"0x000029f9" [URL="dbg.main/0x000029f9", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2ac0\l0x000029f9      lea rdx, [var_2fh]                                     ; int64_t arg3\l0x000029fe      lea rsi, [var_30h]                                     ; int64_t arg2\l0x00002a03      mov rdi, r12                                           ; int64_t arg1\l0x00002a06      call dbg.get_next_tab_column\l0x00002a0b      cmp byte [var_2fh], 0\l0x00002a10      jne 0x2b2b\l"]
+	"0x00002a16" [URL="dbg.main/0x00002a16", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002a16      cmp r12, rax\l0x00002a19      ja 0x2c43\l"]
+	"0x00002a1f" [URL="dbg.main/0x00002a1f", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002a1f      cmp r15d, 9\l0x00002a23      je 0x2b7e\l"]
+	"0x00002a29" [URL="dbg.main/0x00002a29", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002a29      movzx ebx, byte [var_8h]\l0x00002a2e      add r12, 1\l0x00002a32      xor ebx, 1\l0x00002a35      cmp rax, r12\l0x00002a38      setne dl\l0x00002a3b      or bl, dl\l0x00002a3d      jne 0x2b94\l"]
+	"0x00002a43" [URL="dbg.main/0x00002a43", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002a43      mov rax, qword [ptr]\l0x00002a48      mov byte [rax], 9\l0x00002a4b      mov rax, r12\l"]
+	"0x00002a4e" [URL="dbg.main/0x00002a4e", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREFS from dbg.main @ 0x2b81, 0x2b8f\l0x00002a4e      movzx ebp, byte [var_17h]\l0x00002a53      mov r12, rax\l0x00002a56      mov ebx, 1\l0x00002a5b      mov r15d, 9\l0x00002a61      jmp 0x2931\l"]
+	"0x00002a70" [URL="dbg.main/0x00002a70", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x29c2\l0x00002a70      mov rdi, r14\l0x00002a73      call sym.imp.__uflow\l0x00002a78      mov r15d, eax\l0x00002a7b      test eax, eax\l0x00002a7d      jns 0x29d4\l"]
+	"0x00002a83" [URL="dbg.main/0x00002a83", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002a83      mov rdi, r14                                           ; int64_t arg1\l0x00002a86      call dbg.next_file\l0x00002a8b      mov r14, rax\l0x00002a8e      test rax, rax\l0x00002a91      jne 0x29ba\l"]
+	"0x00002a97" [URL="dbg.main/0x00002a97", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002a97      test bl, bl\l0x00002a99      je 0x2b46\l"]
+	"0x00002a9f" [URL="dbg.main/0x00002a9f", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002a9f      call sym.imp.__ctype_b_loc\l0x00002aa4      mov r10, rax\l0x00002aa7      movsxd rax, r15d\l0x00002aaa      mov rdx, qword [r10]\l0x00002aad      movzx eax, word [rdx + rax*2]\l0x00002ab1      mov r13d, eax\l0x00002ab4      and r13d, 1\l0x00002ab8      test al, 1\l0x00002aba      je 0x2922\l"]
+	"0x00002ac0" [URL="dbg.main/0x00002ac0", fillcolor="white",color="#767676", fontname="Courier",label="0x00002ac0      jmp 0x29f9\l"]
+	"0x00002ac5" [URL="dbg.main/0x00002ac5", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x291c\l0x00002ac5      mov rax, qword [var_30h]\l0x00002aca      cmp r12, 1\l0x00002ace      adc r12, 0xffffffffffffffff\l0x00002ad2      cmp rax, 1\l0x00002ad6      adc rax, 0xffffffffffffffff\l0x00002ada      mov qword [var_30h], rax\l0x00002adf      test rbp, rbp\l0x00002ae2      je 0x2b32\l"]
+	"0x00002ae4" [URL="dbg.main/0x00002ae4", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002ae4      mov byte [var_8h], r13b\l0x00002ae9      jmp 0x293b\l"]
+	"0x00002aee" [URL="dbg.main/0x00002aee", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x299f\l0x00002aee      movzx esi, r15b\l0x00002af2      call sym.imp.__overflow\l0x00002af7      test eax, eax\l0x00002af9      jns 0x29b0\l"]
+	"0x00002aff" [URL="dbg.main/0x00002aff", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002aff      mov edx, 5\l0x00002b04      lea rsi, str.write_error                               ; 0x711a ; \"write error\"\l0x00002b0b      xor edi, edi\l0x00002b0d      call sym.imp.dcgettext\l0x00002b12      mov r12, rax\l0x00002b15      call sym.imp.__errno_location\l0x00002b1a      mov rdx, r12                                           ; char *format\l0x00002b1d      mov edi, 1                                             ; int status\l0x00002b22      mov esi, dword [rax]                                   ; int errname\l0x00002b24      xor eax, eax\l0x00002b26      call sym.imp.error                                     ; void error(int status, int errname, char *format)\l"]
+	"0x00002b2b" [URL="dbg.main/0x00002b2b", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2a10\l0x00002b2b      xor ebx, ebx\l0x00002b2d      jmp 0x2931\l"]
+	"0x00002b32" [URL="dbg.main/0x00002b32", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2ae2\l0x00002b32      movzx ebx, byte [obj.convert_entire_line]              ; [0xb100:1]=0\l0x00002b39      mov byte [var_8h], r13b\l0x00002b3e      or ebx, r13d\l0x00002b41      jmp 0x2990\l"]
+	"0x00002b46" [URL="dbg.main/0x00002b46", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREFS from dbg.main @ 0x2988, 0x2a99\l0x00002b46      mov rdi, qword [ptr]                                   ; void *ptr\l0x00002b4b      call sym.imp.free                                      ; void free(void *ptr)\l"]
+	"0x00002b50" [URL="dbg.main/0x00002b50", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x28da\l0x00002b50      call dbg.cleanup_file_list_stdin\l0x00002b55      mov eax, dword [obj.exit_status]                       ; [0xb0f0:4]=1\l0x00002b5b      mov rdx, qword [var_38h]\l0x00002b60      sub rdx, qword fs:[0x28]\l0x00002b69      jne 0x2c67\l"]
+	"0x00002b6f" [URL="dbg.main/0x00002b6f", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002b6f      add rsp, 0x48\l0x00002b73      pop rbx\l0x00002b74      pop rbp\l0x00002b75      pop r12\l0x00002b77      pop r13\l0x00002b79      pop r14\l0x00002b7b      pop r15\l0x00002b7d      ret\l"]
+	"0x00002b7e" [URL="dbg.main/0x00002b7e", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2a23\l0x00002b7e      test rbp, rbp\l0x00002b81      je 0x2a4e\l"]
+	"0x00002b87" [URL="dbg.main/0x00002b87", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="0x00002b87      mov rcx, qword [ptr]\l0x00002b8c      mov byte [rcx], 9\l0x00002b8f      jmp 0x2a4e\l"]
+	"0x00002b94" [URL="dbg.main/0x00002b94", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2a3d\l0x00002b94      cmp rax, r12\l0x00002b97      movzx eax, byte [var_17h]\l0x00002b9c      mov byte [var_8h], bl\l0x00002ba0      cmove eax, ebx\l0x00002ba3      mov byte [var_17h], al\l0x00002ba7      mov rax, qword [ptr]\l0x00002bac      mov byte [rax + rbp], r15b\l0x00002bb0      add rbp, 1\l0x00002bb4      jmp 0x29b0\l"]
+	"0x00002bb9" [URL="dbg.main/0x00002bb9", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x28ac\l0x00002bb9      mov rdi, qword [var_8h]                                ; int64_t arg1\l0x00002bbe      call dbg.add_tab_stop\l0x00002bc3      jmp 0x28b2\l"]
+	"0x00002bc8" [URL="dbg.main/0x00002bc8", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x27dd\l0x00002bc8      xor edi, edi                                           ; int64_t arg1\l0x00002bca      call dbg.usage\l"]
+	"0x00002bcf" [URL="dbg.main/0x00002bcf", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x296c\l0x00002bcf      mov edx, 5\l0x00002bd4      lea rsi, str.write_error                               ; 0x711a ; \"write error\"\l0x00002bdb      xor edi, edi\l0x00002bdd      call sym.imp.dcgettext\l0x00002be2      mov r12, rax\l0x00002be5      call sym.imp.__errno_location\l0x00002bea      mov rdx, r12                                           ; char *format\l0x00002bed      mov edi, 1                                             ; int status\l0x00002bf2      mov esi, dword [rax]                                   ; int errname\l0x00002bf4      xor eax, eax\l0x00002bf6      call sym.imp.error                                     ; void error(int status, int errname, char *format)\l"]
+	"0x00002bfb" [URL="dbg.main/0x00002bfb", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2926\l0x00002bfb      mov edx, 5\l0x00002c00      lea rsi, str.input_line_is_too_long                    ; 0x7103 ; \"input line is too long\"\l0x00002c07      xor edi, edi\l0x00002c09      call sym.imp.dcgettext\l0x00002c0e      xor esi, esi                                           ; int errname\l0x00002c10      mov edi, 1                                             ; int status\l0x00002c15      mov rdx, rax                                           ; char *format\l0x00002c18      xor eax, eax\l0x00002c1a      call sym.imp.error                                     ; void error(int status, int errname, char *format)\l"]
+	"0x00002c1f" [URL="dbg.main/0x00002c1f", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREFS from dbg.main @ 0x27fe, 0x2813\l0x00002c1f      mov edx, 5\l0x00002c24      lea rsi, str.tab_stop_value_is_too_large               ; 0x70d8 ; \"tab stop value is too large\"\l0x00002c2b      xor edi, edi\l0x00002c2d      call sym.imp.dcgettext\l0x00002c32      xor esi, esi                                           ; int errname\l0x00002c34      mov edi, 1                                             ; int status\l0x00002c39      mov rdx, rax                                           ; char *format\l0x00002c3c      xor eax, eax\l0x00002c3e      call sym.imp.error                                     ; void error(int status, int errname, char *format)\l"]
+	"0x00002c43" [URL="dbg.main/0x00002c43", fillcolor="#c19c00",color="#c19c00", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2a19\l0x00002c43      mov edx, 5\l0x00002c48      lea rsi, str.input_line_is_too_long                    ; 0x7103 ; \"input line is too long\"\l0x00002c4f      xor edi, edi\l0x00002c51      call sym.imp.dcgettext\l0x00002c56      xor esi, esi                                           ; int errname\l0x00002c58      mov edi, 1                                             ; int status\l0x00002c5d      mov rdx, rax                                           ; char *format\l0x00002c60      xor eax, eax\l0x00002c62      call sym.imp.error                                     ; void error(int status, int errname, char *format)\l"]
+	"0x00002c67" [URL="dbg.main/0x00002c67", fillcolor="white",color="#767676", fontname="Courier",label="; CODE XREF from dbg.main @ 0x2b69\l0x00002c67      call sym.imp.__stack_chk_fail                          ; void __stack_chk_fail(void)\l"]
+        "0x000026c0" -> "0x00002740" [color="#3a96dd"];
+        "0x00002740" -> "0x0000289d" [color="#13a10e"];
+        "0x00002740" -> "0x0000275c" [color="#c50f1f"];
+        "0x0000275c" -> "0x00002860" [color="#13a10e"];
+        "0x0000275c" -> "0x00002765" [color="#c50f1f"];
+        "0x00002765" -> "0x000027b8" [color="#13a10e"];
+        "0x00002765" -> "0x00002767" [color="#c50f1f"];
+        "0x00002767" -> "0x00002840" [color="#13a10e"];
+        "0x00002767" -> "0x00002770" [color="#c50f1f"];
+        "0x00002770" -> "0x00002828" [color="#13a10e"];
+        "0x00002770" -> "0x00002776" [color="#c50f1f"];
+        "0x00002776" -> "0x000027d8" [color="#13a10e"];
+        "0x00002776" -> "0x0000277d" [color="#c50f1f"];
+        "0x000027b8" -> "0x00002870" [color="#13a10e"];
+        "0x000027b8" -> "0x000027c1" [color="#c50f1f"];
+        "0x000027c1" -> "0x000027e3" [color="#13a10e"];
+        "0x000027c1" -> "0x000027c8" [color="#c50f1f"];
+        "0x000027c8" -> "0x00002740" [color="#3a96dd"];
+        "0x000027d8" -> "0x00002bc8" [color="#13a10e"];
+        "0x000027d8" -> "0x000027e3" [color="#c50f1f"];
+        "0x000027e3" -> "0x00002888" [color="#13a10e"];
+        "0x000027e3" -> "0x000027ec" [color="#c50f1f"];
+        "0x000027ec" -> "0x00002c1f" [color="#13a10e"];
+        "0x000027ec" -> "0x00002804" [color="#c50f1f"];
+        "0x00002804" -> "0x00002c1f" [color="#13a10e"];
+        "0x00002804" -> "0x00002819" [color="#c50f1f"];
+        "0x00002819" -> "0x00002740" [color="#3a96dd"];
+        "0x00002828" -> "0x000027e3" [color="#13a10e"];
+        "0x00002828" -> "0x0000282d" [color="#c50f1f"];
+        "0x00002840" -> "0x00002740" [color="#13a10e"];
+        "0x00002840" -> "0x00002849" [color="#c50f1f"];
+        "0x00002849" -> "0x00002740" [color="#3a96dd"];
+        "0x00002860" -> "0x00002740" [color="#3a96dd"];
+        "0x00002870" -> "0x00002740" [color="#3a96dd"];
+        "0x00002888" -> "0x00002740" [color="#3a96dd"];
+        "0x0000289d" -> "0x000028a9" [color="#13a10e"];
+        "0x0000289d" -> "0x000028a2" [color="#c50f1f"];
+        "0x000028a2" -> "0x000028a9" [color="#3a96dd"];
+        "0x000028a9" -> "0x00002bb9" [color="#13a10e"];
+        "0x000028a9" -> "0x000028b2" [color="#c50f1f"];
+        "0x000028b2" -> "0x000028c8" [color="#13a10e"];
+        "0x000028b2" -> "0x000028c4" [color="#c50f1f"];
+        "0x000028c4" -> "0x000028c8" [color="#3a96dd"];
+        "0x000028c8" -> "0x00002b50" [color="#13a10e"];
+        "0x000028c8" -> "0x000028e0" [color="#c50f1f"];
+        "0x000028e0" -> "0x000028f1" [color="#3a96dd"];
+        "0x000028f1" -> "0x000029ba" [color="#3a96dd"];
+        "0x00002918" -> "0x00002ac5" [color="#13a10e"];
+        "0x00002918" -> "0x00002922" [color="#c50f1f"];
+        "0x00002922" -> "0x00002bfb" [color="#13a10e"];
+        "0x00002922" -> "0x0000292c" [color="#c50f1f"];
+        "0x0000292c" -> "0x00002931" [color="#3a96dd"];
+        "0x00002931" -> "0x00002977" [color="#13a10e"];
+        "0x00002931" -> "0x0000293b" [color="#c50f1f"];
+        "0x0000293b" -> "0x00002950" [color="#13a10e"];
+        "0x0000293b" -> "0x00002941" [color="#c50f1f"];
+        "0x00002941" -> "0x00002950" [color="#13a10e"];
+        "0x00002941" -> "0x00002948" [color="#c50f1f"];
+        "0x00002948" -> "0x00002950" [color="#3a96dd"];
+        "0x00002950" -> "0x00002bcf" [color="#13a10e"];
+        "0x00002950" -> "0x00002972" [color="#c50f1f"];
+        "0x00002972" -> "0x00002977" [color="#3a96dd"];
+        "0x00002977" -> "0x00002b46" [color="#13a10e"];
+        "0x00002977" -> "0x0000298e" [color="#c50f1f"];
+        "0x0000298e" -> "0x00002990" [color="#3a96dd"];
+        "0x00002990" -> "0x00002aee" [color="#13a10e"];
+        "0x00002990" -> "0x000029a5" [color="#c50f1f"];
+        "0x000029a5" -> "0x000029b0" [color="#3a96dd"];
+        "0x000029b0" -> "0x000028f1" [color="#13a10e"];
+        "0x000029b0" -> "0x000029ba" [color="#c50f1f"];
+        "0x000029ba" -> "0x00002a70" [color="#13a10e"];
+        "0x000029ba" -> "0x000029c8" [color="#c50f1f"];
+        "0x000029c8" -> "0x000029d4" [color="#3a96dd"];
+        "0x000029d4" -> "0x00002990" [color="#13a10e"];
+        "0x000029d4" -> "0x000029d8" [color="#c50f1f"];
+        "0x000029d8" -> "0x00002918" [color="#13a10e"];
+        "0x000029d8" -> "0x000029f9" [color="#c50f1f"];
+        "0x000029f9" -> "0x00002b2b" [color="#13a10e"];
+        "0x000029f9" -> "0x00002a16" [color="#c50f1f"];
+        "0x00002a16" -> "0x00002c43" [color="#13a10e"];
+        "0x00002a16" -> "0x00002a1f" [color="#c50f1f"];
+        "0x00002a1f" -> "0x00002b7e" [color="#13a10e"];
+        "0x00002a1f" -> "0x00002a29" [color="#c50f1f"];
+        "0x00002a29" -> "0x00002b94" [color="#13a10e"];
+        "0x00002a29" -> "0x00002a43" [color="#c50f1f"];
+        "0x00002a43" -> "0x00002a4e" [color="#3a96dd"];
+        "0x00002a4e" -> "0x00002931" [color="#3a96dd"];
+        "0x00002a70" -> "0x000029d4" [color="#13a10e"];
+        "0x00002a70" -> "0x00002a83" [color="#c50f1f"];
+        "0x00002a83" -> "0x000029ba" [color="#13a10e"];
+        "0x00002a83" -> "0x00002a97" [color="#c50f1f"];
+        "0x00002a97" -> "0x00002b46" [color="#13a10e"];
+        "0x00002a97" -> "0x00002a9f" [color="#c50f1f"];
+        "0x00002a9f" -> "0x00002922" [color="#13a10e"];
+        "0x00002a9f" -> "0x00002ac0" [color="#c50f1f"];
+        "0x00002ac0" -> "0x000029f9" [color="#3a96dd"];
+        "0x00002ac5" -> "0x00002b32" [color="#13a10e"];
+        "0x00002ac5" -> "0x00002ae4" [color="#c50f1f"];
+        "0x00002ae4" -> "0x0000293b" [color="#3a96dd"];
+        "0x00002aee" -> "0x000029b0" [color="#13a10e"];
+        "0x00002aee" -> "0x00002aff" [color="#c50f1f"];
+        "0x00002aff" -> "0x00002b2b" [color="#3a96dd"];
+        "0x00002b2b" -> "0x00002931" [color="#3a96dd"];
+        "0x00002b32" -> "0x00002990" [color="#3a96dd"];
+        "0x00002b46" -> "0x00002b50" [color="#3a96dd"];
+        "0x00002b50" -> "0x00002c67" [color="#13a10e"];
+        "0x00002b50" -> "0x00002b6f" [color="#c50f1f"];
+        "0x00002b7e" -> "0x00002a4e" [color="#13a10e"];
+        "0x00002b7e" -> "0x00002b87" [color="#c50f1f"];
+        "0x00002b87" -> "0x00002a4e" [color="#3a96dd"];
+        "0x00002b94" -> "0x000029b0" [color="#3a96dd"];
+        "0x00002bb9" -> "0x000028b2" [color="#3a96dd"];
+        "0x00002bc8" -> "0x00002bcf" [color="#3a96dd"];
+        "0x00002bcf" -> "0x00002bfb" [color="#3a96dd"];
+        "0x00002bfb" -> "0x00002c1f" [color="#3a96dd"];
+        "0x00002c1f" -> "0x00002c43" [color="#3a96dd"];
+        "0x00002c43" -> "0x00002c67" [color="#3a96dd"];
+}
