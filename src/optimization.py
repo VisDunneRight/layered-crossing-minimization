@@ -43,6 +43,7 @@ class LayeredOptimizer:
 		self.strat_big_m = parameters["strat_big_m"] if "strat_big_m" in parameters else False
 		self.mirror_vars = parameters["mirror_vars"] if "mirror_vars" in parameters else False
 		self.stratisfimal_y_vars = parameters["stratisfimal_yvars"] if "stratisfimal_yvars" in parameters else False
+		self.symmetry_constraints = parameters["symmetry_constraints"] if "symmetry_constraints" in parameters else True
 		# self.indicator_y_constraints = True
 		self.return_experiment_data = parameters["return_experiment_data"] if "return_experiment_data" in parameters else False
 		self.name = parameters["name"] if "name" in parameters else "graph1"
@@ -788,7 +789,7 @@ class LayeredOptimizer:
 			n_constraints_generated[i] += val
 
 		""" Symmetry constraints """
-		if self.mirror_vars:
+		if self.mirror_vars and self.symmetry_constraints:
 			self.add_symmetry_constraints(m, x_vars, c_vars, x, c)
 
 		""" Fix key x-var """
