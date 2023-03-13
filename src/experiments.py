@@ -1,4 +1,5 @@
 import os
+import itertools
 import pickle
 import csv
 from src import optimization, read_data, vis, motifs
@@ -183,11 +184,11 @@ def run_experiment(start_idx, cutoff_time, exp_name, param_to_set, clear_files, 
                 redundant_timedout = 0
 
 
-def run_multi_param_experiment(start_idx, graphs_file, cutoff_time, exp_name, params_to_set, clear_files, max_timeout):
+def run_multi_param_experiment(start_idx, graphs_file, cutoff_time, exp_name, params_to_set, clear_files):
     with open(graphs_file, 'r') as f:
         gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
     if clear_files:
-        if start_idx != (0, 0):
+        if start_idx != 0:
             print("Something's wrong here...")
             return
         clear_file(f"junger_basic/{exp_name}_{cutoff_time}.csv")
@@ -196,42 +197,31 @@ def run_multi_param_experiment(start_idx, graphs_file, cutoff_time, exp_name, pa
         insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
         insert_one(f"strat_big_m/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
         insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
-    for j in range(start_idx[0], 3):
-        junger_timedout = 0
-        strat_timedout = 0
-        redundant_timedout = 0
-        for i, to_opt in enumerate(gfiles[j][start_idx[1]:]):
-            if junger_timedout >= max_timeout and strat_timedout >= max_timeout and redundant_timedout >= max_timeout:
-                break
-            print(f"{i + start_idx[1] + 1} / {len(gfiles[j])}")
-            g = read_data.read(to_opt)
-            base_info = basic_info(g)
-            params = {param: True for param in params_to_set}
-            params.update({"cutoff_time": cutoff_time, "return_experiment_data": True, "junger_trans": True})
-            optimizer = optimization.LayeredOptimizer(g, params)
-            result = optimizer.optimize_layout()
-            insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv",
-                       [i + start_idx[1], to_opt] + base_info + [j for j in result])
-            if result[5] >= cutoff_time or junger_timedout >= max_timeout:
-                junger_timedout += 1
-            else:
-                junger_timedout = 0
-            optimizer.junger_trans, optimizer.strat_big_m = False, True
-            result = optimizer.optimize_layout()
-            insert_one(f"strat_big_m/{exp_name}_{cutoff_time}.csv",
-                       [i + start_idx[1], to_opt] + base_info + [j for j in result])
-            if result[5] >= cutoff_time or strat_timedout >= max_timeout:
-                strat_timedout += 1
-            else:
-                strat_timedout = 0
-            optimizer.junger_trans = True
-            result = optimizer.optimize_layout()
-            insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv",
-                       [i + start_idx[1], to_opt] + base_info + [j for j in result])
-            if result[5] >= cutoff_time or redundant_timedout >= max_timeout:
-                redundant_timedout += 1
-            else:
-                redundant_timedout = 0
+    for i, to_opt in enumerate(gfiles[start_idx:]):
+        print(f"{i + start_idx + 1} / {len(gfiles)}")
+        g = read_data.read(to_opt)
+        base_info = basic_info(g)
+        params = {param: True for param in params_to_set}
+        params.update({"cutoff_time": cutoff_time, "return_experiment_data": True, "junger_trans": True})
+        optimizer = optimization.LayeredOptimizer(g, params)
+        result = optimizer.optimize_layout()
+        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", [i + start_idx, to_opt] + base_info + [j for j in result])
+        optimizer.junger_trans, optimizer.strat_big_m = False, True
+        result = optimizer.optimize_layout()
+        insert_one(f"strat_big_m/{exp_name}_{cutoff_time}.csv", [i + start_idx, to_opt] + base_info + [j for j in result])
+        optimizer.junger_trans = True
+        result = optimizer.optimize_layout()
+        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", [i + start_idx, to_opt] + base_info + [j for j in result])
+
+
+def all_combinations_experiment():
+    key = ["fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
+    for combo in list(itertools.chain.from_iterable(itertools.combinations(key, r) for r in range(len(key)+1))):
+        if len(combo) == 0:
+            run_multi_param_experiment(0, "data storage/all_combos_files.txt", 60, 'all_combos/exp0', ["baseline"], True)
+        else:
+            run_multi_param_experiment(0, "data storage/all_combos_files.txt", 60, 'all_combos/exp' + ''.join([str(ind+1) for ind, val in enumerate(key) if val in combo]), list(combo), True)
+
 
 
 def run_one_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_files):

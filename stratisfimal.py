@@ -1,5 +1,6 @@
 import os
 import sys
+import csv
 import random
 import cProfile
 import pstats
@@ -9,6 +10,9 @@ from src import vis, layering, motifs, experiments
 from src.graph import *
 from src.read_data import *
 from src.optimization import LayeredOptimizer
+
+
+random.seed(22)
 
 
 def run_all_rome_lib(num_nodes, num_graphs, num_drawings, bendiness_reduction, seq_bend, timelimit, save, savefile=None, shuffle=False, target=None, subgraph_reduction=False):
@@ -321,6 +325,26 @@ def randomly_select_files_for_exp(fname):
         random.shuffle(lines)
     with open(f"data storage/{fname}", 'w') as f:
         f.writelines(lines)
+
+
+def randomly_select_50_files(fname):
+    with open('data storage/junger_basic/baseline_60.csv') as fd:
+        reader = csv.reader(fd)
+        rome_nums = random.sample(list(range(1, 9855)), 35)
+        dagmar_nums = random.sample(list(range(9855, 9900)), 5)
+        north_nums = random.sample(list(range(9900, 11177)), 10)
+        gnames = [row[1]+'\n' for idx, row in enumerate(reader) if idx in rome_nums+dagmar_nums+north_nums]
+    with open(f"data storage/{fname}", 'w') as f:
+        f.writelines(gnames)
+def make_altair_chart_for_ind_var():
+    data = experiments.read_data_from_file("independent_var_study.csv", ',')
+    data = [dat for dat in data if dat["opttime"] < 120 and dat["iterations"] > 0]
+    print(len(data))
+    for dat in data:
+        dat['file'] = dat['file'][:dat['file'].index('/')]
+        dat['xpc'] = dat['xvars'] + dat['cvars']
+    vis.draw_altair_scatter(data, "xpc", "opttime", "file", "X-vars + c-vars", "Time (s)", "Decision variables vs time to optimize")
+    vis.draw_altair_scatter(data, "xpc", "iterations", "file", "X-vars + c-vars", "Simplex iterations", "Decision variables vs iterations")
 
 
 def record_baseline_info(filename, start_idx):

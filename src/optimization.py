@@ -115,7 +115,7 @@ class LayeredOptimizer:
 			butterflies = None
 		for c_var in c_vars:
 			if butterflies is None or c_var not in butterflies:
-				if self.mirror_vars:
+				if self.mirror_vars and not g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
 					model.addConstr(x[c_var[1][0], c_var[0][0]] + x[c_var[0][1], c_var[1][1]] + c[c_var] >= 1, f"1se{c_var}")
 					model.addConstr(x[c_var[0][0], c_var[1][0]] + x[c_var[1][1], c_var[0][1]] + c[c_var] >= 1, f"2se{c_var}")
 					if track_x_var_usage:
@@ -662,7 +662,7 @@ class LayeredOptimizer:
 			z = m.addVars(z_vars, vtype=relax_type, lb=0, ub=self.m_val, name="z")
 		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars)
 		if self.mirror_vars:
-			c_vars_orig = reductions.normal_c_vars(g, edges_by_layer, False)
+			c_vars_orig, c_consts = reductions.normal_c_vars(g, edges_by_layer, False)
 		c = m.addVars(c_vars, vtype=relax_type, name="c")
 		if self.strat_big_m or self.stratisfimal_y_vars:
 			y_vars = [n.name for n in g]
