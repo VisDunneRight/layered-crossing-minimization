@@ -48,8 +48,6 @@ class LayeredOptimizer:
 		self.return_experiment_data = parameters["return_experiment_data"] if "return_experiment_data" in parameters else False
 		self.name = parameters["name"] if "name" in parameters else "graph1"
 		self.print_info = []
-		if not self.junger_trans and not self.strat_big_m and not self.stratisfimal_y_vars:
-			self.strat_big_m = True
 
 	def sequential_br(self, graph_arg=None, substitute_x_vars=None, subgraph_seq=False):
 		g = self.g if graph_arg is None else graph_arg
@@ -633,6 +631,8 @@ class LayeredOptimizer:
 
 	def optimize_layout_standard(self, graph_arg=None, bendiness_reduction=False, assignment=None, return_x_vars=False, heuristic_start=False, transitivity=False, presolve=0, name="graph1", fix_x_vars=None, start_x_vars=None, fix_1_xvar=False, branch_on_x_vars=False, is_subgraph=False, verbose=False, use_top_level_params=False):
 		g = self.g if graph_arg is None else graph_arg
+		if not self.junger_trans and not self.strat_big_m:
+			self.strat_big_m = True
 
 		t1 = time.time()
 		nodes_by_layer = g.get_names_by_layer()
@@ -663,7 +663,7 @@ class LayeredOptimizer:
 			z = m.addVars(z_vars, vtype=relax_type, lb=0, ub=self.m_val, name="z")
 		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars)
 		if self.mirror_vars:
-			c_vars_orig, c_consts = reductions.normal_c_vars(g, edges_by_layer, False)
+			c_vars_orig, nc_consts = reductions.normal_c_vars(g, edges_by_layer, False)
 		c = m.addVars(c_vars, vtype=relax_type, name="c")
 		if self.strat_big_m or self.stratisfimal_y_vars:
 			y_vars = [n.name for n in g]
@@ -768,7 +768,7 @@ class LayeredOptimizer:
 				m.setObjective(opt, GRB.MINIMIZE)
 		else:
 			opt = gp.LinExpr()
-			if self.mirror_vars:
+			if self.mirror_vars and self.symmetry_constraints:
 				for i, c_var in enumerate(c_vars_orig):
 					opt += c_consts[i] * c[c_var]
 			else:

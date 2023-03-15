@@ -57,36 +57,40 @@ def run_stratisfimal_layout(graph_file):
     optimizer = LayeredOptimizer(graph_file)
     optimizer.strat_big_m = True
     optimizer.junger_trans = True
-    optimizer.optimize_layout()
+    optimizer.return_experiment_data = True
+    return optimizer.optimize_layout()
 
 
 def run_optimal_sankey_layout(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.strat_big_m = False
     optimizer.junger_trans = True
     optimizer.mirror_vars = True
     optimizer.butterfly_reduction = True
     optimizer.xvar_branch_priority = True
-    optimizer.optimize_layout()
+    optimizer.return_experiment_data = True
+    return optimizer.optimize_layout()
 
 
 def run_junger_polyhedral_layout(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.strat_big_m = False
     optimizer.junger_trans = True
     optimizer.mirror_vars = True
-    optimizer.symmetry_constraints = False
-    optimizer.optimize_layout()
+    # optimizer.symmetry_constraints = False
+    optimizer.return_experiment_data = True
+    return optimizer.optimize_layout()
 
 
 def run_my_layout_algorithm(graph_file):
     optimizer = LayeredOptimizer(graph_file)
+    optimizer.strat_big_m = True
     optimizer.fix_one_var = True
     optimizer.butterfly_reduction = True
     optimizer.heuristic_start = True
     optimizer.mip_relax = True
     optimizer.xvar_branch_priority = True
-    optimizer.optimize_layout()
+    optimizer.aggro_presolve = True
+    optimizer.return_experiment_data = True
+    return optimizer.optimize_layout()
 
 
 def run_test_pos_1_to_n():
@@ -364,10 +368,29 @@ def record_baseline_info(filename, start_idx):
                 f2.write(','.join(str(j) for j in [i, line.removesuffix('\n'), sum(1 for nd in g.nodes if not nd.is_anchor_node), len(g.nodes), len(g.edges), round(g.calculate_connectedness(), 3), tup[3], tup[4]]) + '\n')
 
 
+def case_study_graph_experiment():
+    my_vals = []
+    strat_vals = []
+    junger_vals = []
+    sankey_vals = []
+    control_flow_file = "control-flow-graphs/echo/dbg.main.dot"
+    for i in range(5):
+        m1 = run_my_layout_algorithm(control_flow_file)
+        m2 = run_junger_polyhedral_layout(control_flow_file)
+        m3 = run_optimal_sankey_layout(control_flow_file)
+        m4 = run_stratisfimal_layout(control_flow_file)
+        my_vals.append(m1[5] + m1[8])
+        junger_vals.append(m2[5] + m2[8])
+        sankey_vals.append(m3[5] + m3[8])
+        strat_vals.append(m4[5] + m4[8])
+    print(sum(my_vals)/5, my_vals)
+    print(sum(strat_vals)/5, strat_vals)
+    print(sum(junger_vals)/5, junger_vals)
+    print(sum(sankey_vals)/5, sankey_vals)
+
+
 if __name__ == '__main__':
-    opt = LayeredOptimizer("control-flow-graphs/touch/dbg.main.dot")
-    opt.draw_graph = True
-    opt.optimize_layout()
+    case_study_graph_experiment()
 
     # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
     # experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)
