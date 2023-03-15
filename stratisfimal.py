@@ -389,8 +389,103 @@ def case_study_graph_experiment():
     print(sum(sankey_vals)/5, sankey_vals)
 
 
+def my_fn(s):
+    if s[1][0] == "R":
+        add_val = -100000
+    elif s[1][0] == "D":
+        add_val = 0
+    else:
+        add_val = 100000
+    return add_val + int(s[3])
+
+
+""" find bucket of files size n in sorted exp file, works regardless of sorted """
+def bucket_lines_in_data(file, bucket_size):
+    lines_in_file = []
+    with open(file, 'r') as fd1:
+        rdr = csv.reader(fd1)
+        next(rdr)
+        for ln in rdr:
+            if bucket_size <= int(ln[3]) < bucket_size + 10:
+                lines_in_file.append(ln)
+    lines_in_file.sort(key=my_fn)
+    return lines_in_file
+
+
+def get_all_files_in_bucket(bucket_size):
+    with open("data storage/all_g_sorted.txt", 'r') as fd1:
+        collect_lines = False
+        filenames = []
+        for line in fd1.readlines():
+            if line[0] == "T":
+                if int(line[line.index('[') + 1:line.index(',')]) == bucket_size:
+                    collect_lines = True
+                else:
+                    collect_lines = False
+            elif collect_lines:
+                filenames.append(line[:line.index(',')])
+    return filenames
+
+
+def calc_if_bucket_donezo(datapts):
+    timedout = sum((1 for pt in datapts if float(pt[10]) > 60))
+    return True if timedout / len(datapts) >= 0.5 else False
+
+
+def run_thing():
+    """ find missing entries, run exp, write to new file, cut off once >50% in bucket timeout """
+    key1 = ["fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
+    key2 = ["fix1var_60", "butterfly_60", "heuristic_60", "presolve_60", "xvar_branch_60", "mip_relax_60", "symmetry_60"]
+    for j, inp1 in enumerate(["junger_basic", "strat_big_m", "redundancy"]):
+        for i, inp2 in enumerate(key2):
+            fname = f"{inp1}/{inp2}"
+            experiments.insert_one(f"{fname}_new.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+            curindex = 0
+            for bsize in range(10, 17141, 10):
+                bfiles = bucket_lines_in_data("data storage/"+fname+".csv", bsize)
+                bfnames = [bfl[1] for bfl in bfiles]
+                all_bfiles = get_all_files_in_bucket(bsize)
+                if len(all_bfiles) > 0:
+                    for check_file in all_bfiles:
+                        if check_file not in bfnames:
+                            parameters = [key1[i], "junger_trans" if j % 2 == 0 else "baseline", "strat_big_m" if j > 0 else "baseline"]
+                            experiments.run_one_graph(check_file, f"{fname[fname.index('/')+1:]}_new", 60, parameters, curindex)
+                        else:
+                            bfiles[bfnames.index(check_file)][0] = curindex
+                            experiments.insert_one(f"{fname}_new.csv", bfiles[bfnames.index(check_file)])
+                        curindex += 1
+                    if calc_if_bucket_donezo(bfiles):
+                        print(f"{inp1} with switch {inp2} cutoff at bucket size {bsize}")
+                        break
+
+# key1 = ["fix_one_var"]
+# key2 = ["fix1var_60"]
+# for j, inp1 in enumerate(["junger_basic"]):
+# 	for i, inp2 in enumerate(key2):
+# 		fname = f"{inp1}/{inp2}"
+# 		experiments.insert_one(f"{fname}_new.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+# 		curindex = 0
+# 		for bsize in range(10, 17141, 10):
+# 			bfiles = bucket_lines_in_data("data storage/"+fname+".csv", bsize)
+# 			bfnames = [bfl[1] for bfl in bfiles]
+# 			all_bfiles = get_all_files_in_bucket(bsize)
+# 			if len(all_bfiles) > 0:
+# 				for check_file in all_bfiles:
+# 					if check_file not in bfnames:
+# 						parameters = [key1[i], "junger_trans" if j % 2 == 0 else "baseline", "strat_big_m" if j > 0 else "baseline"]
+# 						experiments.run_one_graph(check_file, f"{fname[fname.index('/')+1:]}_new", 60, parameters, curindex)
+# 					else:
+# 						bfiles[bfnames.index(check_file)][0] = curindex
+# 						experiments.insert_one(f"{fname}_new.csv", bfiles[bfnames.index(check_file)])
+# 					curindex += 1
+# 				if calc_if_bucket_donezo(bfiles):
+# 					print(f"{inp1} with switch {inp2} cutoff at bucket size {bsize}")
+# 					break
+
+
 if __name__ == '__main__':
-    case_study_graph_experiment()
+    # case_study_graph_experiment()
+    run_thing()
 
     # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
     # experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)

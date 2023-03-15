@@ -121,7 +121,7 @@ def get_all_graphs():
         for file in os.listdir(f"Rome-Lib/graficon{i}nodi"):
             all_g[0].append(f"Rome-Lib/graficon{i}nodi/" + file)
     daglist = []
-    for i in range(1, 11):
+    for i in range(1, 8):
         for file in os.listdir(f"DAGmar/graphs/{i}.6"):
             daglist.append(f"DAGmar/graphs/{i}.6/" + file)
     g_t_nds = {}
@@ -223,7 +223,6 @@ def all_combinations_experiment():
             run_multi_param_experiment(0, "data storage/all_combos_files.txt", 60, 'all_combos/exp' + ''.join([str(ind+1) for ind, val in enumerate(key) if val in combo]), list(combo), True)
 
 
-
 def run_one_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_files):
     with open(graphs_file, 'r') as f:
         gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
@@ -238,3 +237,15 @@ def run_one_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_fi
         optimizer = optimization.LayeredOptimizer(g, params)
         result = optimizer.optimize_layout()
         insert_one(f"{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
+
+
+def run_one_graph(gfile, exp_name, cutoff_time, params_to_set, idx):
+    print(f"running {gfile}")
+    g = read_data.read(gfile)
+    base_info = basic_info(g)
+    params = {param: True for param in params_to_set}
+    params.update({"cutoff_time": cutoff_time, "return_experiment_data": True})
+    optimizer = optimization.LayeredOptimizer(g, params)
+    result = optimizer.optimize_layout()
+    folder = "redundancy" if "junger_trans" in params_to_set and "strat_big_m" in params_to_set else "junger_basic" if "junger_trans" in params_to_set else "strat_big_m"
+    insert_one(f"{folder}/{exp_name}.csv", [idx, gfile] + base_info + [j for j in result])

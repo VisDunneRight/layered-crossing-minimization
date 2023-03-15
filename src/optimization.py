@@ -13,7 +13,7 @@ class LayeredOptimizer:
 	def __init__(self, layered_graph, parameters=None):
 		if parameters is None:
 			parameters = {}
-		assert os.path.isfile(layered_graph) or type(layered_graph) == LayeredGraph, "input needs to be a path to graph file or a LayeredGraph object"
+		assert (type(layered_graph) == str and os.path.isfile(layered_graph)) or type(layered_graph) == LayeredGraph, "input needs to be a path to graph file or a LayeredGraph object"
 		if type(layered_graph) == LayeredGraph:
 			self.g = layered_graph
 		else:
