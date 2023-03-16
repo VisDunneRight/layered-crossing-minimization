@@ -368,12 +368,12 @@ def record_baseline_info(filename, start_idx):
                 f2.write(','.join(str(j) for j in [i, line.removesuffix('\n'), sum(1 for nd in g.nodes if not nd.is_anchor_node), len(g.nodes), len(g.edges), round(g.calculate_connectedness(), 3), tup[3], tup[4]]) + '\n')
 
 
-def case_study_graph_experiment(command):
+def case_study_graph_experiment():
     my_vals = []
     strat_vals = []
     junger_vals = []
     sankey_vals = []
-    control_flow_file = f"control-flow-graphs/{command}/dbg.main.dot"
+    control_flow_file = "control-flow-graphs/echo/dbg.main.dot"
     for i in range(5):
         m1 = run_my_layout_algorithm(control_flow_file)
         m2 = run_junger_polyhedral_layout(control_flow_file)
@@ -402,12 +402,14 @@ def my_fn(s):
 """ find bucket of files size n in sorted exp file, works regardless of sorted """
 def bucket_lines_in_data(file, bucket_size):
     lines_in_file = []
+    seen_files = set()
     with open(file, 'r') as fd1:
         rdr = csv.reader(fd1)
         next(rdr)
         for ln in rdr:
-            if bucket_size <= int(ln[3]) < bucket_size + 10:
+            if bucket_size <= int(ln[3]) < bucket_size + 10 and ln[1] not in seen_files:
                 lines_in_file.append(ln)
+                seen_files.add(ln[1])
     lines_in_file.sort(key=my_fn)
     return lines_in_file
 
@@ -429,7 +431,7 @@ def get_all_files_in_bucket(bucket_size):
 
 def calc_if_bucket_donezo(datapts):
     timedout = sum((1 for pt in datapts if float(pt[10]) > 60))
-    return True if timedout / len(datapts) >= 0.5 else False
+    return True if timedout / len(datapts) >= 0.25 else False
 
 
 def run_thing():
@@ -458,34 +460,23 @@ def run_thing():
                         print(f"{inp1} with switch {inp2} cutoff at bucket size {bsize}")
                         break
 
-# key1 = ["fix_one_var"]
-# key2 = ["fix1var_60"]
-# for j, inp1 in enumerate(["junger_basic"]):
-# 	for i, inp2 in enumerate(key2):
-# 		fname = f"{inp1}/{inp2}"
-# 		experiments.insert_one(f"{fname}_new.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
-# 		curindex = 0
-# 		for bsize in range(10, 17141, 10):
-# 			bfiles = bucket_lines_in_data("data storage/"+fname+".csv", bsize)
-# 			bfnames = [bfl[1] for bfl in bfiles]
-# 			all_bfiles = get_all_files_in_bucket(bsize)
-# 			if len(all_bfiles) > 0:
-# 				for check_file in all_bfiles:
-# 					if check_file not in bfnames:
-# 						parameters = [key1[i], "junger_trans" if j % 2 == 0 else "baseline", "strat_big_m" if j > 0 else "baseline"]
-# 						experiments.run_one_graph(check_file, f"{fname[fname.index('/')+1:]}_new", 60, parameters, curindex)
-# 					else:
-# 						bfiles[bfnames.index(check_file)][0] = curindex
-# 						experiments.insert_one(f"{fname}_new.csv", bfiles[bfnames.index(check_file)])
-# 					curindex += 1
-# 				if calc_if_bucket_donezo(bfiles):
-# 					print(f"{inp1} with switch {inp2} cutoff at bucket size {bsize}")
-# 					break
 
+def calculate_success_rate_by_bucket(file):
+    with open(file, 'r') as fd:
+        rdr = csv.reader(fd)
+        next(rdr)
+        success_rates = {}
+        bucket_size = 10
+        running_count = 0
+        running_success = 0
+        for line in rdr:
+            if int(line[3]) >= bucket_size + 10:
+                bucket_size += 10
+            success_rates[bucket_size]
 
 if __name__ == '__main__':
-    case_study_graph_experiment("cat")
-    # run_thing()
+    # case_study_graph_experiment()
+    run_thing()
 
     # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
     # experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)
