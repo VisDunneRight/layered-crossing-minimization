@@ -19,6 +19,8 @@ def read(filepath, w=4, c=2, layer_assignments=None):
 	elif collection == "control-flow-graphs":
 		gp = pydot.graph_from_dot_file(filepath)[0]
 		gnx = networkx.drawing.nx_pydot.from_pydot(gp)
+		if '\\n' in gnx:
+			gnx.remove_node('\\n')
 		g = layering.create_layered_graph_from_directed_nx_graph(gnx, w, c)
 	else:
 		print("Reading graph...")

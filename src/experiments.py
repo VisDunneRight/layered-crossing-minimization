@@ -120,20 +120,20 @@ def get_all_graphs():
     for i in range(10, 101):
         for file in os.listdir(f"Rome-Lib/graficon{i}nodi"):
             all_g[0].append(f"Rome-Lib/graficon{i}nodi/" + file)
-    daglist = []
-    for i in range(1, 8):
-        for file in os.listdir(f"DAGmar/graphs/{i}.6"):
-            daglist.append(f"DAGmar/graphs/{i}.6/" + file)
-    g_t_nds = {}
-    for file in daglist:
-        g = read_data.read(file)
-        g_t_nds[file] = len(g.nodes)
-    all_g[1].extend(sorted(daglist, key=lambda x: g_t_nds[x]))
-    north_gs = sorted(list(os.listdir("north")), key=lambda fil: int(fil[2:(5 if fil[4] == '0' else 4)]))
-    for i in range(len(north_gs)):
-        north_gs[i] = "north/" + north_gs[i]
-    north_gs.remove("north/g.57.26.graphml")   # skip this one graph that takes over an hour to insert the variables and constraints
-    all_g[2].extend(north_gs)
+    # daglist = []
+    # for i in range(1, 8):
+    #     for file in os.listdir(f"DAGmar/graphs/{i}.6"):
+    #         daglist.append(f"DAGmar/graphs/{i}.6/" + file)
+    # g_t_nds = {}
+    # for file in daglist:
+    #     g = read_data.read(file)
+    #     g_t_nds[file] = len(g.nodes)
+    # all_g[1].extend(sorted(daglist, key=lambda x: g_t_nds[x]))
+    # north_gs = sorted(list(os.listdir("north")), key=lambda fil: int(fil[2:(5 if fil[4] == '0' else 4)]))
+    # for i in range(len(north_gs)):
+    #     north_gs[i] = "north/" + north_gs[i]
+    # north_gs.remove("north/g.57.26.graphml")   # skip this one graph that takes over an hour to insert the variables and constraints
+    # all_g[2].extend(north_gs)
     return all_g
 
 

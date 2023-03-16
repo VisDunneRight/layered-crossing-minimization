@@ -368,12 +368,12 @@ def record_baseline_info(filename, start_idx):
                 f2.write(','.join(str(j) for j in [i, line.removesuffix('\n'), sum(1 for nd in g.nodes if not nd.is_anchor_node), len(g.nodes), len(g.edges), round(g.calculate_connectedness(), 3), tup[3], tup[4]]) + '\n')
 
 
-def case_study_graph_experiment():
+def case_study_graph_experiment(command):
     my_vals = []
     strat_vals = []
     junger_vals = []
     sankey_vals = []
-    control_flow_file = "control-flow-graphs/echo/dbg.main.dot"
+    control_flow_file = f"control-flow-graphs/{command}/dbg.main.dot"
     for i in range(5):
         m1 = run_my_layout_algorithm(control_flow_file)
         m2 = run_junger_polyhedral_layout(control_flow_file)
@@ -484,8 +484,8 @@ def run_thing():
 
 
 if __name__ == '__main__':
-    # case_study_graph_experiment()
-    run_thing()
+    case_study_graph_experiment("cat")
+    # run_thing()
 
     # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
     # experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)
