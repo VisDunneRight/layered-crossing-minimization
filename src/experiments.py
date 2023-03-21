@@ -214,13 +214,34 @@ def run_multi_param_experiment(start_idx, graphs_file, cutoff_time, exp_name, pa
         insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", [i + start_idx, to_opt] + base_info + [j for j in result])
 
 
-def all_combinations_experiment():
+def all_combinations_experiment(graphs_files, folder_to_write):
     key = ["fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
-    for combo in list(itertools.chain.from_iterable(itertools.combinations(key, r) for r in range(len(key)+1))):
-        if len(combo) == 0:
-            run_multi_param_experiment(0, "data storage/all_combos_files.txt", 60, 'all_combos/exp0', ["baseline"], True)
-        else:
-            run_multi_param_experiment(0, "data storage/all_combos_files.txt", 60, 'all_combos/exp' + ''.join([str(ind+1) for ind, val in enumerate(key) if val in combo]), list(combo), True)
+    for form in ["redundancy"]: # ["strat_big_m", "junger_trans", "redundancy"]:
+        for combo in list(itertools.chain.from_iterable(itertools.combinations(key, r) for r in range(len(key)+1))):
+            cur_tnodes = 10
+            cur_success = 0
+            cur_ct = 0
+            for i, file in enumerate(graphs_files):
+                print(f"{i} / {len(graphs_files)}")
+
+                parameters = ["junger_trans" if form == "junger_trans" or form == "redundancy" else "",
+                              "strat_big_m" if form == "strat_big_m" or form == "redundancy" else ""] + list(combo)
+                folder = f"{'junger_basic' if form == 'junger_trans' else form}/{folder_to_write}"
+                if len(combo) == 0:
+                    res = run_one_graph(file, f'{folder}/exp0', 60, parameters, i)
+                else:
+                    res = run_one_graph(file, f'{folder}/exp' + ''.join([str(ind+1) for ind, val in enumerate(key) if val in combo]), 60, parameters, i)
+                if int(res[3]) >= cur_tnodes + 10:
+                    if cur_success / cur_ct < 0.5:
+                        print("-"*70, f"\n{form} experiment {combo} DONE\n", "-"*70)
+                        break
+                    cur_success = 0
+                    cur_ct = 0
+                    cur_tnodes += 10
+                else:
+                    if float(res[10]) < 60:
+                        cur_success += 1
+                    cur_ct += 1
 
 
 def run_one_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_files):
@@ -240,12 +261,13 @@ def run_one_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_fi
 
 
 def run_one_graph(gfile, exp_name, cutoff_time, params_to_set, idx):
-    print(f"running {gfile}")
     g = read_data.read(gfile)
     base_info = basic_info(g)
     params = {param: True for param in params_to_set}
     params.update({"cutoff_time": cutoff_time, "return_experiment_data": True})
     optimizer = optimization.LayeredOptimizer(g, params)
     result = optimizer.optimize_layout()
-    folder = "redundancy" if "junger_trans" in params_to_set and "strat_big_m" in params_to_set else "junger_basic" if "junger_trans" in params_to_set else "strat_big_m"
-    insert_one(f"{folder}/{exp_name}.csv", [idx, gfile] + base_info + [j for j in result])
+    # folder = "redundancy" if "junger_trans" in params_to_set and "strat_big_m" in params_to_set else "junger_basic" if "junger_trans" in params_to_set else "strat_big_m"
+    formatted = [idx, gfile] + base_info + [j for j in result]
+    insert_one(f"{exp_name}.csv", formatted)
+    return formatted

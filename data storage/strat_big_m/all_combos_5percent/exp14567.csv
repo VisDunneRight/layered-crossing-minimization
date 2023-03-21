@@ -1,3 +1,4 @@
+Index,File,Nodes,Total Nodes,Butterflies,X-vars,C-vars,Total vars,Total constraints,Crossings,Opttime,Work,Nodes visited,Setup Time
 0,Rome-Lib/graficon12nodi/grafo2359.12,12,16,1,94,120,230,347,3,0.009,0.005,1,0.009
 1,Rome-Lib/graficon13nodi/grafo361.13,13,19,0,74,86,179,252,0,0.007,0.0034,1,0.005
 2,Rome-Lib/graficon10nodi/grafo265.10,10,12,1,30,34,76,100,1,0.002,0.001,0,0.002
@@ -320,4 +321,3 @@
 319,Rome-Lib/graficon76nodi/grafo8095.76,76,232,1,3290,3912,7434,11425,24,3.227,3.0977,1,0.249
 320,Rome-Lib/graficon80nodi/grafo8538.80,80,235,1,5172,6456,11863,18726,129,60.01,64.6067,2,0.429
 321,Rome-Lib/graficon78nodi/grafo8127.78,78,235,0,6368,8650,15253,24809,672,60.051,64.3819,1,0.55
-322,Rome-Lib/graficon75nodi/grafo6486.75,75,242,1,4398,5356,9996,15589,53,16.152,16.4877,1,0.368

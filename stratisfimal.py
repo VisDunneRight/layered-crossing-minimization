@@ -368,12 +368,12 @@ def record_baseline_info(filename, start_idx):
                 f2.write(','.join(str(j) for j in [i, line.removesuffix('\n'), sum(1 for nd in g.nodes if not nd.is_anchor_node), len(g.nodes), len(g.edges), round(g.calculate_connectedness(), 3), tup[3], tup[4]]) + '\n')
 
 
-def case_study_graph_experiment():
+def case_study_graph_experiment(command):
     my_vals = []
     strat_vals = []
     junger_vals = []
     sankey_vals = []
-    control_flow_file = "control-flow-graphs/echo/dbg.main.dot"
+    control_flow_file = f"control-flow-graphs/{command}/dbg.main.dot"
     for i in range(5):
         m1 = run_my_layout_algorithm(control_flow_file)
         m2 = run_junger_polyhedral_layout(control_flow_file)
@@ -435,7 +435,7 @@ def calc_if_bucket_donezo(datapts):
 
 
 def run_thing():
-    """ find missing entries, run exp, write to new file, cut off once >50% in bucket timeout """
+    """ find missing entries, run experiment, write to new file, cut off once >50% in bucket timeout """
     key1 = ["fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
     key2 = ["fix1var_60", "butterfly_60", "heuristic_60", "presolve_60", "xvar_branch_60", "mip_relax_60", "symmetry_60"]
     for j, inp1 in enumerate(["junger_basic", "strat_big_m", "redundancy"]):
@@ -461,6 +461,28 @@ def run_thing():
                         break
 
 
+def run_select_multi_param():
+    key = ["", "fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
+    for form in [("strat_big_m", "12356"), ("junger_trans", "1357"), ("redundancy", "13467"), ("strat_big_m", "12567"), ("strat_big_m", "12456")]:
+        fname = f"multi_param_results/{form[0]}_{form[1]}"
+        experiments.insert_one(f"{fname}.csv",
+                               ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars",
+                                "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited",
+                                "Setup Time"])
+        curindex = 0
+        for bsize in range(10, 17141, 10):
+            all_bfiles = get_all_files_in_bucket(bsize)
+            if len(all_bfiles) > 0:
+                bucket_results = []
+                for check_file in all_bfiles:
+                    parameters = [key[int(i)] for i in form[1]] + ["junger_trans" if form[0] == "junger_trans" or form[0] == "redundancy" else "", "strat_big_m" if form[0] == "strat_big_m" or form[0] == "redundancy" else ""]
+                    bucket_results.append(experiments.run_one_graph(check_file, f"{fname}", 60, parameters, curindex))
+                    curindex += 1
+                if calc_if_bucket_donezo(bucket_results):
+                    print(f"Cutoff at bucket size {bsize}")
+                    break
+
+
 def calculate_success_rate_by_bucket(file):
     with open(file, 'r') as fd:
         rdr = csv.reader(fd)
@@ -471,12 +493,88 @@ def calculate_success_rate_by_bucket(file):
         running_success = 0
         for line in rdr:
             if int(line[3]) >= bucket_size + 10:
+                success_rates[bucket_size] = running_success / running_count
                 bucket_size += 10
-            success_rates[bucket_size]
+                running_count = 0
+                running_success = 0
+            if int(line[10]) < 60:
+                running_success += 1
+            running_count += 1
+        print(sorted([(hj, success_rates[hj]) for hj in success_rates], key=lambda x: x[0]))
+
+
+def sample_10_percent():
+    with open("data storage/5_percent_all_g_sorted.txt", 'w') as fd:
+        estimate = 0
+        for i in range(10, 1110, 10):
+            with open("data storage/all_g_sorted.txt", 'r') as fd1:
+                collect_lines = False
+                files = []
+                for line in fd1.readlines():
+                    if line[0] == "T":
+                        if int(line[line.index('[') + 1:line.index(',')]) == i:
+                            collect_lines = True
+                        else:
+                            collect_lines = False
+                    elif collect_lines:
+                        files.append(line)
+            if len(files) >= 5:
+                new_files = random.sample(files, round(len(files)/20))
+                for file in new_files:
+                    fd.write(file)
+                    with open("data storage/multi_param_results/junger_trans_1357.csv", 'r') as f:
+                        for row in csv.reader(f):
+                            if row[1] == file[:file.index(',')]:
+                                estimate += float(row[10])
+    print(estimate/60, "minutes")
+
+
+
+def fix_27():
+    for fil in os.listdir("data storage/strat_big_m/all_combos_5percent"):
+        with open(f"data storage/strat_big_m/all_combos_5percent/{fil}", 'r') as fd1:
+            lines = []
+            for lin in csv.reader(fd1):
+                lines.append(lin)
+        with open(f"data storage/strat_big_m/all_combos_5percent/{fil}", 'w') as fd1:
+            wrt = csv.writer(fd1)
+            wrt.writerow(["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+            if "2" in fil and "7" in fil:
+                for lin in lines[:-1]:
+                    if int(lin[4]) > 0:
+                        lin[9] = str(int(lin[9]) - int(lin[4]))
+                    wrt.writerow(lin)
+            else:
+                for lin in lines[:-1]:
+                    wrt.writerow(lin)
+
+
+def tfix():
+    for fil in os.listdir("data storage/strat_big_m/all_combos_5percent"):
+        if fil != "exp0.csv":
+            with open(f"data storage/strat_big_m/all_combos_5percent/{fil}", 'r') as fd1:
+                lines = []
+                for lin in fd1.readlines():
+                    lines.append(lin)
+                lines = [ln for ln in lines if ln != "" and ln != "\n"]
+            with open(f"data storage/strat_big_m/all_combos_5percent/{fil}", 'w') as fd1:
+                    for row in lines:
+                        fd1.write(row)
+
+
 
 if __name__ == '__main__':
     # case_study_graph_experiment()
-    run_thing()
+    # run_select_multi_param()
+    # sample_10_percent()
+
+    # with open("data storage/5_percent_all_g_sorted.txt", 'r') as fd:
+    #     gfiles = []
+    #     for line in fd.readlines():
+    #         gfiles.append(line[:line.index(',')])
+    # experiments.all_combinations_experiment(gfiles, "all_combos_5percent")
+
+    # fix_27()
 
     # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
     # experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)
