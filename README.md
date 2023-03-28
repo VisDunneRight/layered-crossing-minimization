@@ -1,11 +1,13 @@
 # The Scalable Layered Crossing Minimization Project
 
-![example image](Images/Rome-Lib/example.svg)
+<div style="text-align:center">
+<img src="Images/Rome-Lib/example.svg" width="70%" height="70%" class="center"/>
 
 This repository is written and maintained by [Connor Wilson](https://vis.khoury.northeastern.edu/people/Connor-Wilson/), who can be reached at [wilson.conn@northeastern.edu](mailto:wilson.conn@northeastern.edu).
 
 It comprises research performed at Northeastern University's [Data Visualization Lab](https://vis.khoury.northeastern.edu) by [Connor Wilson](https://vis.khoury.northeastern.edu/people/Connor-Wilson/), [Eduardo Puerta](https://vis.khoury.northeastern.edu/people/Eduardo-Puerta/), [Tarik Crnovrsanin](https://www.tarikc.net), and [Sara Di Bartolomeo](https://vis.khoury.northeastern.edu/people/Sara-Di-Bartolomeo/), under the advising of [Cody Dunne](https://vis.khoury.northeastern.edu/people/Cody-Dunne/).
 A free copy of our paper, *Faster integer linear programming formulations for optimal layered network visualization*, is avalable at [https://osf.io/5vq79]().
+</div>
 
 # Quickstart Guide
 1. A Gurobi license is required to run this app. Visit [Gurobi for Academics and Researchers](https://www.gurobi.com/academia/academic-program-and-licenses/) for instructions on obtaining an individual academic license 
