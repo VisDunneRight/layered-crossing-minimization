@@ -902,14 +902,14 @@ class LayeredOptimizer:
 					for v in m.getVars():
 						if v.varName[:1] == "y":
 							g[int(v.varName[2:v.varName.index(']')])].y = float(v.x)
-			vis.draw_graph(g, "interim")
+			vis.draw_graph(g, f"{self.name}")
 
 		if verbose or (use_top_level_params and self.verbose):
 			self.print_info.append(f"{pre_sym}Final edge crossing count: {g.num_edge_crossings()}")
 			self.print_info.append(f"{pre_sym}Number of constraints: {n_constraints_generated}")
 			self.print_info.append(f"{pre_sym}{round(t1, 3)}, {round(t2, 3)}, {round(t3, 3)}, {round(t1 + t2 + t3, 3)}")
 
-		print(m.objVal, round(m.runtime, 3))
+		print(f"Number of crossings: {round(m.objVal)}", f"\tOptimization time: {round(m.runtime, 3)}")
 
 		if use_top_level_params and self.return_x_vars:
 			return int(m.objVal), self.x_var_assign
