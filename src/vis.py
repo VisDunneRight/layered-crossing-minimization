@@ -12,6 +12,16 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
             os.mkdir("../Images")
     elif "Images" not in os.listdir():
         os.mkdir("Images")
+    # with open("chmodgraph.txt", 'w') as f:
+    #     f.write("Node,Layer,YPos,IsDummyNode\n")
+    #     for nd in g.nodes:
+    #         f.write(f"{nd.name},{nd.layer},{nd.y},{nd.is_anchor_node}\n")
+    #     f.write(f"-"*70)
+    #     f.write("\nEdge Node 1,Edge Node 2\n")
+    #     f.write("-"*70)
+    #     f.write("\n")
+    #     for e in g.edges:
+    #         f.write(f"{e.n1.name},{e.n2.name}\n")
     offset = 40
     node_radius = 15
     line_width = 4
