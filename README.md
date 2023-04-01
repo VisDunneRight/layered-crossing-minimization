@@ -5,12 +5,6 @@
 </p>
 
 Redacted to preserve anonymity
-[//]: # (This repository is written and maintained by [Connor Wilson]&#40;https://vis.khoury.northeastern.edu/people/Connor-Wilson/&#41;, who can be reached at [wilson.conn@northeastern.edu]&#40;mailto:wilson.conn@northeastern.edu&#41;.)
-g
-[//]: # ()
-[//]: # (It comprises research performed at Northeastern University's [Data Visualization Lab]&#40;https://vis.khoury.northeastern.edu&#41; by [Connor Wilson]&#40;https://vis.khoury.northeastern.edu/people/Connor-Wilson/&#41;, [Eduardo Puerta]&#40;https://vis.khoury.northeastern.edu/people/Eduardo-Puerta/&#41;, [Tarik Crnovrsanin]&#40;https://www.tarikc.net&#41;, and [Sara Di Bartolomeo]&#40;https://vis.khoury.northeastern.edu/people/Sara-Di-Bartolomeo/&#41;, under the advising of [Cody Dunne]&#40;https://vis.khoury.northeastern.edu/people/Cody-Dunne/&#41;.)
-
-[//]: # (A free copy of our paper, *Faster integer linear programming formulations for optimal layered network visualization*, is avalable at [https://osf.io/5vq79]&#40;&#41;.)
 
 # Quickstart Guide
 1. A Gurobi license is required to run this app. Visit [Gurobi for Academics and Researchers](https://www.gurobi.com/academia/academic-program-and-licenses/) for instructions on obtaining an individual academic license 
