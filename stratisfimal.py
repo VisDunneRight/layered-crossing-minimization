@@ -1,12 +1,8 @@
 import os
-import sys
 import csv
 import random
-import cProfile
-import pstats
-from pstats import SortKey
-import networkx as nx
-from src import vis, layering, motifs, experiments
+from src import vis
+import experiments
 from src.graph import *
 from src.read_data import *
 from src.optimization import LayeredOptimizer
@@ -55,15 +51,15 @@ def run_optimizer(g: LayeredGraph, bendiness_reduction, sequential, timelimit, s
 
 def run_stratisfimal_layout(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.strat_big_m = True
-    optimizer.junger_trans = True
+    optimizer.vertical_transitivity = True
+    optimizer.direct_transitivity = True
     optimizer.return_experiment_data = True
     return optimizer.optimize_layout()
 
 
 def run_optimal_sankey_layout(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.junger_trans = True
+    optimizer.direct_transitivity = True
     optimizer.mirror_vars = True
     optimizer.butterfly_reduction = True
     optimizer.xvar_branch_priority = True
@@ -73,7 +69,7 @@ def run_optimal_sankey_layout(graph_file):
 
 def run_junger_polyhedral_layout(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.junger_trans = True
+    optimizer.direct_transitivity = True
     optimizer.mirror_vars = True
     # optimizer.symmetry_constraints = False
     optimizer.return_experiment_data = True
@@ -82,13 +78,14 @@ def run_junger_polyhedral_layout(graph_file):
 
 def run_my_layout_algorithm(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.strat_big_m = True
+    optimizer.vertical_transitivity = True
     optimizer.fix_one_var = True
-    optimizer.butterfly_reduction = True
-    optimizer.heuristic_start = True
+    # optimizer.butterfly_reduction = True
+    # optimizer.heuristic_start = True
     optimizer.mip_relax = True
     optimizer.xvar_branch_priority = True
     optimizer.aggro_presolve = True
+    optimizer.mirror_vars = True
     optimizer.return_experiment_data = True
     return optimizer.optimize_layout()
 
@@ -332,7 +329,7 @@ def randomly_select_files_for_exp(fname):
 
 
 def randomly_select_50_files(fname):
-    with open('data storage/junger_basic/baseline_60.csv') as fd:
+    with open('data storage/direct_transitivity/baseline_60.csv') as fd:
         reader = csv.reader(fd)
         rome_nums = random.sample(list(range(1, 9855)), 35)
         dagmar_nums = random.sample(list(range(9855, 9900)), 5)
@@ -438,7 +435,7 @@ def run_thing():
     """ find missing entries, run experiment, write to new file, cut off once >50% in bucket timeout """
     key1 = ["fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
     key2 = ["fix1var_60", "butterfly_60", "heuristic_60", "presolve_60", "xvar_branch_60", "mip_relax_60", "symmetry_60"]
-    for j, inp1 in enumerate(["junger_basic", "strat_big_m", "redundancy"]):
+    for j, inp1 in enumerate(["junger_basic", "vertical_transitivity", "redundancy"]):
         for i, inp2 in enumerate(key2):
             fname = f"{inp1}/{inp2}"
             experiments.insert_one(f"{fname}_new.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
@@ -450,8 +447,8 @@ def run_thing():
                 if len(all_bfiles) > 0:
                     for check_file in all_bfiles:
                         if check_file not in bfnames:
-                            parameters = [key1[i], "junger_trans" if j % 2 == 0 else "baseline", "strat_big_m" if j > 0 else "baseline"]
-                            experiments.run_one_graph(check_file, f"{fname[fname.index('/')+1:]}_new", 60, parameters, curindex)
+                            parameters = [key1[i], "direct_transitivity" if j % 2 == 0 else "baseline", "vertical_transitivity" if j > 0 else "baseline"]
+                            experiments.run_one_graph(check_file, f"{fname[fname.index('/') + 1:]}_new", 60, parameters, curindex)
                         else:
                             bfiles[bfnames.index(check_file)][0] = curindex
                             experiments.insert_one(f"{fname}_new.csv", bfiles[bfnames.index(check_file)])
@@ -463,7 +460,7 @@ def run_thing():
 
 def run_select_multi_param():
     key = ["", "fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
-    for form in [("strat_big_m", "12356"), ("junger_trans", "1357"), ("redundancy", "13467"), ("strat_big_m", "12567"), ("strat_big_m", "12456")]:
+    for form in [("vertical_transitivity", "12356"), ("direct_transitivity", "1357"), ("redundancy", "13467"), ("vertical_transitivity", "12567"), ("vertical_transitivity", "12456")]:
         fname = f"multi_param_results/{form[0]}_{form[1]}"
         experiments.insert_one(f"{fname}.csv",
                                ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars",
@@ -475,7 +472,7 @@ def run_select_multi_param():
             if len(all_bfiles) > 0:
                 bucket_results = []
                 for check_file in all_bfiles:
-                    parameters = [key[int(i)] for i in form[1]] + ["junger_trans" if form[0] == "junger_trans" or form[0] == "redundancy" else "", "strat_big_m" if form[0] == "strat_big_m" or form[0] == "redundancy" else ""]
+                    parameters = [key[int(i)] for i in form[1]] + ["direct_transitivity" if form[0] == "direct_transitivity" or form[0] == "redundancy" else "", "vertical_transitivity" if form[0] == "vertical_transitivity" or form[0] == "redundancy" else ""]
                     bucket_results.append(experiments.run_one_graph(check_file, f"{fname}", 60, parameters, curindex))
                     curindex += 1
                 if calc_if_bucket_donezo(bucket_results):
@@ -531,12 +528,12 @@ def sample_10_percent():
 
 
 def fix_27():
-    for fil in os.listdir("data storage/strat_big_m/all_combos_5percent"):
-        with open(f"data storage/strat_big_m/all_combos_5percent/{fil}", 'r') as fd1:
+    for fil in os.listdir("data storage/vertical_transitivity/all_combos_5percent"):
+        with open(f"data storage/vertical_transitivity/all_combos_5percent/{fil}", 'r') as fd1:
             lines = []
             for lin in csv.reader(fd1):
                 lines.append(lin)
-        with open(f"data storage/strat_big_m/all_combos_5percent/{fil}", 'w') as fd1:
+        with open(f"data storage/vertical_transitivity/all_combos_5percent/{fil}", 'w') as fd1:
             wrt = csv.writer(fd1)
             wrt.writerow(["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
             if "2" in fil and "7" in fil:
@@ -550,21 +547,311 @@ def fix_27():
 
 
 def tfix():
-    for fil in os.listdir("data storage/strat_big_m/all_combos_5percent"):
-        if fil != "exp0.csv":
-            with open(f"data storage/strat_big_m/all_combos_5percent/{fil}", 'r') as fd1:
+    for fil in os.listdir("data storage/both_combined/all_combos_5percent"):
+        if fil == "exp0.csv":
+            with open(f"data storage/both_combined/all_combos_5percent/{fil}", 'r') as fd1:
                 lines = []
                 for lin in fd1.readlines():
                     lines.append(lin)
                 lines = [ln for ln in lines if ln != "" and ln != "\n"]
-            with open(f"data storage/strat_big_m/all_combos_5percent/{fil}", 'w') as fd1:
-                    for row in lines:
-                        fd1.write(row)
+            with open(f"data storage/both_combined/all_combos_5percent/{fil}", 'w') as fd1:
+                for row in lines:
+                    fd1.write(row)
 
+
+def find_best():
+    avgs = []
+    meds = []
+    for iv in ["direct_transitivity", "vertical_transitivity", "both_combined"]:
+        for fl in os.listdir(f"data storage/{iv}/all_combos_5percent"):
+            medlist = []
+            with open(f"data storage/{iv}/all_combos_5percent/{fl}", 'r') as fd:
+                rd = csv.reader(fd)
+                next(rd)
+                avsum = 0
+                ct = 0
+                success = 0
+                cr = 0
+                for ln in rd:
+                    if len(ln) > 1:
+                        avsum += float(ln[10]) if float(ln[10]) < 60 else 60
+                        medlist.append(float(ln[10]) if float(ln[10]) < 60 else 60)
+                        if float(ln[10]) < 60:
+                            success += 1
+                        ct += 1
+                        cr += int(ln[9])
+                medlist.sort()
+                meds.append((f"{iv}/{fl}", medlist[len(medlist)//2] / ct, cr / ct, success))
+                avgs.append((f"{iv}/{fl}", avsum / ct, cr / ct, success))
+    avgs.sort(key=lambda x: (-x[3], x[1]))
+    meds.sort(key=lambda x: (-x[3], x[1]))
+    print(avgs)
+    print(meds)
+    # return avgs
+    return meds
+
+
+def find_best_same_files():
+    avgs = []
+    min_nsolved = 309
+    # for iv in ["junger_basic", "vertical_transitivity"]:
+    #     for fl in os.listdir(f"data storage/{iv}/all_combos_5percent"):
+    #         with open(f"data storage/{iv}/all_combos_5percent/{fl}", 'r') as fd:
+    #             fdl = len(fd.readlines())
+    #             if fdl < min_nsolved:
+    #                 # print(iv, fl, fdl)
+    #                 min_nsolved = fdl
+    print(min_nsolved)
+    for iv in ["junger_basic", "vertical_transitivity"]:
+        for fl in os.listdir(f"data storage/{iv}/all_combos_5percent"):
+            with open(f"data storage/{iv}/all_combos_5percent/{fl}", 'r') as fd:
+                rd = csv.reader(fd)
+                next(rd)
+                avsum = 0
+                ct = 0
+                success = 0
+                cr = 0
+                for ln in rd:
+                    if len(ln) > 1 and ct < min_nsolved:
+                        avsum += float(ln[10]) if float(ln[10]) < 60 else 60
+                        if float(ln[10]) < 60:
+                            success += 1
+                        ct += 1
+                        cr += int(ln[9])
+                for i in range(ct, min_nsolved):
+                    avsum += 60
+                    ct += 1
+                avgs.append((f"{iv}/{fl}", avsum / ct, cr / ct, success))
+    avgs.sort(key=lambda x: (-x[3], x[1]))
+    print(avgs)
+    return avgs
+
+
+def find_best_timeout_uncalculated_graphs():
+    avgs = []
+    max_nsolved = 322
+    print(max_nsolved)
+    for iv in ["junger_basic", "vertical_transitivity"]:
+        for fl in os.listdir(f"data storage/{iv}/all_combos_5percent"):
+            with open(f"data storage/{iv}/all_combos_5percent/{fl}", 'r') as fd:
+                rd = csv.reader(fd)
+                next(rd)
+                avsum = 0
+                ct = 0
+                success = 0
+                cr = 0
+                for ln in rd:
+                    if len(ln) > 1:
+                        avsum += float(ln[10]) if float(ln[10]) < 60 else 60
+                        if float(ln[10]) < 60:
+                            success += 1
+                        ct += 1
+                        cr += int(ln[9])
+                for i in range(ct, max_nsolved):
+                    avsum += 60
+                    ct += 1
+                avgs.append((f"{iv}/{fl}", avsum / ct, cr / ct, success))
+    avgs.sort(key=lambda x: x[1])
+    print(avgs)
+    return avgs
+
+
+def rank_switches_all_combos():
+    # avgs = find_best()
+    avgs = find_best_same_files()
+    # avgs = find_best_timeout_uncalculated_graphs()
+    for switch in range(1, 8):
+        swcrwins = 0
+        swrunwins = 0
+        swsuccwins = 0
+        swct = 0
+        for fl in avgs:
+            if fl[0][:5] == "strat" and str(switch) in fl[0]:
+                noswitch = fl[0].replace(str(switch), '0') if not fl[0][fl[0].index('.') - 2].isnumeric() else fl[0].replace(str(switch), '')
+                nosentry = [f for f in avgs if f[0] == noswitch][0]
+                if fl[1] < nosentry[1]:
+                    swrunwins += 1
+                if fl[2] < nosentry[2]:
+                    swcrwins += 1
+                # else:
+                #     print(fl, nosentry)
+                if fl[3] >= nosentry[3]:
+                    swsuccwins += 1
+                swct += 1
+        print(switch, swsuccwins, swrunwins, swcrwins, swct, swsuccwins / swct, swrunwins / swct, swcrwins / swct)
+
+
+def latex_print_ranking():
+    all_results = find_best()
+    all_r_vert = [entry for entry in all_results if entry[0][0] == "v"]
+    all_r_direct = [entry for entry in all_results if entry[0][0] == "d"]
+    all_r_both = [entry for entry in all_results if entry[0][0] == "b"]
+    alphad = {1: "C", 2: "D", 3: "I", 4: "E", 5: "F", 6: "G", 7: "H"}
+    alphae = {1: "1", 2: "2", 3: "7", 4: "3", 5: "4", 6: "5", 7: "6"}
+    switch_conversion = {i: "\hyperref[sec:switchX]{\switchsboxonY}".replace("X", str(i)).replace("Y", alphad[i]) for i in range(1, 8)}
+    switch_conversion.update({0: "baseline"})
+    for i in range(len(all_r_vert)):
+        to_conv1 = []
+        to_conv2 = []
+        to_conv3 = []
+        for j in range(1,8):
+            if alphae[j] in all_r_vert[i][0]:
+                to_conv1.append(switch_conversion[j])
+            else:
+                to_conv1.append(' ')
+            if alphae[j] in all_r_direct[i][0]:
+                to_conv2.append(switch_conversion[j])
+            else:
+                to_conv2.append(' ')
+            if alphae[j] in all_r_both[i][0]:
+                to_conv3.append(switch_conversion[j])
+            else:
+                to_conv3.append(' ')
+        # if "7" in all_r_vert[i][0]:
+        #     to_conv1.insert(2, switch_conversion[7])
+        # else:
+        #     to_conv1.insert(2, ' ')
+        # if "7" in all_r_direct[i][0]:
+        #     to_conv2.insert(2, switch_conversion[7])
+        # else:
+        #     to_conv2.insert(2, ' ')
+        # if "7" in all_r_both[i][0]:
+        #     to_conv3.insert(2, switch_conversion[7])
+        # else:
+        #     to_conv3.insert(2, ' ')
+        # if len(to_conv1) > 4:
+        #     to_conv1.insert(4, '\\\\')
+        # if len(to_conv2) > 4:
+        #     to_conv2.insert(4, '\\\\')
+        # if len(to_conv3) > 4:
+        #     to_conv3.insert(4, '\\\\')
+        # name = '{' + ''.join(to_conv1) + '}'
+        # name2 = '{' + ''.join(to_conv2) + '}'
+        # name3 = '{' + ''.join(to_conv3) + '}'
+        name = ' & '.join(to_conv1)
+        name2 = ' & '.join(to_conv2)
+        name3 = ' & '.join(to_conv3)
+        print(str(i+1), ' & ', name, ' & ', str(all_r_vert[i][3]), ' & & ', str(i+1), ' & ', name2, ' & ', str(all_r_direct[i][3]), ' & & ', str(i+1), ' & ', name3, ' & ', str(all_r_both[i][3]), ' \\\\')
+
+
+def avg_comb_num_switch_ranking():
+    all_results = find_best()
+    all_r_vert = [entry for entry in all_results if entry[0][0] == "s"]
+    avg_rank = [0]*8
+    cts = [0]*8
+    zeropos = 0
+    for i in range(8):
+        if i == 0:
+            for j, val in enumerate(all_r_vert):
+                if "0" in val[0]:
+                    avg_rank[i] = j
+                    cts[i] += 1
+                    zeropos = j
+        else:
+            for j, val in enumerate(all_r_vert):
+                if "1" not in val[0] and j != zeropos and len(val[0][val[0].index('p')+1:val[0].index('.')]) == i:
+                    cts[i] += 1
+                    avg_rank[i] += j
+    print(avg_rank)
+    print(cts)
+    print([a/cts[i] for i, a in enumerate(avg_rank[:7])])
+
+
+def group_success_calc(transitivity):
+    with open(f"data storage/{transitivity}/all_combos_5percent/exp0.csv", 'r') as fd:
+        rdr = csv.reader(fd)
+        next(rdr)
+        basevals = []
+        for row in rdr:
+            basevals.append(float(row[10]))
+    all_cutoffs = {120: 0, 130: 0, 140: 0, 150: 0, 160: 0, 170: 0, 180: 0, 190: 0, 200: 0, 210: 0, 220: 0, 230: 0}
+    for fil in os.listdir(f"data storage/{transitivity}/all_combos_5percent"):
+        with open(f"data storage/{transitivity}/all_combos_5percent/{fil}", 'r') as fd:
+            rdr = csv.reader(fd)
+            next(rdr)
+            ftimein = 0
+            curbin = 10
+            binct = 0
+            for i, row in enumerate(rdr):
+                if int(row[3])//20*20 > curbin:
+                    # print(curbin, ftimein, binct, ftimein/binct)
+                    if ftimein / binct < 0.75:
+                        break
+                    curbin = int(row[3])//20*20
+                    ftimein = 0
+                    binct = 0
+                if i < len(basevals) and basevals[i] < 60 and float(row[10]) < 60:
+                    ftimein += 1
+                binct += 1
+            all_cutoffs[curbin] += 1
+    print(all_cutoffs)
+
+
+def get_plotted_points_in_ind_switch_figures(formulation, switch):
+    with open(f"data storage/{formulation}/baseline_60_new.csv", 'r') as fd:
+        rdr = csv.reader(fd)
+        next(rdr)
+        basevals = []
+        for row in rdr:
+            basevals.append(float(row[10]))
+    with open(f"data storage/{formulation}/{switch}_60_new.csv", 'r') as fd:
+        rdr = csv.reader(fd)
+        next(rdr)
+        cur_tdiffs = []
+        curbin = 10
+        binct = 0
+        for i, row in enumerate(rdr):
+            if int(row[3])//10*10 > curbin:
+                cur_tdiffs.sort()
+                top_25 = cur_tdiffs[3*len(cur_tdiffs)//4:]
+                bottom_25 = cur_tdiffs[:len(cur_tdiffs)//4]
+                print(curbin, binct, sum(cur_tdiffs)/len(cur_tdiffs), sum(top_25)/len(top_25), sum(bottom_25)/len(bottom_25))
+                curbin = int(row[3])//10*10
+                binct = 0
+            if 0 < basevals[i] < 60 and 0 < float(row[10]) < 60:
+                cur_tdiffs.append(math.log(float(row[10])/basevals[i]))
+                binct += 1
 
 
 if __name__ == '__main__':
-    # case_study_graph_experiment()
+    # rank_switches_all_combos()
+
+    latex_print_ranking()
+    # group_success_calc("junger_basic")
+    # avg_comb_num_switch_ranking()
+
+    # with open("data storage/5_percent_all_g_sorted.txt12", 'r') as fd:
+    #     romemax, romemin = 0, 100
+    #     dagmarmax, dagmarmin = 0, 100
+    #     northmax, northmin = 0, 100
+    #     northct, dagmarct, romect = 0, 0, 0
+    #     for line in fd.readlines():
+    #         if line[0] != "T":
+    #             lns = line.split(',')
+    #             tnodes = int(lns[1])
+    #             col = lns[0][:lns[0].index('/')]
+    #             if col == "Rome-Lib":
+    #                 if tnodes > romemax:
+    #                     romemax = tnodes
+    #                 if tnodes < romemin:
+    #                     romemin = tnodes
+    #                 romect += 1
+    #             if col == "DAGmar":
+    #                 if tnodes > dagmarmax:
+    #                     dagmarmax = tnodes
+    #                 if tnodes < dagmarmin:
+    #                     dagmarmin = tnodes
+    #                 dagmarct += 1
+    #             if col == "north":
+    #                 if tnodes > northmax:
+    #                     northmax = tnodes
+    #                 if tnodes < northmin:
+    #                     northmin = tnodes
+    #                 northct += 1
+    # print(romemax, romemin, dagmarmax, dagmarmin, northmax, northmin)
+    # print(romect, dagmarct, northct)
+
+    # case_study_graph_experiment("df")
     # run_select_multi_param()
     # sample_10_percent()
 
@@ -575,6 +862,7 @@ if __name__ == '__main__':
     # experiments.all_combinations_experiment(gfiles, "all_combos_5percent")
 
     # fix_27()
+    # tfix()
 
     # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
     # experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)

@@ -1,12 +1,8 @@
 import os
-import sys
 import csv
 import random
-import cProfile
-import pstats
-from pstats import SortKey
-import networkx as nx
-from src import vis, layering, motifs, experiments
+from src import vis
+import experiments
 from src.graph import *
 from src.read_data import *
 from src.optimization import LayeredOptimizer
@@ -55,15 +51,15 @@ def run_optimizer(g: LayeredGraph, bendiness_reduction, sequential, timelimit, s
 
 def run_stratisfimal_layout(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.strat_big_m = True
-    optimizer.junger_trans = True
+    optimizer.vertical_transitivity = True
+    optimizer.direct_transitivity = True
     optimizer.return_experiment_data = True
     return optimizer.optimize_layout()
 
 
 def run_optimal_sankey_layout(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.junger_trans = True
+    optimizer.direct_transitivity = True
     optimizer.mirror_vars = True
     optimizer.butterfly_reduction = True
     optimizer.xvar_branch_priority = True
@@ -73,7 +69,7 @@ def run_optimal_sankey_layout(graph_file):
 
 def run_junger_polyhedral_layout(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.junger_trans = True
+    optimizer.direct_transitivity = True
     optimizer.mirror_vars = True
     # optimizer.symmetry_constraints = False
     optimizer.return_experiment_data = True
@@ -82,7 +78,7 @@ def run_junger_polyhedral_layout(graph_file):
 
 def run_my_layout_algorithm(graph_file):
     optimizer = LayeredOptimizer(graph_file)
-    optimizer.strat_big_m = True
+    optimizer.vertical_transitivity = True
     optimizer.fix_one_var = True
     optimizer.butterfly_reduction = True
     optimizer.heuristic_start = True
@@ -332,7 +328,7 @@ def randomly_select_files_for_exp(fname):
 
 
 def randomly_select_50_files(fname):
-    with open('data storage/junger_basic/baseline_60.csv') as fd:
+    with open('data storage/direct_transitivity/baseline_60.csv') as fd:
         reader = csv.reader(fd)
         rome_nums = random.sample(list(range(1, 9855)), 35)
         dagmar_nums = random.sample(list(range(9855, 9900)), 5)
@@ -438,7 +434,7 @@ def run_thing():
     """ find missing entries, run exp, write to new file, cut off once >50% in bucket timeout """
     key1 = ["fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
     key2 = ["fix1var_60", "butterfly_60", "heuristic_60", "presolve_60", "xvar_branch_60", "mip_relax_60", "symmetry_60"]
-    for j, inp1 in enumerate(["junger_basic", "strat_big_m", "redundancy"]):
+    for j, inp1 in enumerate(["junger_basic", "vertical_transitivity", "redundancy"]):
         for i, inp2 in enumerate(key2):
             fname = f"{inp1}/{inp2}"
             experiments.insert_one(f"{fname}_new.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
@@ -450,8 +446,8 @@ def run_thing():
                 if len(all_bfiles) > 0:
                     for check_file in all_bfiles:
                         if check_file not in bfnames:
-                            parameters = [key1[i], "junger_trans" if j % 2 == 0 else "baseline", "strat_big_m" if j > 0 else "baseline"]
-                            experiments.run_one_graph(check_file, f"{fname[fname.index('/')+1:]}_new", 60, parameters, curindex)
+                            parameters = [key1[i], "direct_transitivity" if j % 2 == 0 else "baseline", "vertical_transitivity" if j > 0 else "baseline"]
+                            experiments.run_one_graph(check_file, f"{fname[fname.index('/') + 1:]}_new", 60, parameters, curindex)
                         else:
                             bfiles[bfnames.index(check_file)][0] = curindex
                             experiments.insert_one(f"{fname}_new.csv", bfiles[bfnames.index(check_file)])

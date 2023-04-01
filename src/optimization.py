@@ -39,8 +39,8 @@ class LayeredOptimizer:
 		self.mip_relax = parameters["mip_relax"] if "mip_relax" in parameters else False
 		self.xvar_branch_priority = parameters["priority"] if "priority" in parameters else False
 		# self.junger_ec = parameters["junger_ec"] if "junger_ec" in parameters else False
-		self.junger_trans = parameters["junger_trans"] if "junger_trans" in parameters else False
-		self.strat_big_m = parameters["strat_big_m"] if "strat_big_m" in parameters else False
+		self.direct_transitivity = parameters["direct_transitivity"] if "direct_transitivity" in parameters else False
+		self.vertical_transitivity = parameters["vertical_transitivity"] if "vertical_transitivity" in parameters else False
 		self.mirror_vars = parameters["mirror_vars"] if "mirror_vars" in parameters else False
 		self.stratisfimal_y_vars = parameters["stratisfimal_yvars"] if "stratisfimal_yvars" in parameters else False
 		self.symmetry_constraints = parameters["symmetry_constraints"] if "symmetry_constraints" in parameters else True
@@ -631,8 +631,8 @@ class LayeredOptimizer:
 
 	def optimize_layout_standard(self, graph_arg=None, bendiness_reduction=False, assignment=None, return_x_vars=False, heuristic_start=False, transitivity=False, presolve=0, name="graph1", fix_x_vars=None, start_x_vars=None, fix_1_xvar=False, branch_on_x_vars=False, is_subgraph=False, verbose=False, use_top_level_params=False):
 		g = self.g if graph_arg is None else graph_arg
-		if not self.junger_trans and not self.strat_big_m:
-			self.strat_big_m = True
+		if not self.direct_transitivity and not self.vertical_transitivity:
+			self.vertical_transitivity = True
 
 		t1 = time.time()
 		nodes_by_layer = g.get_names_by_layer()
@@ -665,7 +665,7 @@ class LayeredOptimizer:
 		if self.mirror_vars:
 			c_vars_orig, nc_consts = reductions.normal_c_vars(g, edges_by_layer, False)
 		c = m.addVars(c_vars, vtype=relax_type, name="c")
-		if self.strat_big_m or self.stratisfimal_y_vars:
+		if self.vertical_transitivity or self.stratisfimal_y_vars:
 			y_vars = [n.name for n in g]
 			y = m.addVars(y_vars, vtype=relax_type, lb=0, ub=self.m_val, name="y")
 		m.update()
@@ -779,7 +779,7 @@ class LayeredOptimizer:
 
 		""" Transitivity constraints """
 		# if transitivity or (use_top_level_params and self.transitivity_constraints):
-		if self.junger_trans:
+		if self.direct_transitivity:
 			self.transitivity(m, nodes_by_layer, x_vars, x)
 
 		""" Long-version crossing reduction code """
@@ -805,7 +805,7 @@ class LayeredOptimizer:
 
 		""" Vertical position, implication version """
 		# Uses big-M method: https://support.gurobi.com/hc/en-us/articles/4414392016529-How-do-I-model-conditional-statements-in-Gurobi-
-		if self.strat_big_m:
+		if self.vertical_transitivity:
 			for x_var in x_vars:
 				m.addGenConstrIndicator(x[x_var], True, y[x_var[0]] + 1 <= y[x_var[1]])
 				m.addGenConstrIndicator(x[x_var], False, y[x_var[0]] >= 1 + y[x_var[1]])
@@ -893,7 +893,7 @@ class LayeredOptimizer:
 
 		if self.draw_graph:
 			if not self.bendiness_reduction:
-				if self.junger_trans:
+				if self.direct_transitivity:
 					if use_top_level_params:
 						g.assign_y_vals_given_x_vars(self.x_var_assign)
 					else:

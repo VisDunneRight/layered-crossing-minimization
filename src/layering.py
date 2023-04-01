@@ -131,6 +131,28 @@ def create_edge_list_layered_graph_given_layering(filepath, layer_assign):
     return g
 
 
+def run_good_graph_tests(s_g):
+    nlist = [1]
+    seen = [False] * (len(s_g)+1)
+    seen[1], seen[0] = True, True
+    while nlist:
+        next_layer = nlist.copy()
+        nlist.clear()
+        for n in next_layer:
+            for adj in s_g[n]:
+                if not seen[adj]:
+                    seen[adj] = True
+                    nlist.append(adj)
+    if all(seen):
+        print("Connected!")
+    else:
+        print("Disconnected!")
+    for edgelist in s_g.values():
+        if len(set(edgelist)) != len(edgelist):
+            print("Contains duplicate edges")
+    return [i for i in range(1, len(s_g)+1) if not seen[i]]
+
+
 def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
     simple_g = {}
     names = {nname: i+1 for i, nname in enumerate(nxg)}
@@ -138,9 +160,14 @@ def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
         simple_g[names[node]] = []
         for adj in nxg[node]:
             simple_g[names[node]].append(names[adj])
+    print(simple_g)
+    bad = run_good_graph_tests(simple_g)
+    for b in bad:
+        print(next(nn for nn in names if names[nn] == b))
     to_remove = cycle_removal(simple_g)
     for edge in to_remove:
         simple_g[edge[0]].remove(edge[1])
+    run_good_graph_tests(simple_g)
     g = min_width(simple_g, w, c)[0]
     for edge in to_remove:
         g.add_edge(edge[0], edge[1])
