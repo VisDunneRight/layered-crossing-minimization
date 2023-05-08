@@ -3,7 +3,7 @@ from src import graph
 import math
 import altair as alt
 import os
-from altair_saver import save
+# from altair_saver import save
 
 
 def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, gravity=False):
@@ -110,15 +110,16 @@ def draw_altair_scatter(data_points, x_axis, y_axis, color_field, x_title, y_tit
     data = alt.Data(values=data_points)
     chart = alt.Chart(data).mark_circle(size=60).encode(
         x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
-        y=alt.Y(f'{y_axis}:Q', scale=alt.Scale(type="log") if log_y_scale else None, axis=alt.Axis(title=y_title)),
-        color=alt.Color(f'{color_field}:N', scale=alt.Scale(scheme='dark2'))
-    ).facet(column=f'{color_field}:N')
+        y=alt.Y(f'{y_axis}:Q', scale=alt.Scale(type="log") if log_y_scale else None, axis=alt.Axis(title=y_title)) #,
+        # color=alt.Color(f'{color_field}:N', scale=alt.Scale(scheme='dark2'))
+    )
+    # .facet(column=f'{color_field}:N')
     # if plot_loess:
     #     for feature in loess_features:
     #         chart += chart.transform_filter(alt.FieldEqualPredicate(field=color_field, equal=feature)).transform_loess(
     #             x_axis, y_axis
     #         )
-    save(chart, f"charts/{chart_name}.svg")
+    chart.save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})
 
 
 def draw_altair_line_chart(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name, log_y_scale):
@@ -130,7 +131,35 @@ def draw_altair_line_chart(data_points, x_axis, y_axis, color_field, x_title, y_
         y=alt.Y(f'{y_axis}:Q', scale=alt.Scale(type="log") if log_y_scale else None, axis=alt.Axis(title=y_title)),
         color=alt.Color(f'{color_field}:N', scale=alt.Scale(domain=dom, range=rng))
     )
-    save(chart, f"charts/{chart_name}.svg")
+    chart.save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})
+
+
+def draw_altair_scatter_with_regression_line(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name):
+    data = alt.Data(values=data_points)
+    chart = alt.Chart(data).mark_circle(size=60).encode(
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
+        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title)),
+        color=alt.Color(f'{color_field}:N', scale=alt.Scale(scheme='dark2'))
+    )
+    chart2 = chart + chart.transform_regression(x_axis, y_axis).mark_line()
+    chart2.save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})
+
+
+def draw_altair_scatter_with_custom_line(scatter_data, line_data, x_axis, y_axis, color_field, x_title, y_title, chart_name):
+    scatterdata = alt.Data(values=scatter_data)
+    scatterchart = alt.Chart(scatterdata).mark_circle(size=60, opacity=0.9).encode(
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
+        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title)),
+        color=alt.Color(f'{color_field}:N', scale=alt.Scale(scheme='dark2'))
+    )
+    linedata = alt.Data(values=line_data)
+    linechart = alt.Chart(linedata).mark_line(color="black").encode(
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
+        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title)),
+        # color=alt.Color(f'{color_field}:N', scale=alt.Scale())
+    )
+    chart = scatterchart + linechart
+    chart.save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})
 
 
 def draw_altair_line_compare(data_points, x_axis, y_axis, facet_field, x_title, y_title, chart_name, log_y_scale, experiment_name):
@@ -147,14 +176,14 @@ def draw_altair_line_compare(data_points, x_axis, y_axis, facet_field, x_title, 
         y='a:Q'
     )
 
-    save(alt.layer(
+    alt.layer(
         chart, horizline,
         data=data
     ).transform_calculate(
         a="100"
     ).facet(
         column=alt.Column(f'{facet_field}:N', sort=["junger_basic", "vertical_transitivity", "redundancy"])
-    ), f"charts/{chart_name}.svg")
+    ).save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})
 
 
 def draw_altair_colored_line_compare(data_points, x_axis, y_axis, facet_field, color_field, x_title, y_title, chart_name):
@@ -171,11 +200,11 @@ def draw_altair_colored_line_compare(data_points, x_axis, y_axis, facet_field, c
         y='a:Q'
     )
 
-    save(alt.layer(
+    alt.layer(
         chart, horizline,
         data=data
     ).transform_calculate(
         a="100"
     ).facet(
         column=alt.Column(f'{facet_field}:N', sort=["junger_basic", "vertical_transitivity"])
-    ), f"charts/{chart_name}.svg")
+    ).save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})

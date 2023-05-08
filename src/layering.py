@@ -160,14 +160,14 @@ def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
         simple_g[names[node]] = []
         for adj in nxg[node]:
             simple_g[names[node]].append(names[adj])
-    print(simple_g)
-    bad = run_good_graph_tests(simple_g)
-    for b in bad:
-        print(next(nn for nn in names if names[nn] == b))
+    # print(simple_g)
+    # bad = run_good_graph_tests(simple_g)
+    # for b in bad:
+    #     print(next(nn for nn in names if names[nn] == b))
     to_remove = cycle_removal(simple_g)
     for edge in to_remove:
         simple_g[edge[0]].remove(edge[1])
-    run_good_graph_tests(simple_g)
+    # run_good_graph_tests(simple_g)
     g = min_width(simple_g, w, c)[0]
     for edge in to_remove:
         g.add_edge(edge[0], edge[1])
