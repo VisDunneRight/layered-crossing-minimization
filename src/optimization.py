@@ -859,11 +859,13 @@ class LayeredOptimizer:
 			self.print_info.append(f"{pre_sym}Objective: {m.objVal}")
 			self.print_info.append(f"{pre_sym}Time to optimize: {t2}")
 		x_vars_opt = {}
-		for v in m.getVars():
-			if v.varName[:1] == "x" and use_top_level_params:
-				self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
-			elif v.varName[:1] == "x":
-				x_vars_opt[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+		if m.status != 2 and m.status != 9:
+			print("model returned incorrect status code,", m.status, "(if =4 then model probably never found a feasible solution)")
+			for v in m.getVars():
+				if v.varName[:1] == "x" and use_top_level_params:
+					self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+				elif v.varName[:1] == "x":
+					x_vars_opt[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
 
 		""" Draw pre-bendiness graph """
 		# vis.draw_graph(g, "interim")
@@ -909,7 +911,7 @@ class LayeredOptimizer:
 			self.print_info.append(f"{pre_sym}Number of constraints: {n_constraints_generated}")
 			self.print_info.append(f"{pre_sym}{round(t1, 3)}, {round(t2, 3)}, {round(t3, 3)}, {round(t1 + t2 + t3, 3)}")
 
-		print(f"Number of crossings: {round(m.objVal)}", f"\tOptimization time: {round(m.runtime, 3)}")
+		print(f"Number of crossings: {round(m.objVal) if m.objVal != float('inf') else m.objVal}", f"\tOptimization time: {round(m.runtime, 3)}")
 
 		if use_top_level_params and self.return_x_vars:
 			return int(m.objVal), self.x_var_assign
