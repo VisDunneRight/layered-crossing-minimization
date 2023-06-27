@@ -195,7 +195,7 @@ def run_test_fix_x_vars():
         times = []
         vals = []
         for i in range(25):
-            pair = optimizer.optimize_with_starting_assignments(optimizer.generate_random_vars_to_fix(2))
+            pair = optimizer.optimize_with_starting_assignments(optimizer.__generate_random_vars_to_fix(2))
             times.append(pair[0])
             vals.append(pair[1])
         with open("1toN_varstart_experiment.txt", 'a') as f:
@@ -214,10 +214,10 @@ def run_my_algorithm():
 
 def run_standard_version():
     n_nodes = 68
-    to_optimize = os.listdir(f"Rome-Lib/graficon{n_nodes}nodi")[22:23]
+    to_optimize = os.listdir(f"Rome-Lib/graficon{n_nodes}nodi")[0:1]
     for to_opt in to_optimize:
-        g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = LayeredOptimizer(g, {"name": to_opt})
+        optimizer = LayeredOptimizer(f"Rome-Lib/graficon{n_nodes}nodi/{to_opt}")
+        optimizer.fix_one_var = True
         optimizer.optimize_layout()
 
 
@@ -816,7 +816,7 @@ def get_plotted_points_in_ind_switch_figures(formulation, switch):
 if __name__ == '__main__':
     # rank_switches_all_combos()
 
-    latex_print_ranking()
+    # latex_print_ranking()
     # group_success_calc("junger_basic")
     # avg_comb_num_switch_ranking()
 
@@ -887,7 +887,7 @@ if __name__ == '__main__':
 
     # experiments.independent_var_experiment("independent_var_study_files", 80)
 
-    # run_standard_version()
+    run_standard_version()
     # run_test_fix_x_vars()
     # cProfile.run("run_my_algorithm()", "my_algo_stats")
     # p = pstats.Stats("my_algo_stats")

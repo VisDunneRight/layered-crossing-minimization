@@ -6,12 +6,15 @@ import pydot
 
 
 def read(filepath, w=4, c=2, layer_assignments=None):
-	assert os.path.isfile(filepath), "invalid file path"
+	assert os.path.isfile(filepath), f"invalid file path '{filepath}'"
 	collection = ""
 	if '/' in filepath:
-		collection = filepath[:filepath.index('/')]
+		if filepath[:2] == "..":
+			collection = filepath[filepath.index('/') + 1:filepath.index('/', 3)]
+		else:
+			collection = filepath[:filepath.index('/')]
 	if collection == "Rome-Lib":
-		g, tv = layering.create_better_layered_graph(filepath[filepath.index('/') + 1:], w, c)
+		g, tv = layering.create_better_layered_graph(filepath, w, c)
 	elif collection == "DAGmar":
 		g = type_conversions.dagmar_nx_to_layered_graph(nx.read_graphml(filepath, node_type=str))
 	elif collection == "north":

@@ -6,11 +6,11 @@ import random
 import networkx as nx
 
 
-def create_bfs_layered_graph(s_g):
+def create_bfs_layered_graph(s_g):  # DEPRECATED
     visited = {n: False for n in s_g}
     bfs_q = set()
     # first = 1
-    first = random.randint(1, len(s_g))
+    first = random.randint(0, len(s_g) - 1)
     bfs_q.add(first)
     visited[first] = True
     g = graph.LayeredGraph()
@@ -34,7 +34,7 @@ def create_bfs_layered_graph(s_g):
     return g
 
 
-def create_layered_graph(rome_file):
+def create_layered_graph(rome_file):  # DEPRECATED
     with open(f"Rome-Lib/{rome_file}") as f:
         simple_g = {}
         n_e = True
@@ -52,7 +52,7 @@ def create_layered_graph(rome_file):
 
 
 def create_better_layered_graph(rome_file, w, c):
-    with open(f"Rome-Lib/{rome_file}") as f:
+    with open(rome_file) as f:
         simple_g = {}
         n_e = True
         for line in f.readlines():
@@ -60,10 +60,10 @@ def create_better_layered_graph(rome_file, w, c):
                 n_e = False
                 continue
             elif n_e:
-                simple_g[int(line.split(' ')[0])] = []
+                simple_g[int(line.split(' ')[0]) - 1] = []
             else:
                 e = re.split('[ \n]', line)
-                simple_g[int(e[2])].append(int(e[3]))
+                simple_g[int(e[2]) - 1].append(int(e[3]) - 1)
         # print("s_g", simple_g)
         to_remove = cycle_removal(simple_g)
         for edge in to_remove:
@@ -155,7 +155,7 @@ def run_good_graph_tests(s_g):
 
 def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
     simple_g = {}
-    names = {nname: i+1 for i, nname in enumerate(nxg)}
+    names = {nname: i for i, nname in enumerate(nxg)}
     for node in nxg:
         simple_g[names[node]] = []
         for adj in nxg[node]:
@@ -281,7 +281,7 @@ def promote_vertex(layering, g_dl, v):
 
 def vertex_promotion(g: graph.LayeredGraph):
     double_adj = g.create_double_adj_list()
-    layering = [0] + [g.node_names[i].layer for i in range(1, g.n_nodes + 1)]
+    layering = [g.node_names[i].layer for i in range(g.n_nodes)]
     layer_backup = layering.copy()
     for i in range(100):
         promotions = 0
@@ -295,6 +295,6 @@ def vertex_promotion(g: graph.LayeredGraph):
         if promotions == 0:
             break
     for i, l in enumerate(layering):
-        if i == 0:
-            continue
+        # if i == 0:
+        #     continue
         g.node_names[i].layer = l

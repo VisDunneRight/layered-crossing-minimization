@@ -2,7 +2,7 @@ from src.optimization import LayeredOptimizer
 
 
 if __name__ == '__main__':
-	""" Example use case. Optimizes and draws a 40-node Rome-Lib graph with vertical position transitivity (default) and a selection of switches. """
+	""" Example use case. Optimizes and draws a 40-node Rome-Lib graph with vertical position __transitivity (default) and a selection of switches. """
 	optimizer = LayeredOptimizer("Rome-Lib/graficon40nodi/grafo3216.40")
 	optimizer.fix_one_var = True
 	optimizer.aggro_presolve = True

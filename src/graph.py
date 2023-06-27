@@ -11,6 +11,12 @@ class LayeredNode:
         self.is_anchor_node = is_anchor
         self.stacked = stacked
 
+    def __str__(self):
+        return f"ID={self.name}/L={self.layer}"
+
+    def __repr__(self):
+        return f"ID={self.name}/L={self.layer}"
+
 
 class LayeredEdge:
     def __init__(self, node1: LayeredNode, node2: LayeredNode, stacked=False, weight=1):
@@ -27,6 +33,12 @@ class LayeredEdge:
     def update(self):
         self.length = abs(self.n1.layer - self.n2.layer)
         self.same_layer_edge = self.n1.layer == self.n2.layer
+
+    def __str__(self):
+        return f"({str(self.n1)}, {str(self.n2)})"
+
+    def __repr__(self):
+        return f"({str(self.n1)}, {str(self.n2)})"
 
 
 def find_closest(val, taken_vals: set):
@@ -54,7 +66,7 @@ class LayeredGraph:
         self.n_layers = 0
         self.n_nodes = 0
         self.nodes = []
-        self.layers = {}    # TODO convert to layernum->nodename instead of layernum->nodeobject
+        self.layers = {}
         self.edges = []
         self.stacked_edges = []
         self.stacked_nodes = []
@@ -62,9 +74,13 @@ class LayeredGraph:
         self.node_names = {}
         self.edge_names = {}
         self.adj_list = {}
+        self.time = 0
 
     def __getitem__(self, item):
-        return self.node_names[item]
+        if type(item) == int:
+            return self.nodes[item]
+        else:
+            return self.node_names[item]
 
     def __iter__(self):
         return iter(self.nodes)
@@ -72,9 +88,9 @@ class LayeredGraph:
     def __contains__(self, item):
         return item in self.node_names
 
-    def get_node(self, node_name):
-        if node_name in self.node_names:
-            return self.node_names[node_name]
+    def get_node(self, node_id):
+        if 0 <= node_id < len(self.nodes):
+            return self.nodes[node_id]
         return None
 
     def get_edge(self, node1_name, node2_name):
@@ -116,7 +132,7 @@ class LayeredGraph:
 
     def add_node(self, layer, name=None, is_anchor=False, stacked=False):
         if name is None:
-            name = self.n_nodes + 1
+            name = self.n_nodes
         elif name in self.node_names:
             raise Exception(f"node {name} already exists in graph")
         x = LayeredNode(name, layer, is_anchor=is_anchor, stacked=stacked)
@@ -159,7 +175,7 @@ class LayeredGraph:
         for edge in edge_list:
             self.add_edge(edge[0], edge[1])
 
-    def stack_subgraph(self, cut_nodes: set, crossing_edges):
+    def stack_subgraph(self, cut_nodes: set, crossing_edges):  # DEPRECATED
         """
         Saves subgraph to new list in stacked_nodes/stacked_edges, deletes originals from nodes/edges/node_names
         Creates 1 new node, edge per layer with stacked=True and corresponding weight
@@ -206,7 +222,7 @@ class LayeredGraph:
         for i in range(len(self.big_stack_nodes[-1]) - 1):
             self.add_edge(self.big_stack_nodes[-1][i].name, self.big_stack_nodes[-1][i + 1].name, stacked=True, weight=layer_counts[self.big_stack_nodes[-1][i].layer])
 
-    def stack_entire_graph(self, list_of_subgraphs):
+    def stack_entire_graph(self, list_of_subgraphs):  # DEPRECATED
         """
         Saves subgraphs to new lists in stacked_nodes/stacked_edges, deletes originals from nodes/edges/node_names
         Creates 1 new node, edge per layer for each subgraph with stacked=True and corresponding weight
@@ -251,11 +267,11 @@ class LayeredGraph:
 
     def stacked_graph_from_subgraph_nodes(self, subgraph_assignments):
         """
-        :param: subgraph_assignments: List mapping with index node ID minus 1 and elt subgraph assignment, integer in {0,...,#subgraphs-1}
+        :param: subgraph_assignments: List mapping with index node ID and elt subgraph assignment, integer in {0,...,#subgraphs-1}
         :return: new stacked graph object G', mapping of node ID -> stack node ID in G'
         """
         new_g = LayeredGraph()
-        subgraphs = [[i + 1 for i, asgn in enumerate(subgraph_assignments[1:]) if asgn == j] for j in range(max(subgraph_assignments) + 1)]
+        subgraphs = [[i for i, asgn in enumerate(subgraph_assignments) if asgn == j] for j in range(max(subgraph_assignments) + 1)]
         # node_to_group = {}
         node_to_stack_node = {}
         stack_node_to_nodelist = {}
@@ -271,7 +287,7 @@ class LayeredGraph:
             max_l = max((self.node_names[node].layer for node in subgraph))
             sn1 = new_g.add_node(min_l)
             stack_node_to_nodelist[sn1.name] = set()
-            starting_node = new_g.n_nodes
+            starting_node = new_g.n_nodes - 1
             for level in range(min_l, max_l):
                 sn2 = new_g.add_node(level + 1)
                 stack_node_to_nodelist[sn2.name] = set()
@@ -283,7 +299,7 @@ class LayeredGraph:
         for edge in self.edges:
             if subgraph_assignments[edge.n1.name] != subgraph_assignments[edge.n2.name]:
                 if (node_to_stack_node[edge.n1.name], node_to_stack_node[edge.n2.name]) in new_g.edge_names:
-                    new_g.edge_names[node_to_stack_node[edge.n1.name], node_to_stack_node[edge.n2.name]].weight += 1    # TODO fix handling of crossing edges between same stack nodes
+                    new_g.edge_names[node_to_stack_node[edge.n1.name], node_to_stack_node[edge.n2.name]].weight += 1    # FIXME handling of cases with multiple crossing edges between the same two stack nodes
                 else:
                     new_g.add_edge(node_to_stack_node[edge.n1.name], node_to_stack_node[edge.n2.name])
                 # crossing_edges[node_to_group[edge.n1.name]].append((edge.n1.name, edge.n2.name))
@@ -298,7 +314,7 @@ class LayeredGraph:
 
         return new_g, crossing_edges, contact_nodes, stack_node_to_nodelist, node_to_stack_node
 
-    def unstack_graph_nodes(self, stack_index):
+    def unstack_graph_nodes(self, stack_index):  # DEPRECATED
         self.nodes = [node for node in self.nodes if node not in self.big_stack_nodes[stack_index]]
         for s_node in self.big_stack_nodes[stack_index]:
             del self.node_names[s_node.name]
@@ -307,7 +323,7 @@ class LayeredGraph:
             self.node_names[old_node.name] = old_node
         self.big_stack_nodes[stack_index].clear()
 
-    def unstack_all_graph_edges(self):
+    def unstack_all_graph_edges(self):  # DEPRECATED
         stacked_edge = [edge for edge in self.edges if edge.stacked]
         self.edges = [edge for edge in self.edges if not edge.stacked]
         for edge in stacked_edge:
@@ -405,7 +421,7 @@ class LayeredGraph:
             for i, node in enumerate(self.layers[level]):
                 node.y = i + 1
 
-    def barycentric_reordering(self, n_iter):
+    def barycentric_reordering(self, n_iter):  # DEPRECATED: Use heuristics.py
         adjacency = self.create_normal_adj_list()
         min_y = min((n.y for n in self.nodes))
         for node_list in self.layers.values():
@@ -481,8 +497,42 @@ class LayeredGraph:
             max_connectedness += len(self.layers[l_num]) * len(self.layers[l_num + 1])
         return len(self.edges) / max_connectedness
 
-    def calculate_csw_constant(self):
-        return round(math.sqrt(sum(len(lay)**2 for lay in self.layers.values())), 3)
+    def tarjan_ap(self, idx, visited, discovery, low, ap, parent):
+        visited[idx] = True
+        discovery[idx] = self.time
+        low[idx] = self.time
+        self.time += 1
+        for idx_adj in self.adj_list[idx]:
+            if not visited[idx_adj]:
+                parent[idx_adj] = idx
+                self.tarjan_ap(idx_adj, visited, discovery, low, ap, parent)
+                low[idx] = min(low[idx], low[idx_adj])
+                if parent[idx] != -1 and low[idx_adj] >= discovery[idx]:
+                    ap[idx] = True
+        if parent[idx] == -1 and len([v for v in parent if v == idx]) > 1:
+            ap[idx] = True
+
+    def collapse_ap_cases(self):
+        # 1) Recursive DFS to label all articulation points
+        idx = 0
+        disc = [self.n_nodes] * self.n_nodes
+        low = [self.n_nodes] * self.n_nodes
+        visited = [False] * self.n_nodes
+        parent = [-1] * self.n_nodes
+        aps = [False] * self.n_nodes
+        self.time = 0
+        self.tarjan_ap(idx, visited, disc, low, aps, parent)
+
+        # 2) For each AP, calc if largest <|G|/2 subgraph is valid AP case, add to list + calculate ratio, ow check each combo in order of decreasing size
+        #   If an AP is already inside valid subgraph, ignore.
+        ap_idxs = [i for i, v in enumerate(aps) if v]
+        for ap in ap_idxs:
+            subgs_adj = [[v for v in self.adj_list[ap] if low[v] == i] for i in {low[x] for x in self.adj_list[ap]}]
+            for subtree in subgs_adj:
+                ap_bfsq = [v for v in subtree]
+                # while ap_bfsq
+
+        # 4) Mark each L-tree as a subgraph and call collapse_subgraphs
 
     def wiggle_node(self, x_vars, edge_b_l, node, pos_or_neg):
         best_seen_n_cr = 0

@@ -20,9 +20,9 @@ def dagmar_nx_to_layered_graph(nxg: nx.Graph):
 	g = graph.LayeredGraph()
 	lv = nx.get_node_attributes(nxg, "hierarchy.level")
 	for v in nxg.nodes:
-		g.add_node(int(lv[v])+1, name=int(v[1:])+1)
+		g.add_node(int(lv[v])+1, name=int(v[1:]))
 	for edge in nxg.edges:
-		g.add_edge(int(edge[0][1:])+1, int(edge[1][1:])+1)
+		g.add_edge(int(edge[0][1:]), int(edge[1][1:]))
 	g.add_anchors()
 	g.relayer()
 	g.y_val_setup()
