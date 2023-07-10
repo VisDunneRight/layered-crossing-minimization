@@ -6,9 +6,6 @@ import random
 from src import optimization, read_data, vis, motifs
 
 
-random.seed(22)
-
-
 def get_list_of_files(storage_file):
     filenames = []
     with open("data storage/" + storage_file, 'r') as f:
@@ -108,7 +105,7 @@ def fix_1_var_experiment(start_idx, filename):
         gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
     for to_opt in gfiles[start_idx:]:
         g = read_data.read(to_opt)
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "cutoff_time": 600, "fix_one_var": True, "return_experiment_data": True, "stratisfimal_yvars": True})
+        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "cutoff_time": 600, "symmetry_breaking": True, "return_experiment_data": True, "stratisfimal_yvars": True})
         result = optimizer.optimize_layout()
         insert_data("strat_fix1.csv", [result])
         optimizer.junger_ec, optimizer.stratisfimal_y_vars = True, False
@@ -120,24 +117,15 @@ def fix_1_var_experiment(start_idx, filename):
 
 
 def get_all_graphs():
-    all_g = [[], [], []]
+    all_g = [[], []]
     for i in range(10, 101):
         for file in os.listdir(f"Rome-Lib/graficon{i}nodi"):
             all_g[0].append(f"Rome-Lib/graficon{i}nodi/" + file)
-    daglist = []
-    for i in range(1, 8):
-        for file in os.listdir(f"DAGmar/graphs/{i}.6"):
-            daglist.append(f"DAGmar/graphs/{i}.6/" + file)
-    g_t_nds = {}
-    for file in daglist:
-        g = read_data.read(file)
-        g_t_nds[file] = len(g.nodes)
-    all_g[1].extend(sorted(daglist, key=lambda x: g_t_nds[x]))
     north_gs = sorted(list(os.listdir("north")), key=lambda fil: int(fil[2:(5 if fil[4] == '0' else 4)]))
     for i in range(len(north_gs)):
         north_gs[i] = "north/" + north_gs[i]
     north_gs.remove("north/g.57.26.graphml")   # skip this one graph that takes over an hour to insert the variables and constraints
-    all_g[2].extend(north_gs)
+    all_g[1].extend(north_gs)
     return all_g
 
 
@@ -152,9 +140,9 @@ def run_experiment(start_idx, cutoff_time, exp_name, param_to_set, clear_files, 
         clear_file(f"junger_basic/{exp_name}_{cutoff_time}.csv")
         clear_file(f"vertical_transitivity/{exp_name}_{cutoff_time}.csv")
         clear_file(f"redundancy/{exp_name}_{cutoff_time}.csv")
-        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
-        insert_one(f"vertical_transitivity/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
-        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
+        insert_one(f"vertical_transitivity/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
+        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
     for j in range(start_idx[0], 3):
         junger_timedout = 0
         strat_timedout = 0
@@ -198,9 +186,9 @@ def run_multi_param_experiment(start_idx, graphs_file, cutoff_time, exp_name, pa
         clear_file(f"junger_basic/{exp_name}_{cutoff_time}.csv")
         clear_file(f"vertical_transitivity/{exp_name}_{cutoff_time}.csv")
         clear_file(f"redundancy/{exp_name}_{cutoff_time}.csv")
-        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
-        insert_one(f"vertical_transitivity/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
-        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
+        insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
+        insert_one(f"vertical_transitivity/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
+        insert_one(f"redundancy/{exp_name}_{cutoff_time}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
     for i, to_opt in enumerate(gfiles[start_idx:]):
         print(f"{i + start_idx + 1} / {len(gfiles)}")
         g = read_data.read(to_opt)
@@ -219,7 +207,7 @@ def run_multi_param_experiment(start_idx, graphs_file, cutoff_time, exp_name, pa
 
 
 def all_combinations_experiment(folder_to_write):
-    key = ["fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
+    key = ["symmetry_breaking", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
     with open("data storage/5_percent_all_g_sorted.txt", 'r') as fd:
         graphs_files = []
         for line in fd.readlines():
@@ -274,9 +262,9 @@ def run_one_graph(gfile, exp_name, cutoff_time, params_to_set, idx):
     params.update({"cutoff_time": cutoff_time, "return_experiment_data": True})
     optimizer = optimization.LayeredOptimizer(g, params)
     result = optimizer.optimize_layout()
-    # folder = "redundancy" if "direct_transitivity" in params_to_set and "vertical_transitivity" in params_to_set else "junger_basic" if "direct_transitivity" in params_to_set else "vertical_transitivity"
     formatted = [idx, gfile] + base_info + [j for j in result]
-    insert_one(f"{exp_name}.csv", formatted)
+    if int(formatted[11]) != 11:
+        insert_one(f"{exp_name}.csv", formatted)
     return formatted
 
 
@@ -321,49 +309,93 @@ def get_all_files_in_bucket(bucket_size):
     return filenames
 
 
+def get_all_files_by_bucket():
+    with open("data storage/all_g_sorted.txt", 'r') as fd1:
+        filenames = []
+        buckets = []
+        for line in fd1.readlines():
+            if line[0] == "T":
+                filenames.append([])
+                buckets.append(int(line[line.index('[')+1:line.index(',')]))
+            else:
+                filenames[-1].append(line[:line.index(',')])
+    return filenames, buckets
+
+
+def get_start_position(results_file, all_graphs) -> tuple[int, int, int, int, bool]:
+    x, y, cur_bucket, cur_success = 0, 0, 10, 0 
+    with open(results_file, 'r') as fd:
+        rdr = csv.reader(fd)
+        for line in rdr:
+            if line[1][0] == 'R' or line[1][0] == 'n':
+                if int(line[3])//10*10 != cur_bucket:
+                    cur_bucket = int(line[3])//10*10
+                    x += 1
+                    y = 0
+                    cur_success = 0
+                else:
+                    y += 1
+                    if float(line[10]) < 300:
+                        cur_success += 1
+    if y == len(all_graphs[x]) and cur_success / len(all_graphs[x]) < 0.75:
+        return x + 1, 0, cur_success, x, True
+    elif y == len(all_graphs[x]):
+        return x + 1, 0, cur_success, 0, False
+    else:
+        return x, y, cur_success, 0, False
+
+
 def individual_switch_cutoff(datapoints):
     timedout = sum((1 for pt in datapoints if float(pt[10]) > 60))
     return True if timedout / len(datapoints) >= 0.25 else False
 
 
 def individual_switch_experiment():
-    key1 = ["fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
-    key2 = ["fix1var_60", "butterfly_60", "heuristic_60", "presolve_60", "xvar_branch_60", "mip_relax_60", "symmetry_60"]
-    for j, inp1 in enumerate(["direct_transitivity", "vertical_transitivity", "both_combined"]):
+    # This function is checkpoint-safe
+    key1 = ["symmetry_breaking", "butterfly_reduction", "heuristic_start", "priority", "mip_relax", "mirror_vars"]
+    key2 = ["symmetry_breaking_5m", "butterfly_reduction_5m", "heuristic_start_5m", "xvar_branch_priority_5m", "mip_relax_5m", "mirror_vars_5m"]
+    all_files, buckets = get_all_files_by_bucket()
+    for j, inp1 in enumerate(["direct_transitivity", "vertical_transitivity"]):
         furthest_bucket_reached = 0
         for i, inp2 in enumerate(key2):
             fname = f"{inp1}/{inp2}"
-            insert_one(f"{fname}_new.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
-            curindex = 0
-            for bsize in range(10, 17141, 10):
-                all_bfiles = get_all_files_in_bucket(bsize)
-                success_ct = 0
-                if len(all_bfiles) > 0:
-                    for check_file in all_bfiles:
-                        parameters = [key1[i], "direct_transitivity" if j % 2 == 0 else "baseline",
-                                      "vertical_transitivity" if j > 0 else "baseline"]
-                        res = run_one_graph(check_file, f"{fname[fname.index('/') + 1:]}_new", 60, parameters, curindex)
-                        curindex += 1
-                        if res[10] < 60:
-                            success_ct += 1
-                if success_ct / len(all_bfiles) < 0.75:
-                    print(f"{inp1} with switch {inp2} cutoff at bucket size {bsize}")
-                    if bsize > furthest_bucket_reached:
-                        furthest_bucket_reached = bsize
-                    break
+            if os.path.exists(f"{fname}.csv"):
+                x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"{fname}.csv", all_files)
+                if is_complete:
+                    if furthest_bucket > furthest_bucket_reached:
+                        furthest_bucket_reached = furthest_bucket
+                    continue
+            else:
+                insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
+                x, y, success_ct = 0, 0, 0
+            success_condition = True
+            while success_condition and x < len(all_files):
+                for gidx in range(y, len(all_files[x])):
+                    parameters = [key1[i], inp1]
+                    res = run_one_graph(all_files[x][gidx], f"{fname[fname.index('/') + 1:]}", 300, parameters, x * len(all_files[0]) + gidx)
+                    if res[10] < 5*60:
+                        success_ct += 1
+                if success_ct / len(all_files[x]) < 0.75:
+                    print(f"{inp1} with switch {inp2} cutoff at bucket size {buckets[x]}")
+                    if x > furthest_bucket_reached:
+                        furthest_bucket_reached = x
+                    success_condition = False
+                else:
+                    x += 1
+                    y = 0
         # baseline calculation
-        fname = f"{inp1}/baseline"
-        insert_one(f"{fname}_new.csv",
-                   ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars",
-                    "Total constraints", "Crossings", "Opttime", "Work", "Nodes visited", "Setup Time"])
-        curindex = 0
-        for bsize in range(10, furthest_bucket_reached + 10, 10):
-            all_bfiles = get_all_files_in_bucket(bsize)
-            if len(all_bfiles) > 0:
-                for check_file in all_bfiles:
-                    parameters = ["direct_transitivity" if j % 2 == 0 else "baseline", "vertical_transitivity" if j > 0 else "baseline"]
-                    run_one_graph(check_file, f"{fname[fname.index('/') + 1:]}_new", 60, parameters, curindex)
-                    curindex += 1
+        fname = f"{inp1}/baseline_5m"
+        if os.path.exists(f"{fname}.csv"):
+            x, y, dummy, dummy2, dummy3 = get_start_position(f"{fname}.csv", all_files)
+        else:
+            insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
+            x, y = 0, 0
+        while x <= furthest_bucket_reached:
+            for gidx in range(y, len(all_files[x])):
+                parameters = [inp1]
+                run_one_graph(all_files[x][gidx], f"{fname[fname.index('/') + 1:]}", 300, parameters, x * len(all_files[0]) + gidx)
+            x += 1
+            y = 0
 
 
 def sample_experiment_dataset():
@@ -372,27 +404,14 @@ def sample_experiment_dataset():
     for gr in all_g[0]:
         my_g = read_data.read(gr)
         rome_g.append((gr, len(my_g.nodes)))
-    # rome_g.sort(key=lambda x: x[1])
-    print(len(rome_g))
-    rome_g_sample = random.sample(rome_g, len(rome_g)//2)
-    rome_g_sample.sort(key=lambda x: x[1])
-    print(len(rome_g_sample))
+    rome_g.sort(key=lambda x: x[1])
+    rome_g_sample = rome_g
     with open("data storage/rome_sorted.txt", 'w') as fd:
         fd.write("Total nodes in [10,20):\n")
         for i in range(len(rome_g_sample)):
             if i > 0 and rome_g_sample[i][1]//10 > rome_g_sample[i-1][1]//10:
                 fd.write(f"Total nodes in [{rome_g_sample[i][1]//10*10},{rome_g_sample[i][1]//10*10+10}):\n")
             fd.write(f"{rome_g_sample[i][0]},{rome_g_sample[i][1]}\n")
-    dagmar_g = []
-    for gr in all_g[1]:
-        my_g = read_data.read(gr)
-        dagmar_g.append((gr, len(my_g.nodes)))
-    dagmar_g.sort(key=lambda x: x[1])
-    with open("data storage/dagmar_sorted.txt", 'w') as fd:
-        for i in range(len(dagmar_g)):
-            if i > 0 and dagmar_g[i][1] // 10 > dagmar_g[i - 1][1] // 10:
-                fd.write(f"Total nodes in [{dagmar_g[i][1] // 10 * 10},{dagmar_g[i][1] // 10 * 10 + 10}):\n")
-            fd.write(f"{dagmar_g[i][0]},{dagmar_g[i][1]}\n")
     north_g = []
     for gr in all_g[2]:
         my_g = read_data.read(gr)
@@ -449,6 +468,7 @@ def sample_5_percent():
 
 if __name__ == '__main__':
     """ NOTE: Running this file will take a very long time, at minimum 2-3 weeks. """
+    random.seed(22)
 
     """ Individual switch evaluation experiment """
     sample_experiment_dataset()  # sample all data to generate experiment dataset, as described in our paper. Generates data storage/all_g_sorted.txt

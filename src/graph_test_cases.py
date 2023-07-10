@@ -3,6 +3,7 @@ import graph
 import read_data
 from random import choice, randint
 import heuristics
+from src.optimization import LayeredOptimizer
 from sklearn.cluster import SpectralClustering
 
 import src.vis
@@ -108,9 +109,28 @@ def test_method_consistency_for_graph_structure(test_graphs):
 		print("pass")
 
 
+def test_optimization_on_graphs_with_non_ascending_names(test_graphs):
+	print("testing if the result of optimizing a graph is unchanged if the node names are not 0, 1, 2,...:")
+	for grf in test_graphs:
+		print(f"\t{grf}... ", end='')
+		gr = read_data.read(grf)
+		optim = LayeredOptimizer(gr)
+		optim.symmetry_breaking = True
+		optim.optimize_layout()
+
+		nd1 = gr.nodes.pop(2)
+		nd2 = gr.nodes.pop(5)
+		nd3 = gr.nodes.pop(7)
+		nd1.name = 230
+		nd2.name = 304
+		nd3.name = 455
+		gr.nodes.append()
+
+
 if __name__ == '__main__':
 	n_cases = 5
-	test_set = [f"../Rome-Lib/{l1}/" + choice(os.listdir(f"../Rome-Lib/{l1}")) for l1 in [choice(list(os.listdir("../Rome-Lib"))) for i1 in range(n_cases)]]
+	test_folds = [f"../Rome-Lib/graficon" + str(choice(list(range(10, 65)))) + "nodi/" for i in range(n_cases)]
+	test_set = [l1 + choice(list(os.listdir(l1))) for l1 in test_folds]
 	test_all_unique_ids(test_set)
 	test_ascending_names_from_zero(test_set)
 	test_method_consistency_for_counts(test_set)

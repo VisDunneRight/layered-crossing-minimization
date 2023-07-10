@@ -44,7 +44,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		""" Symmetry constraints """
 
 		""" Fix key x-var """
-		# if self.fix_one_var:
+		# if self.symmetry_breaking:
 
 		""" Original vertical position constraints """
 		# if self.vertical_transitivity:

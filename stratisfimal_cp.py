@@ -79,7 +79,7 @@ def run_junger_polyhedral_layout(graph_file):
 def run_my_layout_algorithm(graph_file):
     optimizer = LayeredOptimizer(graph_file)
     optimizer.vertical_transitivity = True
-    optimizer.fix_one_var = True
+    optimizer.symmetry_breaking = True
     optimizer.butterfly_reduction = True
     optimizer.heuristic_start = True
     optimizer.mip_relax = True
@@ -284,11 +284,11 @@ def fix_1_var_experiment():
     optvals2 = []
     for to_opt in to_optimize:
         g = layering.create_better_layered_graph(f"graficon{n_nodes}nodi/{to_opt}", 4, 2)[0]
-        optimizer = LayeredOptimizer(g, {"name": to_opt, "butterfly_reduction": False, "verbose": False, "cutoff_time": 100, "fix_one_var": True})
+        optimizer = LayeredOptimizer(g, {"name": to_opt, "butterfly_reduction": False, "verbose": False, "cutoff_time": 100, "symmetry_breaking": True})
         a, b = optimizer.optimize_layout()
         times1.append(str(a))
         optvals1.append(str(b))
-        optimizer.fix_one_var = False
+        optimizer.symmetry_breaking = False
         a, b = optimizer.optimize_layout()
         times2.append(str(a))
         optvals2.append(str(b))
@@ -355,7 +355,7 @@ def record_baseline_info(filename, start_idx):
             g = read(line.removesuffix('\n'))
             opt = LayeredOptimizer(g, {})
             opt.return_full_data = True
-            opt.fix_one_var = True
+            opt.symmetry_breaking = True
             opt.bendiness_reduction = False
             opt.aggro_presolve = True
             opt.xvar_branch_priority = True
@@ -432,7 +432,7 @@ def calc_if_bucket_donezo(datapts):
 
 def run_thing():
     """ find missing entries, run exp, write to new file, cut off once >50% in bucket timeout """
-    key1 = ["fix_one_var", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
+    key1 = ["symmetry_breaking", "butterfly_reduction", "heuristic_start", "presolve", "priority", "mip_relax", "mirror_vars"]
     key2 = ["fix1var_60", "butterfly_60", "heuristic_60", "presolve_60", "xvar_branch_60", "mip_relax_60", "symmetry_60"]
     for j, inp1 in enumerate(["junger_basic", "vertical_transitivity", "redundancy"]):
         for i, inp2 in enumerate(key2):
@@ -476,7 +476,7 @@ if __name__ == '__main__':
     run_thing()
 
     # experiments.run_experiment((1,0), cutoff_time=60, exp_name="baseline", param_to_set="baseline", clear_files=False, max_timeout=15)
-    # experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="fix_one_var", clear_files=False, max_timeout=5)
+    # experiments.run_experiment((2,58), cutoff_time=60, exp_name="fix1var", param_to_set="symmetry_breaking", clear_files=False, max_timeout=5)
     # experiments.run_experiment((0,0), cutoff_time=60, exp_name="butterfly", param_to_set="butterfly_reduction", clear_files=True, max_timeout=3)
     # experiments.run_experiment((0,0), cutoff_time=60, exp_name="heuristic", param_to_set="heuristic_start", clear_files=True, max_timeout=3)
     # experiments.run_experiment((0,0), cutoff_time=60, exp_name="presolve", param_to_set="presolve", clear_files=True, max_timeout=3)
@@ -484,7 +484,7 @@ if __name__ == '__main__':
     # experiments.run_experiment((0,0), cutoff_time=60, exp_name="mip_relax", param_to_set="mip_relax", clear_files=True, max_timeout=3)
     # experiments.run_experiment((0,0), cutoff_time=60, exp_name="symmetry", param_to_set="mirror_vars", clear_files=True, max_timeout=3)
 
-    # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="fix1var", param_to_set="fix_one_var", clear_files=True)
+    # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="fix1var", param_to_set="symmetry_breaking", clear_files=True)
     # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="heuristic_start", param_to_set="heuristic_start", clear_files=True)
     # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="butterfly", param_to_set="butterfly_reduction", clear_files=True)
     # experiments.run_experiment(0, "data storage/experiment_set_50", exp_name="presolve", param_to_set="presolve", clear_files=True)

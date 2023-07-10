@@ -1,11 +1,12 @@
-import itertools, re, time
 import os.path
 import random
+import time
+import itertools
 import gurobipy as gp
 from gurobipy import GRB
 from sklearn.cluster import SpectralClustering
 from src import vis, reductions, motifs, type_conversions, read_data
-from src.graph import *
+from src.graph import LayeredGraph
 from src.helpers import *
 
 
@@ -33,11 +34,11 @@ class LayeredOptimizer:
 		self.verbose = parameters["verbose"] if "verbose" in parameters else False
 		self.subg_verbose = parameters["subg_verbose"] if "subg_verbose" in parameters else True
 		self.draw_graph = parameters["draw_graph"] if "draw_graph" in parameters else False
-		self.fix_one_var = parameters["fix_one_var"] if "fix_one_var" in parameters else False
+		self.symmetry_breaking = parameters["symmetry_breaking"] if "symmetry_breaking" in parameters else False
 		self.heuristic_start = parameters["heuristic_start"] if "heuristic_start" in parameters else False
 		self.aggro_presolve = parameters["presolve"] if "presolve" in parameters else False
 		self.mip_relax = parameters["mip_relax"] if "mip_relax" in parameters else False
-		self.xvar_branch_priority = parameters["priority"] if "priority" in parameters else False
+		self.xvar_branch_priority = parameters["xvar_branch_priority"] if "xvar_branch_priority" in parameters else False
 		# self.junger_ec = parameters["junger_ec"] if "junger_ec" in parameters else False
 		self.direct_transitivity = parameters["direct_transitivity"] if "direct_transitivity" in parameters else False
 		self.vertical_transitivity = parameters["vertical_transitivity"] if "vertical_transitivity" in parameters else False
@@ -45,22 +46,22 @@ class LayeredOptimizer:
 		self.stratisfimal_y_vars = parameters["stratisfimal_yvars"] if "stratisfimal_yvars" in parameters else False
 		self.symmetry_constraints = parameters["symmetry_constraints"] if "symmetry_constraints" in parameters else True
 		self.cycle_constraints = parameters["cycle_constraints"] if "cycle_constraints" in parameters else False
-		self.l_tree_collapse = parameters["l_tree_collapse"] if "l_tree_collapse" in parameters else False
+		self.collapse_subgraphs = parameters["collapse_subgraphs"] if "collapse_subgraphs" in parameters else False
 		self.return_experiment_data = parameters["return_experiment_data"] if "return_experiment_data" in parameters else False
 		self.name = parameters["name"] if "name" in parameters else "graph1"
 		self.print_info = []
 
-	def __optimize_layout_standard(self, graph_arg=None, bendiness_reduction=False, assignment=None, return_x_vars=False, heuristic_start=False, transitivity=False, presolve=0, name="graph1", fix_x_vars=None, start_x_vars=None, fix_1_xvar=False, branch_on_x_vars=False, is_subgraph=False, verbose=False, use_top_level_params=False):
+	def __optimize_layout_standard(self, graph_arg=None, bendiness_reduction=False, assignment=None, return_x_vars=False, heuristic_start=False, name="graph1", fix_x_vars=None, start_x_vars=None, fix_1_xvar=False, branch_on_x_vars=False, is_subgraph=False, verbose=False, use_top_level_params=False):
 		g = self.g if graph_arg is None else graph_arg
 		if not self.direct_transitivity and not self.vertical_transitivity:
 			self.vertical_transitivity = True
-
-		""" L-Tree Collapse """
-		if self.l_tree_collapse:
-			# g, collapse_mapping, old_g = self.__collapse_ltrees(g), g
-			pass
-
 		t1 = time.time()
+
+		""" Collapse valid subgraphs """
+		if self.collapse_subgraphs:
+			g.adj_list = g.create_normal_adj_list()
+			g = g.collapse_ap_cases()
+
 		nodes_by_layer = g.get_names_by_layer()
 		edges_by_layer = g.get_edge_names_by_layer()
 		n_constraints_generated = [0] * 6  # simple edge, hybrid edge, same layer edge, vertical pos, bendiness, total
@@ -97,7 +98,7 @@ class LayeredOptimizer:
 		m.update()
 
 		""" Fix variables """
-		if assignment:  # LOOKAT remove in place of fix_x_vars
+		if assignment:  # TODO (later): can be removed, not used in full subg algo (remove in place of fix_x_vars)
 			for k, v in assignment.items():
 				m.getVarByName(k).ub, m.getVarByName(k).lb = v, v
 
@@ -127,8 +128,7 @@ class LayeredOptimizer:
 				if v.varName[:1] == "y":
 					v.Start = g[int(v.varName[2:v.varName.index(']')])].y
 				elif v.varName[:1] == "x":
-					v.Start = 1 if g[int(v.varName[2:v.varName.index(',')])].y < g[
-						int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])].y else 0
+					v.Start = 1 if g[int(v.varName[2:v.varName.index(',')])].y < g[int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])].y else 0
 
 		# g.barycentric_reordering(10)
 		# x_assign, c_assign = self.compute_variable_assignments(g, x_vars, c_vars)
@@ -155,7 +155,7 @@ class LayeredOptimizer:
 				else:
 					v.BranchPriority = 0
 
-		""" Butterfly reduction """  # FIXME: butterfly calculation
+		""" Butterfly reduction """
 		butterfly_c_vars = set()
 		butterfly_c_pairs = []
 		if self.butterfly_reduction:
@@ -171,9 +171,7 @@ class LayeredOptimizer:
 					if c_set in b_set_list:
 						b_ind = b_set_list.index(c_set)
 						if b_set_one_found[b_ind]:
-							c_org = \
-							[c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set][
-								0]
+							c_org = [c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set][0]
 							butterfly_c_pairs.append((c_org, c_var))
 						else:
 							b_set_one_found[b_ind] = True
@@ -212,8 +210,8 @@ class LayeredOptimizer:
 			self.__transitivity(m, nodes_by_layer, x_vars, x)
 
 		""" Long-version crossing reduction code """
-		n_cs = self.__edge_crossings(m, c_vars, x, c, graph_arg=g, track_x_var_usage=fix_1_xvar or (use_top_level_params and self.fix_one_var), butterflies=butterfly_c_vars)
-		# n_cs = self.edge_crossings_2(m, c_vars, x, c, graph_arg=g, track_x_var_usage=fix_1_xvar or (use_top_level_params and self.fix_one_var), butterflies=butterfly_c_pairs)
+		n_cs = self.__edge_crossings(m, c_vars, x, c, graph_arg=g, track_x_var_usage=fix_1_xvar or (use_top_level_params and self.symmetry_breaking), butterflies=butterfly_c_vars)
+		# n_cs = self.edge_crossings_2(m, c_vars, x, c, graph_arg=g, track_x_var_usage=fix_1_xvar or (use_top_level_params and self.symmetry_breaking), butterflies=butterfly_c_pairs)
 		for i, val in enumerate(n_cs[:-1]):
 			n_constraints_generated[i] += val
 
@@ -226,7 +224,7 @@ class LayeredOptimizer:
 			self.__add_cycle_constraints(m, g)
 
 		""" Fix key x-var """
-		if fix_1_xvar or (use_top_level_params and self.fix_one_var):
+		if fix_1_xvar or (use_top_level_params and self.symmetry_breaking):
 			x_var_usage = n_cs[-1]
 			if x_vars:
 				if x_var_usage != {}:
@@ -300,11 +298,45 @@ class LayeredOptimizer:
 			print("otherwise check https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html")
 			for v in m.getVars():
 				if v.varName[:1] == "x" and use_top_level_params:
-					self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(
-						v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+					self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
 				elif v.varName[:1] == "x":
-					x_vars_opt[int(v.varName[2:v.varName.index(',')]), int(
-						v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+					x_vars_opt[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+
+		""" Optimize and merge collapsed subgraphs """  # TODO: implement. create new optimizer for each
+		if self.collapse_subgraphs:
+			# new_g, stack_node_to_nodelist, node_to_stack_node, subgraphs_collapsed, subg_types
+			subgraphs = g.create_layered_graphs_from_subgraphs()
+			subgraph_ncr = 0
+			for i, subgraph in enumerate(subgraphs):
+				if g.subgraph_types[i] != 0:
+					var_to_fix = -1
+					xvars_to_fix = {}
+					if g.subgraph_types[i] != 1:
+						for nd in g.contact_nodes:
+							if nd in subgraph:
+								var_to_fix = nd
+					if var_to_fix != -1:
+						behind_nd = -1
+						connect_nd = -1
+						for ed in g.contact_edges:
+							if ed[0] == var_to_fix:
+								connect_nd = ed[1]
+							elif ed[1] == var_to_fix:
+								connect_nd = ed[0]
+						for nd_adj in g.adj_list[var_to_fix]:
+							if g[nd_adj].layer == g[connect_nd].layer:
+								behind_nd = nd_adj
+						if behind_nd != -1 and connect_nd != -1:
+							for other_nd in subgraph.layers[subgraph[var_to_fix].layer]:
+								if other_nd != var_to_fix:
+									xvars_to_fix[var_to_fix, other_nd] = 1 - get_x_var(self.x_var_assign, behind_nd, other_nd)
+					optim = LayeredOptimizer(subgraph)
+					if xvars_to_fix != {}:
+						subgraph_ncr += optim.optimize_layout(fix_xvars=xvars_to_fix)
+					else:
+						subgraph_ncr += optim.optimize_layout()
+					for xv, assgn in optim.x_var_assign.items():
+						self.x_var_assign[xv] = assgn
 
 		""" Draw pre-bendiness graph """
 		# vis.draw_graph(g, "interim")
@@ -359,7 +391,7 @@ class LayeredOptimizer:
 
 		if self.return_experiment_data:
 			objv = "inf" if m.objVal == float('inf') else round(m.objVal)
-			return len(x_vars), len(c_vars), m.numVars, m.numConstrs, objv, round(m.runtime, 4), round(m.work, 4), int(m.nodeCount), round(t1, 3)
+			return len(x_vars), len(c_vars), m.numVars, m.numConstrs, objv, m.runtime, m.status, int(m.nodeCount), round(t1, 3)
 
 		return round(t1 + t2 + t3, 3), int(m.objVal)
 
@@ -383,7 +415,7 @@ class LayeredOptimizer:
 			n_orig = max((n.name for n in g.nodes))
 		for var, val in x_var_opt.items():
 			if val == 0:
-				if int(var[0]) > n_orig and int(var[1]) > n_orig:
+				if g[int(var[0])].is_anchor_node and int(var[1]) > n_orig:
 					m2.addConstr(y[var[0]] >= 0.15 + y[var[1]], f"vert{var}")
 				elif int(var[0]) > n_orig or int(var[1]) > n_orig:
 					m2.addConstr(y[var[0]] >= 0.3 + y[var[1]], f"vert{var}")
@@ -424,288 +456,152 @@ class LayeredOptimizer:
 		g = self.g if graph_arg is None else graph_arg
 		n_constr_0, n_constr_1, n_constr_2 = 0, 0, 0
 		x_var_usage = {}
-		if butterflies == set():
-			butterflies = None
+		if butterflies is not None:
+			for c_var_pair in butterflies:
+				model.addConstr(c[c_var_pair[0]] + c[c_var_pair[1]] == 1)
 		for c_var in c_vars:
-			if butterflies is None or c_var not in butterflies:
-				if self.mirror_vars and not g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
-					model.addConstr(x[c_var[1][0], c_var[0][0]] + x[c_var[0][1], c_var[1][1]] + c[c_var] >= 1, f"1se{c_var}")
-					model.addConstr(x[c_var[0][0], c_var[1][0]] + x[c_var[1][1], c_var[0][1]] + c[c_var] >= 1, f"2se{c_var}")
-					if track_x_var_usage:
-						if (c_var[1][0], c_var[0][0]) not in x_var_usage:
-							x_var_usage[c_var[1][0], c_var[0][0]] = 0
-						if (c_var[0][1], c_var[1][1]) not in x_var_usage:
-							x_var_usage[c_var[0][1], c_var[1][1]] = 0
-						if (c_var[0][0], c_var[1][0]) not in x_var_usage:
-							x_var_usage[c_var[0][0], c_var[1][0]] = 0
-						if (c_var[1][1], c_var[0][1]) not in x_var_usage:
-							x_var_usage[c_var[1][1], c_var[0][1]] = 0
-						x_var_usage[c_var[1][0], c_var[0][0]] += 1
-						x_var_usage[c_var[0][1], c_var[1][1]] += 1
-						x_var_usage[c_var[0][0], c_var[1][0]] += 1
-						x_var_usage[c_var[1][1], c_var[0][1]] += 1
-				else:
-					x1_rev, x2_rev, x3_rev = 1, 1, 1
-
-					# simple edge crossing
-					if not g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
-						if (c_var[0][0], c_var[1][0]) in x:
-							x1 = (c_var[0][0], c_var[1][0])
-						else:
-							x1 = (c_var[1][0], c_var[0][0])
-							x1_rev = -1
-						if (c_var[0][1], c_var[1][1]) in x:
-							x2 = (c_var[0][1], c_var[1][1])
-						else:
-							x2 = (c_var[1][1], c_var[0][1])
-							x2_rev = -1
-						if track_x_var_usage:
-							if x1 not in x_var_usage:
-								x_var_usage[x1] = 0
-							if x2 not in x_var_usage:
-								x_var_usage[x2] = 0
-							x_var_usage[x1] += 2
-							x_var_usage[x2] += 2
-						# print(f"(1-{x1_rev}*x[{x1}]) + {x2_rev}*x[{x2}] + c[c_var] + {(1-x1_rev)/2} >= 1")
-						model.addConstr((1 - x1_rev * x[x1]) + x2_rev * x[x2] + c[c_var] - (1 - x1_rev) / 2 + (1 - x2_rev) / 2 >= 1, f"1se{c_var}")
-						model.addConstr(x1_rev * x[x1] + (1 - x2_rev * x[x2]) + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 1, f"2se{c_var}")
-						n_constr_0 += 2
-
-					# same-layer/2-layer edge crossing
-					elif g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
-						if (c_var[0][0], c_var[1][0]) in x:
-							x1 = (c_var[0][0], c_var[1][0])
-						else:
-							x1 = (c_var[1][0], c_var[0][0])
-							x1_rev = -1
-						if (c_var[0][1], c_var[1][0]) in x:
-							x2 = (c_var[0][1], c_var[1][0])
-						else:
-							x2 = (c_var[1][0], c_var[0][1])
-							x2_rev = -1
-						if track_x_var_usage:
-							if x1 not in x_var_usage:
-								x_var_usage[x1] = 0
-							if x2 not in x_var_usage:
-								x_var_usage[x2] = 0
-							x_var_usage[x1] += 2
-							x_var_usage[x2] += 2
-						model.addConstr(-x1_rev * x[x1] + x2_rev * x[x2] + c[c_var] - (1 - x1_rev) / 2 + (1 - x2_rev) / 2 >= 0, f"1hy{c_var}")
-						model.addConstr(x1_rev * x[x1] - x2_rev * x[x2] + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 0, f"2hy{c_var}")
-						n_constr_1 += 2
-
-					elif g.edge_names[c_var[1]].same_layer_edge and not g.edge_names[c_var[0]].same_layer_edge:
-						if (c_var[1][0], c_var[0][0]) in x:
-							x1 = (c_var[1][0], c_var[0][0])
-						else:
-							x1 = (c_var[0][0], c_var[1][0])
-							x1_rev = -1
-						if (c_var[1][1], c_var[0][0]) in x:
-							x2 = (c_var[1][1], c_var[0][0])
-						else:
-							x2 = (c_var[0][0], c_var[1][1])
-							x2_rev = -1
-						if track_x_var_usage:
-							if x1 not in x_var_usage:
-								x_var_usage[x1] = 0
-							if x2 not in x_var_usage:
-								x_var_usage[x2] = 0
-							x_var_usage[x1] += 2
-							x_var_usage[x2] += 2
-						model.addConstr(-x1_rev * x[x1] + x2_rev * x[x2] + c[c_var] - (1 - x1_rev) / 2 + (1 - x2_rev) / 2 >= 0, f"1hy{c_var}")
-						model.addConstr(x1_rev * x[x1] - x2_rev * x[x2] + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 0, f"2hy{c_var}")
-						n_constr_1 += 2
-
-					# same layer edge crossing
-					else:
-						x1_rev, x2_rev, x3_rev, x4_rev = 1, 1, 1, 1
-						if (c_var[0][0], c_var[1][0]) in x:
-							x1 = (c_var[0][0], c_var[1][0])
-						else:
-							x1 = (c_var[1][0], c_var[0][0])
-							x1_rev = -1
-						if (c_var[0][1], c_var[1][1]) in x:
-							x2 = (c_var[0][1], c_var[1][1])
-						else:
-							x2 = (c_var[1][1], c_var[0][1])
-							x2_rev = -1
-						if (c_var[0][0], c_var[1][1]) in x:
-							x3 = (c_var[0][0], c_var[1][1])
-						else:
-							x3 = (c_var[1][1], c_var[0][0])
-							x3_rev = -1
-						if (c_var[0][1], c_var[1][0]) in x:
-							x4 = (c_var[0][1], c_var[1][0])
-						else:
-							x4 = (c_var[1][0], c_var[0][1])
-							x4_rev = -1
-						if track_x_var_usage:
-							if x1 not in x_var_usage:
-								x_var_usage[x1] = 0
-							if x2 not in x_var_usage:
-								x_var_usage[x2] = 0
-							if x3 not in x_var_usage:
-								x_var_usage[x3] = 0
-							if x4 not in x_var_usage:
-								x_var_usage[x4] = 0
-							x_var_usage[x1] += 6
-							x_var_usage[x2] += 6
-							x_var_usage[x3] += 6
-							x_var_usage[x4] += 6
-						model.addConstr(
-							c[c_var] + 1 - x1_rev * x[x1] + 1 - x4_rev * x[x4] + 1 - x2_rev * x[x2] - (1 - x1_rev) / 2 - (
-									1 - x4_rev) / 2 - (1 - x2_rev) / 2 >= 1, f"1sl{c_var}")
-						model.addConstr(c[c_var] + 1 - x3_rev * x[x3] + x2_rev * x[x2] + x4_rev * x[x4] - (1 - x3_rev) / 2 + (
-								1 - x2_rev) / 2 + (1 - x4_rev) / 2 >= 1, f"2sl{c_var}")
-						model.addConstr(c[c_var] + x1_rev * x[x1] + 1 - x3_rev * x[x3] + x2_rev * x[x2] + (1 - x1_rev) / 2 - (
-								1 - x3_rev) / 2 + (1 - x2_rev) / 2 >= 1, f"3sl{c_var}")
-						model.addConstr(c[c_var] + 1 - x4_rev * x[x4] + 1 - x2_rev * x[x2] + x3_rev * x[x3] - (1 - x4_rev) / 2 - (
-								1 - x2_rev) / 2 + (1 - x3_rev) / 2 >= 1, f"4sl{c_var}")
-						model.addConstr(c[c_var] + x4_rev * x[x4] + x1_rev * x[x1] + 1 - x3_rev * x[x3] + (1 - x4_rev) / 2 + (
-								1 - x1_rev) / 2 - (1 - x3_rev) / 2 >= 1, f"5sl{c_var}")
-						model.addConstr(c[c_var] + 1 - x2_rev * x[x2] + x3_rev * x[x3] + 1 - x1_rev * x[x1] - (1 - x2_rev) / 2 + (
-								1 - x3_rev) / 2 - (1 - x1_rev) / 2 >= 1, f"6sl{c_var}")
-						model.addConstr(c[c_var] + x2_rev * x[x2] + x4_rev * x[x4] + x1_rev * x[x1] + (1 - x2_rev) / 2 + (
-								1 - x4_rev) / 2 + (1 - x1_rev) / 2 >= 1, f"7sl{c_var}")
-						model.addConstr(c[c_var] + x3_rev * x[x3] + 1 - x1_rev * x[x1] + 1 - x4_rev * x[x4] + (1 - x3_rev) / 2 - (
-								1 - x1_rev) / 2 - (1 - x4_rev) / 2 >= 1, f"8sl{c_var}")
-						n_constr_2 += 8
-		return n_constr_0, n_constr_1, n_constr_2, x_var_usage
-
-	def __edge_crossings_equal_butterfly(self, model: gp.Model, c_vars, x, c, graph_arg=None, track_x_var_usage=False, butterflies=None):
-		g = self.g if graph_arg is None else graph_arg
-		n_constr_0, n_constr_1, n_constr_2 = 0, 0, 0
-		x_var_usage = {}
-		if butterflies == set():
-			butterflies = None
-		for c_var_pair in butterflies:
-			model.addConstr(c[c_var_pair[0]] + c[c_var_pair[1]] == 1)
-		for c_var in c_vars:
-			x1_rev, x2_rev, x3_rev = 1, 1, 1
-
-			# simple edge crossing
-			if not g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
-				if (c_var[0][0], c_var[1][0]) in x:
-					x1 = (c_var[0][0], c_var[1][0])
-				else:
-					x1 = (c_var[1][0], c_var[0][0])
-					x1_rev = -1
-				if (c_var[0][1], c_var[1][1]) in x:
-					x2 = (c_var[0][1], c_var[1][1])
-				else:
-					x2 = (c_var[1][1], c_var[0][1])
-					x2_rev = -1
+			if self.mirror_vars and not g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
+				model.addConstr(x[c_var[1][0], c_var[0][0]] + x[c_var[0][1], c_var[1][1]] + c[c_var] >= 1, f"1se{c_var}")
+				model.addConstr(x[c_var[0][0], c_var[1][0]] + x[c_var[1][1], c_var[0][1]] + c[c_var] >= 1, f"2se{c_var}")
 				if track_x_var_usage:
-					if x1 not in x_var_usage:
-						x_var_usage[x1] = 0
-					if x2 not in x_var_usage:
-						x_var_usage[x2] = 0
-					x_var_usage[x1] += 2
-					x_var_usage[x2] += 2
-				# print(f"(1-{x1_rev}*x[{x1}]) + {x2_rev}*x[{x2}] + c[c_var] + {(1-x1_rev)/2} >= 1")
-				model.addConstr((1 - x1_rev * x[x1]) + x2_rev * x[x2] + c[c_var] - (1 - x1_rev) / 2 + (1 - x2_rev) / 2 >= 1, f"1se{c_var}")
-				model.addConstr(x1_rev * x[x1] + (1 - x2_rev * x[x2]) + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 1, f"2se{c_var}")
-				n_constr_0 += 2
-
-			# same-layer/2-layer edge crossing
-			elif g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
-				if (c_var[0][0], c_var[1][0]) in x:
-					x1 = (c_var[0][0], c_var[1][0])
-				else:
-					x1 = (c_var[1][0], c_var[0][0])
-					x1_rev = -1
-				if (c_var[0][1], c_var[1][0]) in x:
-					x2 = (c_var[0][1], c_var[1][0])
-				else:
-					x2 = (c_var[1][0], c_var[0][1])
-					x2_rev = -1
-				if track_x_var_usage:
-					if x1 not in x_var_usage:
-						x_var_usage[x1] = 0
-					if x2 not in x_var_usage:
-						x_var_usage[x2] = 0
-					x_var_usage[x1] += 2
-					x_var_usage[x2] += 2
-				model.addConstr(-x1_rev * x[x1] + x2_rev * x[x2] + c[c_var] - (1 - x1_rev) / 2 + (1 - x2_rev) / 2 >= 0, f"1hy{c_var}")
-				model.addConstr(x1_rev * x[x1] - x2_rev * x[x2] + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 0, f"2hy{c_var}")
-				n_constr_1 += 2
-
-			elif g.edge_names[c_var[1]].same_layer_edge and not g.edge_names[c_var[0]].same_layer_edge:
-				if (c_var[1][0], c_var[0][0]) in x:
-					x1 = (c_var[1][0], c_var[0][0])
-				else:
-					x1 = (c_var[0][0], c_var[1][0])
-					x1_rev = -1
-				if (c_var[1][1], c_var[0][0]) in x:
-					x2 = (c_var[1][1], c_var[0][0])
-				else:
-					x2 = (c_var[0][0], c_var[1][1])
-					x2_rev = -1
-				if track_x_var_usage:
-					if x1 not in x_var_usage:
-						x_var_usage[x1] = 0
-					if x2 not in x_var_usage:
-						x_var_usage[x2] = 0
-					x_var_usage[x1] += 2
-					x_var_usage[x2] += 2
-				model.addConstr(-x1_rev * x[x1] + x2_rev * x[x2] + c[c_var] - (1 - x1_rev) / 2 + (1 - x2_rev) / 2 >= 0, f"1hy{c_var}")
-				model.addConstr(x1_rev * x[x1] - x2_rev * x[x2] + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 0, f"2hy{c_var}")
-				n_constr_1 += 2
-
-			# same layer edge crossing
+					if (c_var[1][0], c_var[0][0]) not in x_var_usage:
+						x_var_usage[c_var[1][0], c_var[0][0]] = 0
+					if (c_var[0][1], c_var[1][1]) not in x_var_usage:
+						x_var_usage[c_var[0][1], c_var[1][1]] = 0
+					if (c_var[0][0], c_var[1][0]) not in x_var_usage:
+						x_var_usage[c_var[0][0], c_var[1][0]] = 0
+					if (c_var[1][1], c_var[0][1]) not in x_var_usage:
+						x_var_usage[c_var[1][1], c_var[0][1]] = 0
+					x_var_usage[c_var[1][0], c_var[0][0]] += 1
+					x_var_usage[c_var[0][1], c_var[1][1]] += 1
+					x_var_usage[c_var[0][0], c_var[1][0]] += 1
+					x_var_usage[c_var[1][1], c_var[0][1]] += 1
 			else:
-				x1_rev, x2_rev, x3_rev, x4_rev = 1, 1, 1, 1
-				if (c_var[0][0], c_var[1][0]) in x:
-					x1 = (c_var[0][0], c_var[1][0])
+				x1_rev, x2_rev, x3_rev = 1, 1, 1
+
+				# simple edge crossing
+				if not g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
+					if (c_var[0][0], c_var[1][0]) in x:
+						x1 = (c_var[0][0], c_var[1][0])
+					else:
+						x1 = (c_var[1][0], c_var[0][0])
+						x1_rev = -1
+					if (c_var[0][1], c_var[1][1]) in x:
+						x2 = (c_var[0][1], c_var[1][1])
+					else:
+						x2 = (c_var[1][1], c_var[0][1])
+						x2_rev = -1
+					if track_x_var_usage:
+						if x1 not in x_var_usage:
+							x_var_usage[x1] = 0
+						if x2 not in x_var_usage:
+							x_var_usage[x2] = 0
+						x_var_usage[x1] += 2
+						x_var_usage[x2] += 2
+					# print(f"(1-{x1_rev}*x[{x1}]) + {x2_rev}*x[{x2}] + c[c_var] + {(1-x1_rev)/2} >= 1")
+					model.addConstr((1 - x1_rev * x[x1]) + x2_rev * x[x2] + c[c_var] - (1 - x1_rev) / 2 + (1 - x2_rev) / 2 >= 1, f"1se{c_var}")
+					model.addConstr(x1_rev * x[x1] + (1 - x2_rev * x[x2]) + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 1, f"2se{c_var}")
+					n_constr_0 += 2
+
+				# same-layer/2-layer edge crossing
+				elif g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
+					if (c_var[0][0], c_var[1][0]) in x:
+						x1 = (c_var[0][0], c_var[1][0])
+					else:
+						x1 = (c_var[1][0], c_var[0][0])
+						x1_rev = -1
+					if (c_var[0][1], c_var[1][0]) in x:
+						x2 = (c_var[0][1], c_var[1][0])
+					else:
+						x2 = (c_var[1][0], c_var[0][1])
+						x2_rev = -1
+					if track_x_var_usage:
+						if x1 not in x_var_usage:
+							x_var_usage[x1] = 0
+						if x2 not in x_var_usage:
+							x_var_usage[x2] = 0
+						x_var_usage[x1] += 2
+						x_var_usage[x2] += 2
+					model.addConstr(-x1_rev * x[x1] + x2_rev * x[x2] + c[c_var] - (1 - x1_rev) / 2 + (1 - x2_rev) / 2 >= 0, f"1hy{c_var}")
+					model.addConstr(x1_rev * x[x1] - x2_rev * x[x2] + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 0, f"2hy{c_var}")
+					n_constr_1 += 2
+
+				elif g.edge_names[c_var[1]].same_layer_edge and not g.edge_names[c_var[0]].same_layer_edge:
+					if (c_var[1][0], c_var[0][0]) in x:
+						x1 = (c_var[1][0], c_var[0][0])
+					else:
+						x1 = (c_var[0][0], c_var[1][0])
+						x1_rev = -1
+					if (c_var[1][1], c_var[0][0]) in x:
+						x2 = (c_var[1][1], c_var[0][0])
+					else:
+						x2 = (c_var[0][0], c_var[1][1])
+						x2_rev = -1
+					if track_x_var_usage:
+						if x1 not in x_var_usage:
+							x_var_usage[x1] = 0
+						if x2 not in x_var_usage:
+							x_var_usage[x2] = 0
+						x_var_usage[x1] += 2
+						x_var_usage[x2] += 2
+					model.addConstr(-x1_rev * x[x1] + x2_rev * x[x2] + c[c_var] - (1 - x1_rev) / 2 + (1 - x2_rev) / 2 >= 0, f"1hy{c_var}")
+					model.addConstr(x1_rev * x[x1] - x2_rev * x[x2] + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 0, f"2hy{c_var}")
+					n_constr_1 += 2
+
+				# same layer edge crossing
 				else:
-					x1 = (c_var[1][0], c_var[0][0])
-					x1_rev = -1
-				if (c_var[0][1], c_var[1][1]) in x:
-					x2 = (c_var[0][1], c_var[1][1])
-				else:
-					x2 = (c_var[1][1], c_var[0][1])
-					x2_rev = -1
-				if (c_var[0][0], c_var[1][1]) in x:
-					x3 = (c_var[0][0], c_var[1][1])
-				else:
-					x3 = (c_var[1][1], c_var[0][0])
-					x3_rev = -1
-				if (c_var[0][1], c_var[1][0]) in x:
-					x4 = (c_var[0][1], c_var[1][0])
-				else:
-					x4 = (c_var[1][0], c_var[0][1])
-					x4_rev = -1
-				if track_x_var_usage:
-					if x1 not in x_var_usage:
-						x_var_usage[x1] = 0
-					if x2 not in x_var_usage:
-						x_var_usage[x2] = 0
-					if x3 not in x_var_usage:
-						x_var_usage[x3] = 0
-					if x4 not in x_var_usage:
-						x_var_usage[x4] = 0
-					x_var_usage[x1] += 6
-					x_var_usage[x2] += 6
-					x_var_usage[x3] += 6
-					x_var_usage[x4] += 6
-				model.addConstr(
-					c[c_var] + 1 - x1_rev * x[x1] + 1 - x4_rev * x[x4] + 1 - x2_rev * x[x2] - (1 - x1_rev) / 2 - (
-							1 - x4_rev) / 2 - (1 - x2_rev) / 2 >= 1, f"1sl{c_var}")
-				model.addConstr(c[c_var] + 1 - x3_rev * x[x3] + x2_rev * x[x2] + x4_rev * x[x4] - (1 - x3_rev) / 2 + (
-						1 - x2_rev) / 2 + (1 - x4_rev) / 2 >= 1, f"2sl{c_var}")
-				model.addConstr(c[c_var] + x1_rev * x[x1] + 1 - x3_rev * x[x3] + x2_rev * x[x2] + (1 - x1_rev) / 2 - (
-						1 - x3_rev) / 2 + (1 - x2_rev) / 2 >= 1, f"3sl{c_var}")
-				model.addConstr(c[c_var] + 1 - x4_rev * x[x4] + 1 - x2_rev * x[x2] + x3_rev * x[x3] - (1 - x4_rev) / 2 - (
-						1 - x2_rev) / 2 + (1 - x3_rev) / 2 >= 1, f"4sl{c_var}")
-				model.addConstr(c[c_var] + x4_rev * x[x4] + x1_rev * x[x1] + 1 - x3_rev * x[x3] + (1 - x4_rev) / 2 + (
-						1 - x1_rev) / 2 - (1 - x3_rev) / 2 >= 1, f"5sl{c_var}")
-				model.addConstr(c[c_var] + 1 - x2_rev * x[x2] + x3_rev * x[x3] + 1 - x1_rev * x[x1] - (1 - x2_rev) / 2 + (
-						1 - x3_rev) / 2 - (1 - x1_rev) / 2 >= 1, f"6sl{c_var}")
-				model.addConstr(c[c_var] + x2_rev * x[x2] + x4_rev * x[x4] + x1_rev * x[x1] + (1 - x2_rev) / 2 + (
-						1 - x4_rev) / 2 + (1 - x1_rev) / 2 >= 1, f"7sl{c_var}")
-				model.addConstr(c[c_var] + x3_rev * x[x3] + 1 - x1_rev * x[x1] + 1 - x4_rev * x[x4] + (1 - x3_rev) / 2 - (
-						1 - x1_rev) / 2 - (1 - x4_rev) / 2 >= 1, f"8sl{c_var}")
-				n_constr_2 += 8
+					x1_rev, x2_rev, x3_rev, x4_rev = 1, 1, 1, 1
+					if (c_var[0][0], c_var[1][0]) in x:
+						x1 = (c_var[0][0], c_var[1][0])
+					else:
+						x1 = (c_var[1][0], c_var[0][0])
+						x1_rev = -1
+					if (c_var[0][1], c_var[1][1]) in x:
+						x2 = (c_var[0][1], c_var[1][1])
+					else:
+						x2 = (c_var[1][1], c_var[0][1])
+						x2_rev = -1
+					if (c_var[0][0], c_var[1][1]) in x:
+						x3 = (c_var[0][0], c_var[1][1])
+					else:
+						x3 = (c_var[1][1], c_var[0][0])
+						x3_rev = -1
+					if (c_var[0][1], c_var[1][0]) in x:
+						x4 = (c_var[0][1], c_var[1][0])
+					else:
+						x4 = (c_var[1][0], c_var[0][1])
+						x4_rev = -1
+					if track_x_var_usage:
+						if x1 not in x_var_usage:
+							x_var_usage[x1] = 0
+						if x2 not in x_var_usage:
+							x_var_usage[x2] = 0
+						if x3 not in x_var_usage:
+							x_var_usage[x3] = 0
+						if x4 not in x_var_usage:
+							x_var_usage[x4] = 0
+						x_var_usage[x1] += 6
+						x_var_usage[x2] += 6
+						x_var_usage[x3] += 6
+						x_var_usage[x4] += 6
+					model.addConstr(
+						c[c_var] + 1 - x1_rev * x[x1] + 1 - x4_rev * x[x4] + 1 - x2_rev * x[x2] - (1 - x1_rev) / 2 - (
+								1 - x4_rev) / 2 - (1 - x2_rev) / 2 >= 1, f"1sl{c_var}")
+					model.addConstr(c[c_var] + 1 - x3_rev * x[x3] + x2_rev * x[x2] + x4_rev * x[x4] - (1 - x3_rev) / 2 + (
+							1 - x2_rev) / 2 + (1 - x4_rev) / 2 >= 1, f"2sl{c_var}")
+					model.addConstr(c[c_var] + x1_rev * x[x1] + 1 - x3_rev * x[x3] + x2_rev * x[x2] + (1 - x1_rev) / 2 - (
+							1 - x3_rev) / 2 + (1 - x2_rev) / 2 >= 1, f"3sl{c_var}")
+					model.addConstr(c[c_var] + 1 - x4_rev * x[x4] + 1 - x2_rev * x[x2] + x3_rev * x[x3] - (1 - x4_rev) / 2 - (
+							1 - x2_rev) / 2 + (1 - x3_rev) / 2 >= 1, f"4sl{c_var}")
+					model.addConstr(c[c_var] + x4_rev * x[x4] + x1_rev * x[x1] + 1 - x3_rev * x[x3] + (1 - x4_rev) / 2 + (
+							1 - x1_rev) / 2 - (1 - x3_rev) / 2 >= 1, f"5sl{c_var}")
+					model.addConstr(c[c_var] + 1 - x2_rev * x[x2] + x3_rev * x[x3] + 1 - x1_rev * x[x1] - (1 - x2_rev) / 2 + (
+							1 - x3_rev) / 2 - (1 - x1_rev) / 2 >= 1, f"6sl{c_var}")
+					model.addConstr(c[c_var] + x2_rev * x[x2] + x4_rev * x[x4] + x1_rev * x[x1] + (1 - x2_rev) / 2 + (
+							1 - x4_rev) / 2 + (1 - x1_rev) / 2 >= 1, f"7sl{c_var}")
+					model.addConstr(c[c_var] + x3_rev * x[x3] + 1 - x1_rev * x[x1] + 1 - x4_rev * x[x4] + (1 - x3_rev) / 2 - (
+							1 - x1_rev) / 2 - (1 - x4_rev) / 2 >= 1, f"8sl{c_var}")
+					n_constr_2 += 8
 		return n_constr_0, n_constr_1, n_constr_2, x_var_usage
 
 	def __edge_crossings_junger(self, model: gp.Model, c_vars, x_vars, x, c, graph_arg=None, track_x_var_usage=False, butterflies=None):
@@ -775,18 +671,62 @@ class LayeredOptimizer:
 				model.addConstr(c[c_var] == c[c_var[1], c_var[0]])
 				c_v_seen.add(c_var)
 
-	def __add_cycle_constraints(self, m: gp.Model, g: LayeredGraph):
-		# TODO cycle constraints
-		# create vertex-exchange graph (in graph.py)
-		# find BFS tree, then calculate all fundamental cycles and if they are even/odd
-		# add cycle constraints from Healy and Kuusik, "The Vertex-Exchange Graph"
-		pass
+	def __add_cycle_constraints(self, model: gp.Model, g: LayeredGraph, cvars, c):
+		# create vertex-exchange graph
+		v_e_g, node_list, edge_signs = g.vertex_exchange_graph()
 
-	def __collapse_subgraphs(self, g: LayeredGraph):
-		# TODO collapse valid 1-connected subgraphs
-		# implement Tarjan AP algo in graph.py, collect all groups of isolated APs into L-trees
-		# return new layered graph object with the collapsed nodes, and mapping function
-		pass
+		# Find BFS tree, then calculate all fundamental cycles
+		veg_bfsq = []
+		veg_visit = [False] * len(node_list)
+		n_visited = 0
+		start_search_at = 0
+		veg_parent = [-1] * len(node_list)
+		fund_cycles = []
+		while n_visited < len(node_list):
+			while veg_visit[start_search_at]:
+				start_search_at += 1
+			veg_bfsq.append(start_search_at)
+			veg_visit[start_search_at] = True
+			n_visited += 1
+			while veg_bfsq:
+				next_layer = veg_bfsq.copy()
+				for nd in next_layer:
+					for nd_adj in v_e_g[nd]:
+						if not veg_visit[nd_adj[0]]:
+							veg_visit[nd_adj[0]] = True
+							veg_parent[nd_adj[0]] = nd
+							veg_bfsq.append(nd_adj[0])
+							n_visited += 1
+						elif veg_parent[nd] != nd_adj[0]:
+							branch1 = nd
+							branch2 = nd_adj[0]
+							fcycle_edges = [(nd, nd_adj[0], nd_adj[1])]
+							while veg_parent[branch1] != branch2 and branch1 != veg_parent[branch2] and branch1 != branch2:
+								fcycle_edges.append((branch1, veg_parent[branch1], edge_signs[branch1, veg_parent[branch1]] if (branch1, veg_parent[branch1]) in edge_signs else edge_signs[veg_parent[branch1], branch1]))
+								fcycle_edges.append((branch2, veg_parent[branch2], edge_signs[branch2, veg_parent[branch2]] if (branch2, veg_parent[branch2]) in edge_signs else edge_signs[veg_parent[branch2], branch2]))
+								branch1 = veg_parent[branch1]
+								branch2 = veg_parent[branch2]
+							if branch1 != branch2:
+								fcycle_edges.append((branch1, branch2, edge_signs[branch1, branch2] if (branch1, branch2) in edge_signs else edge_signs[branch2, branch1]))
+							fund_cycles.append(fcycle_edges)
+
+		# Add cycle constraints from Healy and Kuusik, "The Vertex-Exchange Graph"
+		for i, fcycle in enumerate(fund_cycles):
+			label = sum((fc[2] for fc in fcycle)) % 2
+			csum = gp.LinExpr()
+			for edg in fcycle:
+				if self.mirror_vars:
+					u, v = node_list[edg[0]], node_list[edg[1]]
+				else:
+					u, v = get_c_var(cvars, node_list[edg[0]], node_list[edg[1]])
+				csum += c[u, v]
+			if label == 0:
+				kc = model.addVar(0, len(fcycle) / 2, vtype=GRB.INTEGER)
+				model.addConstr(2 * kc == csum)
+			else:
+				kc = model.addVar(0, len(fcycle) / 2 - 1, vtype=GRB.INTEGER)
+				model.addConstr(2 * kc + 1 == csum)
+				model.addConstr(csum >= 1)
 
 	# def compute_variable_assignments(self, x_vars, c_vars):
 	# 	x_assignments = {}
@@ -817,6 +757,7 @@ class LayeredOptimizer:
 	# 	return x_assignments, c_assignments
 
 	def __optimize_with_subgraph_reduction(self, n_partitions, cluster, top_level_g, crosses, contacts, stack_to_nodeset, node_to_stack):
+		# TODO (later): remove all the parameters to standard_opt, replace non-top-level calls with creation of new optimizer object
 		self.print_info.append("")
 
 		subgraphs = [set(node.name for node in self.g.nodes if cluster[node.name] == i) for i in range(n_partitions)]
@@ -948,7 +889,7 @@ class LayeredOptimizer:
 		n_ec = self.g.num_edge_crossings_from_xvars_no_sl(self.x_var_assign)
 		self.print_info.append(f"Total time to optimize and patch together subgraphs: {t}")
 		self.print_info.append(f"Final edge crossing count: {n_ec}")
-		self.print_info.append(f"{top_level_optval} crossings in collapsed graph, {sum(opt_vals)} in subgraphs, {n_ec - top_level_optval - sum(opt_vals)} from crossing edges")  # FIXME
+		self.print_info.append(f"{top_level_optval} crossings in collapsed graph, {sum(opt_vals)} in subgraphs, {n_ec - top_level_optval - sum(opt_vals)} from crossing edges")  # FIXME (later)
 
 		self.__sequential_br()
 		vis.draw_graph(self.g, "endpoints_highlight", groups=cluster)
@@ -1038,9 +979,11 @@ class LayeredOptimizer:
 				return "non-transitive x-values"
 		return y_assign
 
-	def optimize_layout(self):
+	def optimize_layout(self, fix_xvars=None):
 		if self.do_subg_reduction:
 			out = self.__optimize_full_subgraph_algorithm()
+		elif fix_xvars is not None:
+			out = self.__optimize_layout_standard(use_top_level_params=True, fix_x_vars=fix_xvars)
 		else:
 			out = self.__optimize_layout_standard(use_top_level_params=True)
 		if self.verbose:

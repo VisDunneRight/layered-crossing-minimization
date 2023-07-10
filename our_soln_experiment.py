@@ -5,7 +5,7 @@ import experiments
 def run_my_layout_algorithm(graph_file):
     optimizer = optimization.LayeredOptimizer(graph_file)
     optimizer.vertical_transitivity = True
-    optimizer.fix_one_var = True
+    optimizer.symmetry_breaking = True
     optimizer.mip_relax = True
     optimizer.xvar_branch_priority = True
     optimizer.aggro_presolve = True

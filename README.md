@@ -19,25 +19,25 @@ Any path to a Rome-Lib, AT&T, or DAGmar graph included in this repo will also be
 
 ```Python
 from src.optimization import LayeredOptimizer
-optimizer = LayeredOptimizer("path_to_file")
+optimizer = LayeredOptimizer("[path_to_file]")
 ```
 
 Then, set the desired options for your `optimizer`:
 1. Vertical position transitivity is default. To switch to direct transitivity, set `optimizer.direct_transitivity = True` and `optimizer.vertical_transitivity = False`.
 2. Switches from our paper are set using the following options (note that all switches are off by default):
-   1. Fix one variable is set using
+   1. Symmetry breaking is set using
    ```Python
-   optimizer.fix_one_var = True
+   optimizer.symmetry_breaking = True
    ```
-   2. Butterfly reduction is set using 
+   2. Butterfly reduction is set using
    ```Python
    optimizer.butterfly_reduction = True
    ```
-   3. Mirrored variables with symmetry constraints is set using 
+   3. Mirrored variables with symmetry constraints is set using
    ```Python
    optimizer.mirror_vars = True
    ```
-   4. Heuristic starting assignments is set using 
+   4. Heuristic starting assignments is set using
    ```Python
    optimizer.heuristic_start = True
    ```
@@ -57,7 +57,7 @@ Then, set the desired options for your `optimizer`:
    1. `optimizer.cutoff_time` sets the amount of time (in seconds) the optimizer will run before terminating and returning its best found solution
    2. `optimizer.draw_graph` generates the image of the layout as an svg in the /Images folder. It is recommended to also set `optimizer.bendiness_reduction` and `optimizer.sequential_bendiness` for a prettier, edge-length minimized drawing.
       1. `optimizer.name` sets the name of the file
-   3. `optimizer.verbose` prints more information about the visualization
+   3. `optimizer.verbose` prints more information about the solving process
 
 
 Finally, optimize the graph using
@@ -82,18 +82,18 @@ where `my_layering` is a Python dictionary mapping node IDs to layer assignments
 ```Python
 optimizer = LayeredOptimizer(g)
 # Set optimization parameters, e.g.
-optimizer.fix_one_var = True
-optimizer.cutoff_time = 60
+optimizer.symmetry_breaking = True
+optimizer.cutoff_time = 60  # Halt solver after 60 seconds
 optimizer.optimize_layout()
 ```
 
 # Other files of note in this repository
 
 1. `src/graph.py` contains our custom layered graph class. A layered graph can be created manually by instantiating the object and using the following functions:
-   1. `g.add_node(layer, name=your_custom_name)` adds a node at with layer `layer`. It is recommended to use integers for the names. An integer name will be used if unspecified.
+   1. `g.add_node(layer, name=your_custom_name)` adds a node at with layer `layer`. It is recommended to use integers for the names. Integer names 0, 1, 2,... will be used if no name is specified.
    2. `g.add_edge(n1, n2)` adds an edge between nodes with names `n1`, `n2`.
    3. `g.add_anchors()` adds dummy nodes along long edges.
-   4. `g.relayer()` is recommended after inserting dummy nodes. It cleans up the graph by removing empty layers, and optimizing a custom graph may error without it.
+   4. `g.relayer()` is required after inserting dummy nodes. It cleans up the graph by removing empty layers, and optimizing a custom graph may error without it.
    
    The graph data can be accessed as follows:
    1. `g.nodes` is a list of the node objects. A node object `n` has ID `n.name`, layer `n.layer`, within-layer position `n.y` and dummy node identifier `n.is_anchor_node`.
