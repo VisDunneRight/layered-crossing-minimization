@@ -3,6 +3,8 @@ import itertools
 import pickle
 import csv
 import random
+import sys
+
 from src import optimization, read_data, vis, motifs
 
 
@@ -117,15 +119,15 @@ def fix_1_var_experiment(start_idx, filename):
 
 
 def get_all_graphs():
-    all_g = [[], []]
+    all_g = []
     for i in range(10, 101):
         for file in os.listdir(f"Rome-Lib/graficon{i}nodi"):
-            all_g[0].append(f"Rome-Lib/graficon{i}nodi/" + file)
+            all_g.append(f"Rome-Lib/graficon{i}nodi/" + file)
     north_gs = sorted(list(os.listdir("north")), key=lambda fil: int(fil[2:(5 if fil[4] == '0' else 4)]))
     for i in range(len(north_gs)):
         north_gs[i] = "north/" + north_gs[i]
     north_gs.remove("north/g.57.26.graphml")   # skip this one graph that takes over an hour to insert the variables and constraints
-    all_g[1].extend(north_gs)
+    all_g.extend(north_gs)
     return all_g
 
 
@@ -309,8 +311,8 @@ def get_all_files_in_bucket(bucket_size):
     return filenames
 
 
-def get_all_files_by_bucket():
-    with open("data storage/all_g_sorted.txt", 'r') as fd1:
+def get_all_files_by_bucket(n_g_per_bucket):
+    with open(f"data storage/g{n_g_per_bucket}_sorted.txt", 'r') as fd1:
         filenames = []
         buckets = []
         for line in fd1.readlines():
@@ -324,7 +326,7 @@ def get_all_files_by_bucket():
 
 def get_start_position(results_file, all_graphs) -> tuple[int, int, int, int, bool]:
     x, y, cur_bucket, cur_success = 0, 0, 10, 0 
-    with open(results_file, 'r') as fd:
+    with open(f"data storage/{results_file}", 'r') as fd:
         rdr = csv.reader(fd)
         for line in rdr:
             if line[1][0] == 'R' or line[1][0] == 'n':
@@ -333,16 +335,15 @@ def get_start_position(results_file, all_graphs) -> tuple[int, int, int, int, bo
                     x += 1
                     y = 0
                     cur_success = 0
-                else:
-                    y += 1
-                    if float(line[10]) < 300:
-                        cur_success += 1
+                y += 1
+                if int(line[11]) == 2:
+                    cur_success += 1
     if y == len(all_graphs[x]) and cur_success / len(all_graphs[x]) < 0.75:
         return x + 1, 0, cur_success, x, True
     elif y == len(all_graphs[x]):
-        return x + 1, 0, cur_success, 0, False
+        return x + 1, 0, cur_success, x, False
     else:
-        return x, y, cur_success, 0, False
+        return x, y, cur_success, x, False
 
 
 def individual_switch_cutoff(datapoints):
@@ -350,99 +351,90 @@ def individual_switch_cutoff(datapoints):
     return True if timedout / len(datapoints) >= 0.25 else False
 
 
-def individual_switch_experiment():
+def individual_switch_experiment(switch_num, num_per_bucket):
     # This function is checkpoint-safe
-    key1 = ["symmetry_breaking", "butterfly_reduction", "heuristic_start", "priority", "mip_relax", "mirror_vars"]
-    key2 = ["symmetry_breaking_5m", "butterfly_reduction_5m", "heuristic_start_5m", "xvar_branch_priority_5m", "mip_relax_5m", "mirror_vars_5m"]
-    all_files, buckets = get_all_files_by_bucket()
+    if "direct_transitivity" not in os.listdir("data storage"):
+        os.mkdir("data storage/direct_transitivity")
+    if "vertical_transitivity" not in os.listdir("data storage"):
+        os.mkdir("data storage/vertical_transitivity")
+    key1 = ["baseline", "symmetry_breaking", "butterfly_reduction", "heuristic_start", "priority", "mip_relax", "mirror_vars", "cycle_constraints", "collapse_subgraphs"]
+    key2 = ["baseline_5m", "symmetry_breaking_5m", "butterfly_reduction_5m", "heuristic_start_5m", "xvar_branch_priority_5m", "mip_relax_5m", "mirror_vars_5m", "cycle_constraints_5m", "collapse_subgraphs_5m"]
+    all_files, buckets = get_all_files_by_bucket(num_per_bucket)
     for j, inp1 in enumerate(["direct_transitivity", "vertical_transitivity"]):
-        furthest_bucket_reached = 0
-        for i, inp2 in enumerate(key2):
-            fname = f"{inp1}/{inp2}"
-            if os.path.exists(f"{fname}.csv"):
+        fname = f"{inp1}/{key2[switch_num]}"
+        if switch_num != 0:
+            if os.path.exists(f"data storage/{fname}.csv"):
                 x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"{fname}.csv", all_files)
                 if is_complete:
-                    if furthest_bucket > furthest_bucket_reached:
-                        furthest_bucket_reached = furthest_bucket
                     continue
             else:
                 insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
                 x, y, success_ct = 0, 0, 0
             success_condition = True
+            parameters = [key1[switch_num], inp1]
             while success_condition and x < len(all_files):
                 for gidx in range(y, len(all_files[x])):
-                    parameters = [key1[i], inp1]
-                    res = run_one_graph(all_files[x][gidx], f"{fname[fname.index('/') + 1:]}", 300, parameters, x * len(all_files[0]) + gidx)
-                    if res[10] < 5*60:
+                    print(f"\n{all_files[x][gidx]}")
+                    res = run_one_graph(all_files[x][gidx], fname, 300, parameters, x * len(all_files[0]) + gidx)
+                    if int(res[11]) == 2:
                         success_ct += 1
                 if success_ct / len(all_files[x]) < 0.75:
-                    print(f"{inp1} with switch {inp2} cutoff at bucket size {buckets[x]}")
-                    if x > furthest_bucket_reached:
-                        furthest_bucket_reached = x
+                    print(f"{inp1} with switch {key1[switch_num]} cutoff at bucket size {buckets[x]}")
                     success_condition = False
                 else:
                     x += 1
                     y = 0
-        # baseline calculation
-        fname = f"{inp1}/baseline_5m"
-        if os.path.exists(f"{fname}.csv"):
-            x, y, dummy, dummy2, dummy3 = get_start_position(f"{fname}.csv", all_files)
+                    success_ct = 0
         else:
-            insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
-            x, y = 0, 0
-        while x <= furthest_bucket_reached:
-            for gidx in range(y, len(all_files[x])):
-                parameters = [inp1]
-                run_one_graph(all_files[x][gidx], f"{fname[fname.index('/') + 1:]}", 300, parameters, x * len(all_files[0]) + gidx)
-            x += 1
-            y = 0
+            # baseline calculation
+            furthest_reached = 0
+            for key2v in key2[1:]:
+                if os.path.exists(f"data storage/{inp1}/{key2v}.csv"):
+                    x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"{inp1}/{key2v}.csv", all_files)
+                    if not is_complete:
+                        raise Exception("Wait until all other experiments are done to run the baseline")
+                    if furthest_bucket > furthest_reached:
+                        furthest_reached = furthest_bucket
+                else:
+                    raise Exception("Wait until all other experiments are done to run the baseline")
+            if os.path.exists(f"data storage/{fname}.csv"):
+                x, y, dummy, dummy2, dummy3 = get_start_position(f"{fname}.csv", all_files)
+            else:
+                insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
+                x, y = 0, 0
+            parameters = [inp1]
+            while x <= furthest_reached:
+                for gidx in range(y, len(all_files[x])):
+                    run_one_graph(all_files[x][gidx], fname, 300, parameters, x * len(all_files[0]) + gidx)
+                x += 1
+                y = 0
 
 
-def sample_experiment_dataset():
+def sample_experiment_dataset(n_per_bucket):
     all_g = get_all_graphs()
-    rome_g = []
-    for gr in all_g[0]:
+    all_g_tnode = []
+    for gr in all_g:
         my_g = read_data.read(gr)
-        rome_g.append((gr, len(my_g.nodes)))
-    rome_g.sort(key=lambda x: x[1])
-    rome_g_sample = rome_g
-    with open("data storage/rome_sorted.txt", 'w') as fd:
-        fd.write("Total nodes in [10,20):\n")
-        for i in range(len(rome_g_sample)):
-            if i > 0 and rome_g_sample[i][1]//10 > rome_g_sample[i-1][1]//10:
-                fd.write(f"Total nodes in [{rome_g_sample[i][1]//10*10},{rome_g_sample[i][1]//10*10+10}):\n")
-            fd.write(f"{rome_g_sample[i][0]},{rome_g_sample[i][1]}\n")
-    north_g = []
-    for gr in all_g[2]:
-        my_g = read_data.read(gr)
-        north_g.append((gr, len(my_g.nodes)))
-    north_g.sort(key=lambda x: x[1])
-    with open("data storage/north_sorted.txt", 'w') as fd:
-        fd.write("Total nodes in [0,10):\n")
-        for i in range(len(north_g)):
-            if i > 0 and north_g[i][1] // 10 > north_g[i - 1][1] // 10:
-                fd.write(f"Total nodes in [{north_g[i][1] // 10 * 10},{north_g[i][1] // 10 * 10 + 10}):\n")
-            fd.write(f"{north_g[i][0]},{north_g[i][1]}\n")
-    with open("data storage/all_g_sorted.txt", 'w') as fd1:
-        tval_hash = {}  # tnode count -> index in linestore
-        n_seen = 0
-        linestore = []
-        for fname in ["rome_sorted", "dagmar_sorted", "north_sorted"]:
-            with open(f"data storage/{fname}.txt", 'r') as fd2:
-                cur_tnodes = 0
-                for line in fd2.readlines():
-                    if line[0] == "T":
-                        cur_tnodes = int(line[line.index('[') + 1:line.index(',')])
-                        if cur_tnodes not in tval_hash:
-                            tval_hash[int(line[line.index('[') + 1:line.index(',')])] = n_seen
-                            n_seen += 1
-                            linestore.append([])
-                    else:
-                        linestore[tval_hash[cur_tnodes]].append(line)
-        for i in sorted(list(tval_hash.keys())):
-            cur_idx = next((tval_hash[j] for j in tval_hash if j == i))  # index in linestore for next tnode val
-            fd1.write(f"Total nodes in [{i},{i + 10}):\n")
-            for ln in linestore[cur_idx]:
+        all_g_tnode.append((gr, len(my_g.nodes)))
+    all_g_tnode.sort(key=lambda x: x[1])
+    this_bucket = -10
+    linestore = []
+    bucket_sizes = []
+    for gname in all_g_tnode:
+        if gname[1] // 10 * 10 > this_bucket:
+            bucket_sizes.append(gname[1] // 10 * 10)
+            linestore.append([])
+            this_bucket = gname[1] // 10 * 10
+        linestore[-1].append(f"{gname[0]},{gname[1]}\n")
+    for i, bucket in enumerate(linestore):
+        if len(linestore[i]) > n_per_bucket:
+            linestore[i] = random.sample(bucket, n_per_bucket)
+    if not os.path.exists("data storage"):
+        os.mkdir("data storage")
+    with open(f"data storage/g{n_per_bucket}_sorted.txt", 'w') as fd1:
+        for i, bucket in enumerate(linestore):
+            fd1.write(f"Total nodes in [{bucket_sizes[i]},{bucket_sizes[i] + 10}):\n")
+            for ln in bucket:
                 fd1.write(ln)
 
 
@@ -469,13 +461,18 @@ def sample_5_percent():
 if __name__ == '__main__':
     """ NOTE: Running this file will take a very long time, at minimum 2-3 weeks. """
     random.seed(22)
+    num_g_per_bucket = 200
+    if len(sys.argv) >= 2:
+        switch_to_test = int(sys.argv[-1])
+    else:
+        switch_to_test = 2
 
     """ Individual switch evaluation experiment """
-    sample_experiment_dataset()  # sample all data to generate experiment dataset, as described in our paper. Generates data storage/all_g_sorted.txt
-    individual_switch_experiment()  # performs the individual switch experiment, writing all data to csv files in /data storage/{formulation}
+    # sample_experiment_dataset(num_g_per_bucket)  # sample all data to generate experiment dataset, as described in our paper. Generates data storage/all_g_sorted.txt
+    individual_switch_experiment(switch_to_test, num_g_per_bucket)  # performs the individual switch experiment, writing all data to csv files in /data storage/{formulation}
 
     """ All combinations of switches/formulations experiment """
-    sample_5_percent()  # sample 5% of the experiment dataset (per 10-node bin), write to data storage/5_percent_all_g_sorted.txt
-    all_combinations_experiment("all_combos_5percent")  # performs all combinations experiment, writing all data to csv files in /data storage/{formulation}/all_combos_5percent
+    # sample_5_percent()  # sample 5% of the experiment dataset (per 10-node bin), write to data storage/5_percent_all_g_sorted.txt
+    # all_combicalcnations_experiment("all_combos_5percent")  # performs all combinations experiment, writing all data to csv files in /data storage/{formulation}/all_combos_5percent
     # Files are named by switches used according to this key: 0=baseline, 1=fix one var, 2=butterfly reduction, 3=heuristic start, 4=presolve, 5=xvar priority, 6=mip relax, 7=mirror vars
 

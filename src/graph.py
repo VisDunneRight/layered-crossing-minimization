@@ -1,5 +1,6 @@
 import itertools
-import math
+import random
+
 from src.helpers import *
 
 
@@ -74,13 +75,11 @@ class LayeredGraph:
 		self.node_names = {}
 		self.edge_names = {}
 		self.adj_list = {}
+		self.double_adj_list = {}
 		self.time = 0
 
 	def __getitem__(self, item):
-		if type(item) == int:
-			return self.nodes[item]
-		else:
-			return self.node_names[item]
+		return self.node_names[item]
 
 	def __iter__(self):
 		return iter(self.nodes)
@@ -265,13 +264,13 @@ class LayeredGraph:
 				del self.edge_names[edge.n1.name, edge.n2.name]
 		self.edges = [edge for edge in self.edges if edge.stacked]
 
-	def stacked_graph_from_subgraph_nodes(self, subgraph_assignments):
+	def stacked_graph_from_subgraph_nodes(self, subgraph_assignments, only_subgraphs=False):
 		"""
 		:param: subgraph_assignments: List mapping with index node ID and elt subgraph assignment, integer in {0,...,#subgraphs-1}
 		:return: new stacked graph object G', mapping of node ID -> stack node ID in G'
 		"""
 		new_g = CollapsedGraph(self)
-		new_g.subgraphs = [[i for i, asgn in enumerate(subgraph_assignments) if asgn == j] for j in range(max(subgraph_assignments) + 1)]
+		new_g.subgraphs = [[i for i, asgn in enumerate(subgraph_assignments) if asgn == j] for j in range(1 if only_subgraphs else 0, max(subgraph_assignments) + 1)]
 		# node_to_group = {}
 		new_g.node_to_stack_node = {}
 		new_g.stack_node_to_nodelist = {}
@@ -282,36 +281,57 @@ class LayeredGraph:
 		# for i, subg_list in enumerate(subgraphs):
 		#     for node in subg_list:
 		#         node_to_group[node] = i
+		if only_subgraphs:
+			for i, nd_val in enumerate(subgraph_assignments):
+				if nd_val == 0:
+					new_g.add_node(self.nodes[i].layer, name=i)
+
+		new_g.n_nodes = self.n_nodes
 		for subgraph in new_g.subgraphs:
+			starting_node = new_g.n_nodes
 			min_l = min((self.node_names[node].layer for node in subgraph))
 			max_l = max((self.node_names[node].layer for node in subgraph))
-			sn1 = new_g.add_node(min_l)
+			sn1 = new_g.add_node(min_l, stacked=True)
 			new_g.stack_node_to_nodelist[sn1.name] = set()
-			starting_node = new_g.n_nodes - 1
 			for level in range(min_l, max_l):
-				sn2 = new_g.add_node(level + 1)
+				sn2 = new_g.add_node(level + 1, stacked=True)
 				new_g.stack_node_to_nodelist[sn2.name] = set()
-				new_g.add_edge(sn1.name, sn2.name, weight=0)
+				new_g.add_edge(sn1.name, sn2.name, stacked=True, weight=0)
 				sn1 = sn2
 			for node in subgraph:
 				new_g.node_to_stack_node[node] = starting_node + (self.node_names[node].layer - min_l)
 				new_g.stack_node_to_nodelist[starting_node + (self.node_names[node].layer - min_l)].add(node)
 		for edge in self.edges:
 			if subgraph_assignments[edge.n1.name] != subgraph_assignments[edge.n2.name]:
-				if (new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name]) in new_g.edge_names:
-					new_g.edge_names[new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name]].weight += 1    # FIXME handling of cases with multiple crossing edges between the same two stack nodes
+				if only_subgraphs:
+					if subgraph_assignments[edge.n1.name] != 0 and subgraph_assignments[edge.n2.name] != 0:
+						new_g.add_edge(new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name])
+					elif subgraph_assignments[edge.n1.name] != 0:
+						new_g.add_edge(new_g.node_to_stack_node[edge.n1.name], edge.n2.name)
+					elif subgraph_assignments[edge.n2.name] != 0:
+						new_g.add_edge(edge.n1.name, new_g.node_to_stack_node[edge.n2.name])
 				else:
-					new_g.add_edge(new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name])
+					if (new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name]) in new_g.edge_names:
+						new_g.edge_names[new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name]].weight += 1    # FIXME handling of cases with multiple crossing edges between the same two stack nodes
+					else:
+						new_g.add_edge(new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name])
 				# crossing_edges[node_to_group[edge.n1.name]].append((edge.n1.name, edge.n2.name))
 				# crossing_edges[node_to_group[edge.n2.name]].append((edge.n1.name, edge.n2.name))
 				if edge.n1.name not in new_g.crossing_edges:
 					new_g.crossing_edges[edge.n1.name] = []
 				new_g.crossing_edges[edge.n1.name].append(edge.n2.name)
-				new_g.contact_nodes[subgraph_assignments[edge.n1.name]].append(edge.n1.name)
-				new_g.contact_nodes[subgraph_assignments[edge.n2.name]].append(edge.n2.name)
-			else:
+				if only_subgraphs:
+					new_g.contact_nodes[subgraph_assignments[edge.n1.name] - 1].append(edge.n1.name)
+					new_g.contact_nodes[subgraph_assignments[edge.n2.name] - 1].append(edge.n2.name)
+				else:
+					new_g.contact_nodes[subgraph_assignments[edge.n1.name]].append(edge.n1.name)
+					new_g.contact_nodes[subgraph_assignments[edge.n2.name]].append(edge.n2.name)
+			elif not only_subgraphs or subgraph_assignments[edge.n1.name] != 0:
 				new_g.edge_names[new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name]].weight += 1
+			elif only_subgraphs:
+				new_g.add_edge(edge.n1.name, edge.n2.name)
 
+		new_g.n_nodes = len(new_g.nodes)
 		return new_g
 
 	def unstack_graph_nodes(self, stack_index):  # DEPRECATED
@@ -369,28 +389,27 @@ class LayeredGraph:
 	def create_double_adj_list(self, forward_only=False):
 		for node in self.nodes:
 			if forward_only:
-				self.adj_list[node.name] = []
+				self.double_adj_list[node.name] = []
 			else:
-				self.adj_list[node.name] = [[], []]
+				self.double_adj_list[node.name] = [[], []]
 		for edge in self.edges:
 			if forward_only:
-				self.adj_list[edge.n1.name].append(edge.n2.name)
+				self.double_adj_list[edge.n1.name].append(edge.n2.name)
 			else:
-				self.adj_list[edge.n1.name][1].append(edge.n2.name)
-				self.adj_list[edge.n2.name][0].append(edge.n1.name)
-		return self.adj_list
+				self.double_adj_list[edge.n1.name][1].append(edge.n2.name)
+				self.double_adj_list[edge.n2.name][0].append(edge.n1.name)
+		return self.double_adj_list
 
 	def create_normal_adj_list(self):
-		adjacency_list = {}
 		for node in self.nodes:
-			adjacency_list[node.name] = []
+			self.adj_list[node.name] = []
 		for edge in self.edges:
-			adjacency_list[edge.n1.name].append(edge.n2.name)
-			adjacency_list[edge.n2.name].append(edge.n1.name)
-		return adjacency_list
+			self.adj_list[edge.n1.name].append(edge.n2.name)
+			self.adj_list[edge.n2.name].append(edge.n1.name)
+		return self.adj_list
 
 	# Clean up graph by removing empty layers and making sure the first layer has label 1.
-	def relayer(self):
+	def relayer(self, remove_sl=True):
 		n_removals = min((n.layer for n in self.nodes)) - 1
 		levels = sorted(list(self.layers.keys()))
 		if n_removals > 0:
@@ -409,9 +428,17 @@ class LayeredGraph:
 				if node.layer not in self.layers:
 					self.layers[node.layer] = []
 				self.layers[node.layer].append(node)
+		removals = []
 		for edge in self.edges:
 			edge.update()
+			if edge.same_layer_edge:
+				removals.append(edge)
+		if remove_sl:
+			for to_remove in removals:
+				del self.edge_names[to_remove.n1.name, to_remove.n2.name]
+				self.edges.remove(to_remove)
 		self.n_layers = len(self.layers)
+		self.nodes.sort(key=lambda x: x.name)
 		# for i in self.layers.keys():
 		#     print(i, [n.name for n in self.layers[i]], [n.layer for n in self.layers[i]])
 
@@ -507,7 +534,7 @@ class LayeredGraph:
 		aps = [False] * self.n_nodes
 		time = 0
 		if self.adj_list == {}:
-			self.adj_list = self.create_normal_adj_list()
+			self.create_normal_adj_list()
 
 		def tarjan_ap(index, visit, discovery, lowest, apoints, parents):
 			nonlocal time
@@ -532,40 +559,67 @@ class LayeredGraph:
 		ap_idxs = [i for i, v in enumerate(aps) if v]
 		subgraphs_selected = []
 		subgraph_types = []
+		type_names = ["articulation point with leaves", "extreme layer subgraph", "<=2 node/layer subgraph", "left L-tree", "right L-tree"]
 		aps_covered = [False] * len(ap_idxs)
+		aps_subg_assign = [-1] * len(ap_idxs)
 		for i, ap in enumerate(ap_idxs):
 			if not aps_covered[i]:
 				subgs_adj = [[v for v in self.adj_list[ap] if low[v] == i] for i in {low[x] for x in self.adj_list[ap]}]
-				for j in range(len(subgs_adj)):
-					ap_bfsq = [v for v in subgs_adj[j]]
-					bfs_visit = [False] * self.n_nodes
-					bfs_visit[ap] = True
-					for v in ap_bfsq:
-						bfs_visit[v] = True
-					while ap_bfsq:
-						next_layer = ap_bfsq.copy()
-						ap_bfsq.clear()
-						for nd in next_layer:
-							for nd_adj in self.adj_list[nd]:
-								if not bfs_visit[nd_adj]:
-									bfs_visit[nd_adj] = True
-									ap_bfsq.append(nd_adj)
-									subgs_adj[j].append(nd_adj)
-				subgs_adj = [temp for temp in subgs_adj if len(temp) <= self.n_nodes / 2]
-				combos = []
-				for r in range(1, len(subgs_adj) + 1):
-					combos += [[cidx for temp2 in temp for cidx in temp2] for temp in itertools.combinations(subgs_adj, r)]
-				combos.sort(key=lambda x: -len(x))
-				for cmb in combos:
-					if len(cmb) <= self.n_nodes / 2:
+				if subgs_adj:
+					for j in range(len(subgs_adj)):
+						ap_bfsq = [v for v in subgs_adj[j]]
+						bfs_visit = [False] * self.n_nodes
+						bfs_visit[ap] = True
+						for v in ap_bfsq:
+							bfs_visit[v] = True
+						while ap_bfsq:
+							next_layer = ap_bfsq.copy()
+							ap_bfsq.clear()
+							for nd in next_layer:
+								for nd_adj in self.adj_list[nd]:
+									if not bfs_visit[nd_adj]:
+										bfs_visit[nd_adj] = True
+										ap_bfsq.append(nd_adj)
+										subgs_adj[j].append(nd_adj)
+					subgs_adj = [temp for temp in subgs_adj if len(temp) <= self.n_nodes / 2]
+					combos = []
+					if len(subgs_adj) < 10:
+						for r_val in range(1, len(subgs_adj) + 1):
+							for temp in itertools.combinations(subgs_adj, r_val):
+								if sum(len(lis) for lis in temp) <= self.n_nodes / 2:
+									combos.append([cidx for temp2 in temp for cidx in temp2])
+					else:
+						for j in range(100):
+							kv = random.randint(1, len(subgs_adj))
+							samp = random.sample(subgs_adj, kv)
+							if sum(len(lis) for lis in samp) <= self.n_nodes / 2:
+								combos.append([cidx for temp2 in samp for cidx in temp2])
+						# combos += [[cidx for temp2 in temp for cidx in temp2] for temp in itertools.combinations(subgs_adj, r)]
+					combos.sort(key=lambda x: -len(x))
+					for cmb in combos:
 						valid, subg_type = self.check_if_collapsible_subgraph(cmb, ap, leaves_only=leaves_only)
 						if valid:
-							aps_covered[i] = True
+							overwrite_idx = -1
 							for k, ap2 in enumerate(ap_idxs):
 								if ap2 in cmb:
+									if aps_covered[k]:  # already covered ap situation
+										overwrite_idx = aps_subg_assign[k]
 									aps_covered[k] = True
-							subgraphs_selected.append(cmb + [ap])
-							subgraph_types.append(subg_type)
+							aps_covered[i] = True
+							if overwrite_idx == -1:
+								subgraphs_selected.append(cmb + [ap])
+								subgraph_types.append(subg_type)
+								for k, ap2 in enumerate(ap_idxs):
+									if ap2 in cmb + [ap]:
+										aps_subg_assign[k] = len(subgraphs_selected) - 1
+								print(f"Collapsible subgraph of type [{type_names[subg_type]}] found: {cmb + [ap]}")
+							else:
+								subgraphs_selected[overwrite_idx] = cmb + [ap]
+								subgraph_types[overwrite_idx] = subg_type
+								for k, ap2 in enumerate(ap_idxs):
+									if ap2 in cmb + [ap]:
+										aps_subg_assign[k] = overwrite_idx
+								print(f"Updated collapsible subgraph of type [{type_names[subg_type]}] found: {cmb + [ap]}")
 							break
 
 		# 4) Mark each collapsible as a subgraph and call collapse_subgraphs
@@ -573,7 +627,7 @@ class LayeredGraph:
 		for mkid in range(len(subgraphs_selected)):
 			for nd in subgraphs_selected[mkid]:
 				subgraphs_marked[nd] = mkid + 1
-		new_g = self.stacked_graph_from_subgraph_nodes(subgraphs_marked)
+		new_g = self.stacked_graph_from_subgraph_nodes(subgraphs_marked, only_subgraphs=True)
 		new_g.subgraph_types = subgraph_types
 		return new_g
 
@@ -608,43 +662,43 @@ class LayeredGraph:
 		return False, 0
 
 	def vertex_exchange_graph(self):
-		veg = {}
-		nd_set = {}
+		veg = {}  # vertex exchange graph as adj list
+		nd_set = {}  #
 		nd_list = []
 		ed_sign = {}
 		nd_idx = 0
 		for ln in range(1, self.n_layers + 1):
 			for nd1, nd2 in itertools.combinations(self.layers[ln], 2):
 				veg[nd_idx] = []
-				nd_list.append((nd1, nd2))
-				nd_set[nd1, nd2] = nd_idx
+				nd_list.append((nd1.name, nd2.name))
+				nd_set[nd1.name, nd2.name] = nd_idx
 				nd_idx += 1
 		ebl = self.get_edges_by_layer()
-		for ln in range(1, self.n_layers + 1):
+		for ln in range(1, self.n_layers):
 			for ed1, ed2 in itertools.combinations(ebl[ln], 2):
-				if len({ed1[0], ed1[1], ed2[0], ed2[1]}) == 4:
-					if (self.nodes[ed1[0]].y > self.nodes[ed2[0]].y and self.nodes[ed1[1]].y > self.nodes[ed2[1]].y) or (self.nodes[ed1[0]].y < self.nodes[ed2[0]].y and self.nodes[ed1[1]].y < self.nodes[ed2[1]].y):
+				if len({ed1.n1.name, ed1.n2.name, ed2.n1.name, ed2.n2.name}) == 4:
+					if (ed1.n1.y > ed2.n1.y and ed1.n2.y > ed2.n2.y) or (ed1.n1.y < ed2.n1.y and ed1.n2.y < ed2.n2.y):
 						sign = 0
 					else:
 						sign = 1
-					if (ed1[0], ed2[0]) in nd_set:
-						if (ed1[1], ed2[1]) in nd_set:
-							veg[nd_set[ed1[0], ed2[0]]].append((nd_set[ed1[1], ed2[1]], sign))
-							veg[nd_set[ed1[1], ed2[1]]].append((nd_set[ed1[0], ed2[0]], sign))
-							ed_sign[nd_set[ed1[0], ed2[0]], nd_set[ed1[1], ed2[1]]] = sign
+					if (ed1.n1.name, ed2.n1.name) in nd_set:
+						if (ed1.n2.name, ed2.n2.name) in nd_set:
+							veg[nd_set[ed1.n1.name, ed2.n1.name]].append((nd_set[ed1.n2.name, ed2.n2.name], sign))
+							veg[nd_set[ed1.n2.name, ed2.n2.name]].append((nd_set[ed1.n1.name, ed2.n1.name], sign))
+							ed_sign[nd_set[ed1.n1.name, ed2.n1.name], nd_set[ed1.n2.name, ed2.n2.name]] = sign
 						else:
-							veg[nd_set[ed1[0], ed2[0]]].append((nd_set[ed2[1], ed1[1]], sign))
-							veg[nd_set[ed2[1], ed1[1]]].append((nd_set[ed1[0], ed2[0]], sign))
-							ed_sign[nd_set[ed1[0], ed2[0]], nd_set[ed2[1], ed1[1]]] = sign
+							veg[nd_set[ed1.n1.name, ed2.n1.name]].append((nd_set[ed2.n2.name, ed1.n2.name], sign))
+							veg[nd_set[ed2.n2.name, ed1.n2.name]].append((nd_set[ed1.n1.name, ed2.n1.name], sign))
+							ed_sign[nd_set[ed1.n1.name, ed2.n1.name], nd_set[ed2.n2.name, ed1.n2.name]] = sign
 					else:
-						if (ed1[1], ed2[1]) in nd_set:
-							veg[nd_set[ed2[0], ed1[0]]].append((nd_set[ed1[1], ed2[1]], sign))
-							veg[nd_set[ed1[1], ed2[1]]].append((nd_set[ed2[0], ed1[0]], sign))
-							ed_sign[nd_set[ed2[0], ed1[0]], nd_set[ed1[1], ed2[1]]] = sign
+						if (ed1.n2.name, ed2.n2.name) in nd_set:
+							veg[nd_set[ed2.n1.name, ed1.n1.name]].append((nd_set[ed1.n2.name, ed2.n2.name], sign))
+							veg[nd_set[ed1.n2.name, ed2.n2.name]].append((nd_set[ed2.n1.name, ed1.n1.name], sign))
+							ed_sign[nd_set[ed2.n1.name, ed1.n1.name], nd_set[ed1.n2.name, ed2.n2.name]] = sign
 						else:
-							veg[nd_set[ed2[0], ed1[0]]].append((nd_set[ed2[1], ed1[1]], sign))
-							veg[nd_set[ed2[0], ed1[0]]].append((nd_set[ed2[1], ed1[1]], sign))
-							ed_sign[nd_set[ed2[0], ed1[0]], nd_set[ed2[1], ed1[1]]] = sign
+							veg[nd_set[ed2.n1.name, ed1.n1.name]].append((nd_set[ed2.n2.name, ed1.n2.name], sign))
+							veg[nd_set[ed2.n2.name, ed1.n2.name]].append((nd_set[ed2.n1.name, ed1.n1.name], sign))
+							ed_sign[nd_set[ed2.n1.name, ed1.n1.name], nd_set[ed2.n2.name, ed1.n2.name]] = sign
 		return veg, nd_list, ed_sign
 
 	def wiggle_node(self, x_vars, edge_b_l, node, pos_or_neg):
@@ -660,14 +714,6 @@ class LayeredGraph:
 class CollapsedGraph(LayeredGraph):
 	def __init__(self, g: LayeredGraph):
 		super().__init__()
-		self.n_layers = g.n_layers
-		self.n_nodes = g.n_nodes
-		self.nodes = g.nodes
-		self.layers = g.layers
-		self.edges = g.edges
-		self.node_names = g.node_names
-		self.edge_names = g.edge_names
-		self.adj_list = g.adj_list
 		self.old_g = g
 		self.subgraphs = None
 		self.subgraph_types = None
@@ -686,7 +732,7 @@ class CollapsedGraph(LayeredGraph):
 				seen_nds.add(nd)
 				for adj in self.old_g.adj_list[nd]:
 					if adj in seen_nds:
-						subg_obj.add_edge(subg_obj[nd], subg_obj[adj])
+						subg_obj.add_edge(nd, adj)
 			subgraph_lgs.append(subg_obj)
 		return subgraph_lgs
 
