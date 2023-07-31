@@ -124,7 +124,7 @@ class LayeredOptimizer:
 			g_igraph = type_conversions.layered_graph_to_igraph(g)
 			heuristic_layout = g_igraph.layout_sugiyama(layers=g_igraph.vs["layer"])
 			for i, coord in enumerate(heuristic_layout.coords[:g.n_nodes]):
-				g[i + 1].y = coord[0]
+				g.nodes[i].y = coord[0]
 			for v in m.getVars():
 				if v.varName[:1] == "y":
 					v.Start = g[int(v.varName[2:v.varName.index(']')])].y
@@ -392,7 +392,7 @@ class LayeredOptimizer:
 			self.print_info.append(f"{pre_sym}{round(t1, 3)}, {round(t2, 3)}, {round(t3, 3)}, {round(t1 + t2 + t3, 3)}")
 
 		print(f"Number of crossings: {num_crossings}", f"\tOptimization time: {round(m.runtime, 3)}")
-		print(f"g calc: {g.num_edge_crossings()}")
+		# print(f"g calc: {g.num_edge_crossings()}")
 
 		if self.return_x_vars:
 			return num_crossings, self.x_var_assign
