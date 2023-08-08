@@ -1,4 +1,5 @@
 import itertools
+import pickle
 import random
 
 from src.helpers import *
@@ -148,18 +149,18 @@ class LayeredGraph:
 		for nl in names_and_layers:
 			self.add_node(nl[1], name=nl[0])
 
-	def add_edge(self, n1, n2, stacked=False, weight=1):
-		if n1 not in self.node_names or n2 not in self.node_names:
-			print(f"failed to add edge ({n1}, {n2}): node DNE")
+	def add_edge(self, n1_name, n2_name, stacked=False, weight=1):
+		if n1_name not in self.node_names or n2_name not in self.node_names:
+			print(f"failed to add edge ({n1_name}, {n2_name}): node DNE")
 			return
-		if self.node_names[n1].layer > self.node_names[n2].layer:
-			e = LayeredEdge(self.node_names[n2], self.node_names[n1], stacked=stacked, weight=weight)
+		if self.node_names[n1_name].layer > self.node_names[n2_name].layer:
+			e = LayeredEdge(self.node_names[n2_name], self.node_names[n1_name], stacked=stacked, weight=weight)
 			self.edges.append(e)
-			self.edge_names[n2, n1] = e
+			self.edge_names[n2_name, n1_name] = e
 		else:
-			e = LayeredEdge(self.node_names[n1], self.node_names[n2], stacked=stacked, weight=weight)
+			e = LayeredEdge(self.node_names[n1_name], self.node_names[n2_name], stacked=stacked, weight=weight)
 			self.edges.append(e)
-			self.edge_names[n1, n2] = e
+			self.edge_names[n1_name, n2_name] = e
 		return e
 
 	def add_graph_by_edges(self, edge_list):
@@ -624,6 +625,7 @@ class LayeredGraph:
 
 		# 4) Mark each collapsible as a subgraph and call collapse_subgraphs
 		subgraphs_marked = [0] * self.n_nodes
+		subgraphs_selected = [subg for i, subg in enumerate(subgraphs_selected) if i in set(aps_subg_assign)]  # remove extraneous subgraphs, occurring when an updated subgraph encompasses multiple already found subgraphs
 		for mkid in range(len(subgraphs_selected)):
 			for nd in subgraphs_selected[mkid]:
 				subgraphs_marked[nd] = mkid + 1
@@ -709,6 +711,10 @@ class LayeredGraph:
 		for n_other in self.layers[self[node].layer]:
 			if n_other.name != node:
 				relevant_x_vars[node, n_other.name] = get_x_var(x_vars, node, n_other.name)
+
+	def write_out(self, path):
+		with open(path, 'wb') as bfd:
+			pickle.dump(self, bfd)
 
 
 class CollapsedGraph(LayeredGraph):

@@ -1,4 +1,6 @@
 import os.path
+import pickle
+
 import networkx.drawing.nx_pydot
 from src import layering, type_conversions
 import networkx as nx
@@ -33,6 +35,9 @@ def read(filepath, w=4, c=2, layer_assignments=None):
 				g = type_conversions.nx_with_separate_layerings_to_layered_graph(nx.read_graphml(filepath, node_type=str), layer_assignments)
 			else:
 				g = type_conversions.north_nx_to_layered_graph(nx.read_graphml(filepath, node_type=str), w, c)
+		elif f_ext == ".lgbin":
+			with open(filepath, 'rb') as fdb:
+				g = pickle.load(fdb)
 		else:
 			if layer_assignments is not None:
 				g = layering.create_edge_list_layered_graph_given_layering(filepath, layer_assignments)

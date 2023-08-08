@@ -6,4 +6,4 @@
 #SBATCH -e error_%A_%a.txt        # Standard error file
 
 module load gurobi
-srun python ../experiments.py $SLURM_ARRAY_TASK_ID
+srun python ../experiments.py 1 $SLURM_ARRAY_TASK_ID

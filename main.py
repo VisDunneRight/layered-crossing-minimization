@@ -13,16 +13,21 @@ if __name__ == '__main__':
 	# optimizer.name = "grafo3216.40"
 	# optimizer.optimize_layout()
 
-	optimizer = LayeredOptimizer("Rome-Lib/graficon55nodi/grafo3318.55")
-	# optimizer.symmetry_breaking = True
+	# optimizer = LayeredOptimizer("Rome-Lib/graficon55nodi/grafo3318.55")
+
+	optimizer = LayeredOptimizer("Rome-Lib/graficon35nodi/grafo6035.35")
+	optimizer.symmetry_breaking = True
 	# optimizer.aggro_presolve = True
 	# optimizer.mip_relax = True
 	optimizer.draw_graph = True
 	optimizer.bendiness_reduction = True
-	# optimizer.cycle_constraints = True
-	optimizer.mirror_vars = True
+	optimizer.cycle_constraints = True
+	# optimizer.butterfly_reduction = True
+	# optimizer.mirror_vars = True
 	optimizer.collapse_subgraphs = True
-	optimizer.name = "grafo3318.55"
+	optimizer.heuristic_start = True
+	# optimizer.xvar_branch_priority = True
+	# optimizer.name = "grafo3318.55"
 	optimizer.optimize_layout()
 
 	# optimizer = LayeredOptimizer("Rome-Lib/graficon19nodi/grafo976.19")

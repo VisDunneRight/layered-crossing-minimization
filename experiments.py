@@ -360,8 +360,8 @@ def individual_switch_experiment(switch_num, transitivity_num, num_per_bucket):
     if "vertical_transitivity" not in os.listdir("data storage/individual switch"):
         os.mkdir("data storage/individual switch/vertical_transitivity")
 
-    key1 = ["baseline", "symmetry_breaking", "butterfly_reduction", "heuristic_start", "priority", "mip_relax", "mirror_vars", "cycle_constraints", "collapse_subgraphs"]
-    key2 = ["baseline_5m", "symmetry_breaking_5m", "butterfly_reduction_5m", "heuristic_start_5m", "xvar_branch_priority_5m", "mip_relax_5m", "mirror_vars_5m", "cycle_constraints_5m", "collapse_subgraphs_5m"]
+    key1 = ["baseline", "symmetry_breaking", "butterfly_reduction", "mirror_vars", "cycle_constraints", "collapse_subgraphs", "heuristic_start", "priority", "mip_relax"]
+    key2 = ["baseline_5m", "symmetry_breaking_5m", "butterfly_reduction_5m", "mirror_vars_5m", "cycle_constraints_5m", "collapse_subgraphs_5m", "heuristic_start_5m", "xvar_branch_priority_5m", "mip_relax_5m"]
     transitivity = "direct_transitivity" if transitivity_num == 0 else "vertical_transitivity"
     all_files, buckets = get_all_files_by_bucket(num_per_bucket)
     fname = f"individual switch/{transitivity}/{key2[switch_num]}"
@@ -370,6 +370,7 @@ def individual_switch_experiment(switch_num, transitivity_num, num_per_bucket):
         if os.path.exists(f"data storage/{fname}.csv"):
             x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"{fname}.csv", all_files, 0.75)
             if is_complete:
+                print(f"{key1[switch_num]} with {transitivity} was cut off at bucket {furthest_bucket}")
                 return
         else:
             insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
@@ -378,7 +379,7 @@ def individual_switch_experiment(switch_num, transitivity_num, num_per_bucket):
         parameters = [key1[switch_num], transitivity]
         while success_condition and x < len(all_files):
             for gidx in range(y, len(all_files[x])):
-                print(f"\n{all_files[x][gidx]}")
+                print(f"\n{all_files[x][gidx]}  [bucket {buckets[x]}: {gidx}/{len(all_files[x])}]")
                 res = run_one_graph(all_files[x][gidx], fname, 300, parameters, x * len(all_files[0]) + gidx)
                 if int(res[11]) == 2:  # model status = 2 means solved to optimality w/o hitting cutoff
                     success_ct += 1
@@ -395,12 +396,12 @@ def individual_switch_experiment(switch_num, transitivity_num, num_per_bucket):
         for key2v in key2[1:]:
             if os.path.exists(f"data storage/individual switch/{transitivity}/{key2v}.csv"):
                 x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"individual switch/{transitivity}/{key2v}.csv", all_files, 0.75)
-                if not is_complete:
-                    raise Exception("Wait until all other experiments are done to run the baseline")
+                # if not is_complete:
+                #     raise Exception("Wait until all other experiments are done to run the baseline")
                 if furthest_bucket > furthest_reached:
                     furthest_reached = furthest_bucket
-            else:
-                raise Exception("Wait until all other experiments are done to run the baseline")
+            # else:
+            #     raise Exception("Wait until all other experiments are done to run the baseline")
         if os.path.exists(f"data storage/{fname}.csv"):
             x, y, dummy, dummy2, dummy3 = get_start_position(f"{fname}.csv", all_files, 0.75)
         else:
@@ -409,6 +410,7 @@ def individual_switch_experiment(switch_num, transitivity_num, num_per_bucket):
         parameters = [transitivity]
         while x <= furthest_reached:
             for gidx in range(y, len(all_files[x])):
+                print(f"\n{all_files[x][gidx]}  [bucket {buckets[x]}: {gidx}/{len(all_files[x])}]")
                 run_one_graph(all_files[x][gidx], fname, 300, parameters, x * len(all_files[0]) + gidx)
             x += 1
             y = 0
@@ -422,7 +424,7 @@ def all_combinations_experiment_checkpoint_safe(combination, num_per_bucket):
     if "vertical_transitivity" not in os.listdir("data storage/all switches"):
         os.mkdir("data storage/all switches/vertical_transitivity")
 
-    key = ["symmetry_breaking", "butterfly_reduction", "heuristic_start", "priority", "mip_relax", "mirror_vars", "cycle_constraints", "collapse_subgraphs"]
+    key = ["symmetry_breaking", "butterfly_reduction", "mirror_vars", "cycle_constraints", "collapse_subgraphs", "heuristic_start", "priority", "mip_relax"]
     all_files, buckets = get_all_files_by_bucket(num_per_bucket)
     transitivity = "direct_transitivity" if combination[-1] else "vertical_transitivity"
     is_baseline = all((not j for j in combination[:-1]))
@@ -432,6 +434,7 @@ def all_combinations_experiment_checkpoint_safe(combination, num_per_bucket):
         if os.path.exists(f"data storage/{fname}.csv"):
             x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"{fname}.csv", all_files, 0.5)
             if is_complete:
+                print(f"Combination {combination} with {transitivity} was cut off at bucket {buckets[furthest_bucket]}")
                 return
         else:
             insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
@@ -440,7 +443,7 @@ def all_combinations_experiment_checkpoint_safe(combination, num_per_bucket):
         parameters = [key[i] for i, val in enumerate(combination[:-1]) if val] + [transitivity]
         while success_condition and x < len(all_files):
             for gidx in range(y, len(all_files[x])):
-                print(f"\n{all_files[x][gidx]}")
+                print(f"\n{all_files[x][gidx]}  [bucket {buckets[x]}: {gidx}/{len(all_files[x])}]")
                 res = run_one_graph(all_files[x][gidx], fname, 60, parameters, x * len(all_files[0]) + gidx)
                 if int(res[11]) == 2:  # model status = 2 means solved to optimality w/o hitting cutoff
                     success_ct += 1
@@ -457,12 +460,12 @@ def all_combinations_experiment_checkpoint_safe(combination, num_per_bucket):
             key2 = ''.join(key2v)
             if os.path.exists(f"data storage/all switches/{transitivity}/exp_{key2}.csv"):
                 x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"all switches/{transitivity}/exp_{key2}.csv", all_files, 0.5)
-                if not is_complete:
-                    raise Exception("Wait until all other experiments are done to run the baseline")
+                # if not is_complete:
+                #     raise Exception("Wait until all other experiments are done to run the baseline")
                 if furthest_bucket > furthest_reached:
                     furthest_reached = furthest_bucket
-            else:
-                raise Exception("Wait until all other experiments are done to run the baseline")
+            # else:
+            #     raise Exception("Wait until all other experiments are done to run the baseline")
         if os.path.exists(f"data storage/{fname}.csv"):
             x, y, dummy, dummy2, dummy3 = get_start_position(f"{fname}.csv", all_files, 0.5)
         else:
@@ -471,6 +474,7 @@ def all_combinations_experiment_checkpoint_safe(combination, num_per_bucket):
         parameters = [transitivity]
         while x <= furthest_reached:
             for gidx in range(y, len(all_files[x])):
+                print(f"\n{all_files[x][gidx]}  [bucket {buckets[x]}: {gidx}/{len(all_files[x])}]")
                 run_one_graph(all_files[x][gidx], fname, 60, parameters, x * len(all_files[0]) + gidx)
             x += 1
             y = 0
@@ -524,24 +528,42 @@ def sample_experiment_dataset(n_per_bucket):
 #                     fd.write(file)
 
 
+def count_complete(num_per_bucket):
+    all_files, buckets = get_all_files_by_bucket(num_per_bucket)
+    complete = 0
+    incomplete = 0
+    for file in os.listdir("data storage/all switches/vertical_transitivity"):
+        x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"/data storage/all switches/vertical_transitivity/{file}", all_files, 0.5)
+        if is_complete:
+            complete += 1
+        else:
+            incomplete += 1
+    print(f"{complete} complete, {incomplete} incomplete")
+
+
 if __name__ == '__main__':
     random.seed(22)
-    num_g_per_bucket = 4
+    num_g_per_bucket = 200
     if len(sys.argv) >= 2:
         exp_choice = int(sys.argv[1])
         switch_to_test = int(sys.argv[2])
     else:
-        exp_choice = 1
-        switch_to_test = 2
+        exp_choice = 2
+        switch_to_test = 1
+
+    """ Sample all data to generate experiment dataset, as described in our paper. Generates ./data storage/g[n per bucket]_sorted.txt """
+    if exp_choice == 1 and not os.path.exists(f"data storage/g{num_g_per_bucket}_sorted.txt"):
+        sample_experiment_dataset(num_g_per_bucket)
+    elif exp_choice == 2 and not os.path.exists(f"data storage/g{num_g_per_bucket // 2}_sorted.txt"):
+        sample_experiment_dataset(num_g_per_bucket // 2)
 
     """ Individual switch evaluation experiment """
     if exp_choice == 1:
-        # sample_experiment_dataset(num_g_per_bucket)  # sample all data to generate experiment dataset, as described in our paper. Generates data storage/g[n per bucket]_sorted.txt
-        individual_switch_experiment(switch_to_test // 2, switch_to_test % 2, num_g_per_bucket)  # performs the individual switch experiment, writing all data to csv files in /data storage/{formulation}
+        individual_switch_experiment(switch_to_test // 2, switch_to_test % 2, num_g_per_bucket)  # performs the individual switch experiment, writing all data to csv files in ./data storage/individual switch
 
     """ All combinations of switches/formulations experiment """
     if exp_choice == 2:
         combo_to_test = [bool(int(j)) for j in f'{switch_to_test:09b}']
-        all_combinations_experiment_checkpoint_safe(combo_to_test, num_g_per_bucket // 2)  # performs all combinations experiment, writing all data to csv files in /data storage/{formulation}/all_combos_5percent
-        # Files are named by switches used according to this key: 0=baseline, 1=fix one var, 2=butterfly reduction, 3=heuristic start, 4=presolve, 5=xvar priority, 6=mip relax, 7=mirror vars
-
+        all_combinations_experiment_checkpoint_safe(combo_to_test, num_g_per_bucket // 2)  # performs all combinations experiment, writing all data to csv files in ./data storage/all switches
+        # Files are named by switches used according to this key:
+        # 1=symmetry breaking, 2=butterfly reduction, 3=mirrored vars, 4=heuristic start, 5=x-var priority, 6=mip relax, 7=cycle constraints, 8=collapse subgraphs

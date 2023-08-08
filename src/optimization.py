@@ -125,11 +125,20 @@ class LayeredOptimizer:
 			heuristic_layout = g_igraph.layout_sugiyama(layers=g_igraph.vs["layer"])
 			for i, coord in enumerate(heuristic_layout.coords[:g.n_nodes]):
 				g.nodes[i].y = coord[0]
+			for lay in g.layers:
+				g.layers[lay].sort(key=lambda nd1: nd1.y)
+				l_offset = 0
+				for j in range(1, len(g.layers[lay])):
+					if g.layers[lay][j].y <= g.layers[lay][j - 1].y:
+						l_offset += 1
+					g.layers[lay][j].y += l_offset
 			for v in m.getVars():
 				if v.varName[:1] == "y":
 					v.Start = g[int(v.varName[2:v.varName.index(']')])].y
 				elif v.varName[:1] == "x":
 					v.Start = 1 if g[int(v.varName[2:v.varName.index(',')])].y < g[int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])].y else 0
+
+		# vis.draw_graph(g, "interim")
 
 		# g.barycentric_reordering(10)
 		# x_assign, c_assign = self.compute_variable_assignments(g, x_vars, c_vars)
@@ -163,7 +172,7 @@ class LayeredOptimizer:
 			b_set_list = []
 			for b_v in motifs.get_butterflies(g):
 				b_set_list.append(set(b_v))
-			b_set_one_found = [False] * len(b_set_list)
+			b_set_one_found = [0] * len(b_set_list)
 			print("Butterfly set:", b_set_list)
 			if b_set_list:
 				self.print_info.append(f"{pre_sym}Num butterflies found: {len(b_set_list)}")
@@ -171,11 +180,20 @@ class LayeredOptimizer:
 					c_set = {c_var[0][0], c_var[0][1], c_var[1][0], c_var[1][1]}
 					if c_set in b_set_list:
 						b_ind = b_set_list.index(c_set)
-						if b_set_one_found[b_ind]:
+						if self.mirror_vars and b_set_one_found[b_ind] == 3:
+							c_org = [c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set]
+							cv_p = [c_v for c_v in c_org if c_v[0][0] == c_var[0][0]][0]
+							cv_r = [c_v for c_v in c_org if c_v[0][1] == c_var[0][1]][0]
+							cv_q = [c_v for c_v in c_org if c_v[0] == c_var[1]][0]
+							butterfly_c_pairs.append((c_var, cv_p))
+							butterfly_c_pairs.append((c_var, cv_r))
+							butterfly_c_pairs.append((cv_q, cv_p))
+							butterfly_c_pairs.append((cv_q, cv_r))
+						elif not self.mirror_vars and b_set_one_found[b_ind]:
 							c_org = [c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set][0]
 							butterfly_c_pairs.append((c_org, c_var))
 						else:
-							b_set_one_found[b_ind] = True
+							b_set_one_found[b_ind] += 1
 						butterfly_c_vars.add(c_var)
 
 		""" Set model objective function """
@@ -184,7 +202,7 @@ class LayeredOptimizer:
 			# for i, name_list in nodes_by_layer.items():
 			# 	z_vars += list(itertools.permutations(name_list, 2))
 			# z = m.addVars(z_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="z")
-			if bendiness_reduction:
+			if self.bendiness_reduction:
 				b_vars = list(g.edge_names.keys())
 				b = m.addVars(b_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="b")
 				m.setObjective(self.gamma_1 * c.sum() + self.gamma_2 * b.sum(), GRB.MINIMIZE)
@@ -294,7 +312,7 @@ class LayeredOptimizer:
 			print("4: model probably never found a feasible solution")
 			print("11: solve interrupted")
 			print("otherwise check https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html")
-			raise Exception()
+			return 0, 0, 0, 0, 0, m.objVal, m.status, 0, 0, "INCORRECT STATUS"
 		for v in m.getVars():
 			if v.varName[:1] == "x":
 				self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
@@ -316,12 +334,10 @@ class LayeredOptimizer:
 					if var_to_fix != -1:
 						connect_nd = -1
 						relative_xval = -1
-						# print(subgraph.nodes)
-						# print(g.crossing_edges)
 						for nd, adj in g.crossing_edges.items():
 							if nd == var_to_fix:
 								connect_nd = adj[0]
-							elif adj[0] == var_to_fix:
+							elif var_to_fix in adj:
 								connect_nd = nd
 						if connect_nd not in g:
 							connect_nd = g.node_to_stack_node[connect_nd]
@@ -728,8 +744,6 @@ class LayeredOptimizer:
 				u, v = node_list[edg[0]], node_list[edg[1]]
 				if g.node_names[u[0]].layer > g.node_names[v[0]].layer:
 					u, v = v, u
-				# print(g.node_names[u[0]], g.node_names[u[1]], g.node_names[v[0]], g.node_names[v[1]])
-				# print(g.node_names[u[0]].y, g.node_names[u[1]].y, g.node_names[v[0]].y, g.node_names[v[1]].y)
 				if ((u[0], v[0]), (u[1], v[1])) in cvars or ((u[1], v[1]), (u[0], v[0])) in cvars:
 					if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y < g.node_names[v[1]].y):
 						e1 = (u[0], v[0]) if edg[2] == 0 else (u[0], v[1])  # if sign doesn't match ypos comparison then we know this is a butterfly, and we got the wrong two edges in cvars
@@ -738,7 +752,7 @@ class LayeredOptimizer:
 						e1 = (u[0], v[0]) if edg[2] == 1 else (u[0], v[1])
 						e2 = (u[1], v[1]) if edg[2] == 1 else (u[1], v[0])
 				elif ((u[0], v[1]), (u[1], v[0])) in cvars or ((u[1], v[0]), (u[0], v[1])) in cvars:
-					if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):
+					if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):  # XAND
 						e1 = (u[0], v[1]) if edg[2] == 0 else (u[0], v[0])
 						e2 = (u[1], v[0]) if edg[2] == 0 else (u[1], v[1])
 					else:
@@ -749,10 +763,10 @@ class LayeredOptimizer:
 				u, v = get_c_var(cvars, e1, e2)
 				csum += c[u, v]
 			if label == 0:
-				kc = model.addVar(0, len(fcycle) / 2, vtype=GRB.INTEGER)
+				kc = model.addVar(0, len(fcycle) / 2, vtype=GRB.CONTINUOUS)
 				model.addConstr(2 * kc == csum)
 			else:
-				kc = model.addVar(0, len(fcycle) / 2 - 1, vtype=GRB.INTEGER)
+				kc = model.addVar(0, len(fcycle) / 2 - 1, vtype=GRB.CONTINUOUS)
 				model.addConstr(2 * kc + 1 == csum)
 				model.addConstr(csum >= 1)
 
