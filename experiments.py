@@ -5,7 +5,7 @@ import csv
 import random
 import sys
 
-from src import optimization, read_data, vis, motifs
+from src import optimization, read_data, vis, motifs, optimization_open_src
 
 
 def get_list_of_files(storage_file):
@@ -257,12 +257,15 @@ def run_one_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_fi
         insert_one(f"{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
 
 
-def run_one_graph(gfile, exp_name, cutoff_time, params_to_set, idx):
+def run_one_graph(gfile, exp_name, cutoff_time, params_to_set, idx, open_source=False):
     g = read_data.read(gfile)
     base_info = basic_info(g)
     params = {param: True for param in params_to_set}
     params.update({"cutoff_time": cutoff_time, "return_experiment_data": True})
-    optimizer = optimization.LayeredOptimizer(g, params)
+    if open_source:
+        optimizer = optimization_open_src.HiGHSLayeredOptimizer(g, params)
+    else:
+        optimizer = optimization.LayeredOptimizer(g, params)
     result = optimizer.optimize_layout()
     formatted = [idx, gfile] + base_info + [j for j in result]
     if int(formatted[11]) != 11:
@@ -508,6 +511,134 @@ def sample_experiment_dataset(n_per_bucket):
                 fd1.write(ln)
 
 
+def get_start_position_density_exp(file, fixed_density=False):
+    if os.path.exists(file):
+        with open(file, 'r') as fd:
+            num_lines = sum(1 for line in fd if line.rstrip())
+    else:
+        num_lines = 0
+    if num_lines > 1:
+        with open(file, 'r') as fd:
+            last_line = fd.readlines()[-1]
+            last_graph = last_line.split(',')[1]
+            ind = last_graph.index('p/d') + 3
+            foldkey = int(last_graph[ind: ind + 1 if last_graph[ind + 1] == '/' else (ind + 2 if last_graph[ind + 2] == '/' else ind + 3)])
+            if 'graph9' in last_graph:
+                if (foldkey == 50 and not fixed_density) or (foldkey == 20 and fixed_density):
+                    return 0, 0, True
+                else:
+                    return foldkey + 1 if fixed_density else foldkey + 2, 0, False
+            else:
+                return foldkey, int(last_graph[last_graph.index('.lgbin') - 1]) + 1, False
+    else:
+        if fixed_density:
+            return 3, 0, False
+        else:
+            return 14, 0, False
+
+
+def density_experiment_checkpoint_safe(switch_num, transitivity_num, fixed_density=False):
+    # This function is checkpoint-safe
+    exp_fold = "fixed density" if fixed_density else "vary density"
+    if exp_fold not in os.listdir("data storage"):
+        os.mkdir(f"data storage/{exp_fold}")
+    if "direct_transitivity" not in os.listdir(f"data storage/{exp_fold}"):
+        os.mkdir(f"data storage/{exp_fold}/direct_transitivity")
+    if "vertical_transitivity" not in os.listdir(f"data storage/{exp_fold}"):
+        os.mkdir(f"data storage/{exp_fold}/vertical_transitivity")
+
+    key1 = ["baseline", "symmetry_breaking", "butterfly_reduction", "mirror_vars", "cycle_constraints", "collapse_subgraphs", "heuristic_start", "priority", "mip_relax"]
+    key2 = ["baseline_5m", "symmetry_breaking_5m", "butterfly_reduction_5m", "mirror_vars_5m", "cycle_constraints_5m", "collapse_subgraphs_5m", "heuristic_start_5m", "xvar_branch_priority_5m", "mip_relax_5m"]
+    transitivity = "direct_transitivity" if transitivity_num == 0 else "vertical_transitivity"
+    fname = f"{exp_fold}/{transitivity}/{key2[switch_num]}"
+
+    if os.path.exists(f"data storage/{fname}.csv"):
+        dk, x, is_complete = get_start_position_density_exp(f"{fname}.csv", fixed_density=fixed_density)
+        if is_complete:
+            print(f"{key1[switch_num]} with {transitivity} is complete")
+            return
+    else:
+        insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Nodes visited", "Setup Time"])
+        dk, x = 3 if fixed_density else 14, 0
+    success_condition = True
+    parameters = [key1[switch_num], transitivity]
+    while success_condition:
+        for gidx in range(x, 10):
+            print(f"\n{'k' if fixed_density else 'd'}{dk}/graph{gidx}")
+            run_one_graph(f"random graphs/{'fixed_density' if fixed_density else 'density_exp'}/{'k' if fixed_density else 'd'}{dk}/graph{gidx}.lgbin", fname, 300, parameters, int((dk - 3) * 10 + gidx) if fixed_density else int((dk / 2 - 7) * 10 + gidx))
+        if (dk == 50 and not fixed_density) or (dk == 20 and fixed_density):
+            print(f"{key1[switch_num]} with {transitivity} is complete")
+            success_condition = False
+        else:
+            dk += 1 if fixed_density else 2
+            x = 0
+
+
+def individual_switch_experiment_highs(switch_num, transitivity_num, num_per_bucket):
+    # This function is checkpoint-safe
+    if "open source results" not in os.listdir("data storage"):
+        os.mkdir("data storage/open source results")
+    if "direct_transitivity" not in os.listdir("data storage/open source results"):
+        os.mkdir("data storage/open source results/direct_transitivity")
+    if "vertical_transitivity" not in os.listdir("data storage/open source results"):
+        os.mkdir("data storage/open source results/vertical_transitivity")
+
+    key1 = ["baseline", "symmetry_breaking", "butterfly_reduction", "mirror_vars", "cycle_constraints", "collapse_subgraphs", "heuristic_start", "priority", "mip_relax"]
+    key2 = ["baseline_5m", "symmetry_breaking_5m", "butterfly_reduction_5m", "mirror_vars_5m", "cycle_constraints_5m", "collapse_subgraphs_5m", "heuristic_start_5m", "xvar_branch_priority_5m", "mip_relax_5m"]
+    transitivity = "direct_transitivity" if transitivity_num == 0 else "vertical_transitivity"
+    all_files, buckets = get_all_files_by_bucket(num_per_bucket)
+    fname = f"open source results/{transitivity}/{key2[switch_num]}"
+
+    if switch_num != 0:
+        if os.path.exists(f"data storage/{fname}.csv"):
+            x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"{fname}.csv", all_files, 0.75)
+            if is_complete:
+                print(f"{key1[switch_num]} with {transitivity} was cut off at bucket {furthest_bucket}")
+                return
+        else:
+            insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Iterations", "Setup Time"])
+            x, y, success_ct = 0, 0, 0
+        success_condition = True
+        parameters = [key1[switch_num], transitivity]
+        while success_condition and x < len(all_files):
+            for gidx in range(y, len(all_files[x])):
+                print(f"\n{all_files[x][gidx]}  [bucket {buckets[x]}: {gidx}/{len(all_files[x])}]")
+                res = run_one_graph(all_files[x][gidx], fname, 300, parameters, x * len(all_files[0]) + gidx, open_source=True)
+                if int(res[11]) == 2:  # model status = 2 means solved to optimality w/o hitting cutoff
+                    success_ct += 1
+            if success_ct / len(all_files[x]) < 0.75:
+                print(f"{transitivity} with switch {key1[switch_num]} cutoff at bucket size {buckets[x]}")
+                success_condition = False
+            else:
+                x += 1
+                y = 0
+                success_ct = 0
+    else:
+        # baseline calculation
+        furthest_reached = 0
+        for key2v in key2[1:]:
+            if os.path.exists(f"data storage/open source results/{transitivity}/{key2v}.csv"):
+                x, y, success_ct, furthest_bucket, is_complete = get_start_position(f"open source results/{transitivity}/{key2v}.csv", all_files, 0.75)
+                # if not is_complete:
+                #     raise Exception("Wait until all other experiments are done to run the baseline")
+                if furthest_bucket > furthest_reached:
+                    furthest_reached = furthest_bucket
+            # else:
+            #     raise Exception("Wait until all other experiments are done to run the baseline")
+        if os.path.exists(f"data storage/{fname}.csv"):
+            x, y, dummy, dummy2, dummy3 = get_start_position(f"{fname}.csv", all_files, 0.75)
+        else:
+            insert_one(f"{fname}.csv", ["Index", "File", "Nodes", "Total Nodes", "Butterflies", "X-vars", "C-vars", "Total vars", "Total constraints", "Crossings", "Opttime", "Status", "Iterations", "Setup Time"])
+            x, y = 0, 0
+        parameters = [transitivity]
+        while x <= furthest_reached:
+            for gidx in range(y, len(all_files[x])):
+                print(f"\n{all_files[x][gidx]}  [bucket {buckets[x]}: {gidx}/{len(all_files[x])}]")
+                run_one_graph(all_files[x][gidx], fname, 300, parameters, x * len(all_files[0]) + gidx, open_source=True)
+            x += 1
+            y = 0
+
+
 # def sample_5_percent():
 #     with open("data storage/5_percent_all_g_sorted.txt", 'w') as fd:
 #         for i in range(10, 1110, 10):
@@ -548,7 +679,7 @@ if __name__ == '__main__':
         exp_choice = int(sys.argv[1])
         switch_to_test = int(sys.argv[2])
     else:
-        exp_choice = 2
+        exp_choice = 3
         switch_to_test = 1
 
     """ Sample all data to generate experiment dataset, as described in our paper. Generates ./data storage/g[n per bucket]_sorted.txt """
@@ -567,3 +698,15 @@ if __name__ == '__main__':
         all_combinations_experiment_checkpoint_safe(combo_to_test, num_g_per_bucket // 2)  # performs all combinations experiment, writing all data to csv files in ./data storage/all switches
         # Files are named by switches used according to this key:
         # 1=symmetry breaking, 2=butterfly reduction, 3=mirrored vars, 4=heuristic start, 5=x-var priority, 6=mip relax, 7=cycle constraints, 8=collapse subgraphs
+
+    """ Density experiment with random graphs """
+    if exp_choice == 3:
+        density_experiment_checkpoint_safe(switch_to_test // 2, switch_to_test % 2)
+
+    """ Fixed density/vary number of layers experiment with random graphs """
+    if exp_choice == 4:
+        density_experiment_checkpoint_safe(switch_to_test // 2, switch_to_test % 2, fixed_density=True)
+
+    """ Open-source implementation individual switch experiment """
+    if exp_choice == 5:
+        individual_switch_experiment_highs(switch_to_test // 2, switch_to_test % 2, num_g_per_bucket)

@@ -25,7 +25,6 @@ class LayeredOptimizer:
 		self.gamma_2 = parameters["gamma_2"] if "gamma_2" in parameters else 1
 		self.m_val = parameters["m_val"] if "m_val" in parameters else max(len(layer) for layer in self.g.layers.values())
 		self.sequential_bendiness = parameters["sequential_bendiness"] if "sequential_bendiness" in parameters else True
-		# self.transitivity_constraints = parameters["transitivity_constraints"] if "transitivity_constraints" in parameters else False
 		self.return_full_data = parameters["return_full_data"] if "return_full_data" in parameters else False
 		self.cutoff_time = parameters["cutoff_time"] if "cutoff_time" in parameters else 0
 		self.do_subg_reduction = parameters["do_subg_reduction"] if "do_subg_reduction" in parameters else False
@@ -39,7 +38,6 @@ class LayeredOptimizer:
 		self.aggro_presolve = parameters["presolve"] if "presolve" in parameters else False
 		self.mip_relax = parameters["mip_relax"] if "mip_relax" in parameters else False
 		self.xvar_branch_priority = parameters["xvar_branch_priority"] if "xvar_branch_priority" in parameters else False
-		# self.junger_ec = parameters["junger_ec"] if "junger_ec" in parameters else False
 		self.direct_transitivity = parameters["direct_transitivity"] if "direct_transitivity" in parameters else False
 		self.vertical_transitivity = parameters["vertical_transitivity"] if "vertical_transitivity" in parameters else False
 		self.mirror_vars = parameters["mirror_vars"] if "mirror_vars" in parameters else False
@@ -47,6 +45,7 @@ class LayeredOptimizer:
 		self.symmetry_constraints = parameters["symmetry_constraints"] if "symmetry_constraints" in parameters else True
 		self.cycle_constraints = parameters["cycle_constraints"] if "cycle_constraints" in parameters else False
 		self.collapse_subgraphs = parameters["collapse_subgraphs"] if "collapse_subgraphs" in parameters else False
+		self.bearclaw_constraints = parameters["bearclaw_constraints"] if "bearclaw_constraints" in parameters else False
 		self.return_experiment_data = parameters["return_experiment_data"] if "return_experiment_data" in parameters else False
 		self.name = parameters["name"] if "name" in parameters else "graph1"
 		self.print_info = []
@@ -63,6 +62,7 @@ class LayeredOptimizer:
 			self.x_var_assign = {x_v: 2 for n_l in g.get_names_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
 			# vis.draw_graph(g, "after collapse", groups={nd.name: 1 if nd.stacked else 0 for nd in g.nodes})
 
+		""" Create model and graph data """
 		nodes_by_layer = g.get_names_by_layer()
 		edges_by_layer = g.get_edge_names_by_layer()
 		n_constraints_generated = [0] * 6  # simple edge, hybrid edge, same layer edge, vertical pos, bendiness, total
@@ -73,7 +73,6 @@ class LayeredOptimizer:
 
 		""" Add all variables """
 		x_vars = []
-		# x_vars_layers = {}
 		z_vars = []
 		relax_type = GRB.INTEGER if not self.mip_relax else GRB.CONTINUOUS
 		for i, name_list in nodes_by_layer.items():
@@ -83,12 +82,11 @@ class LayeredOptimizer:
 				x_vars += list(itertools.combinations(name_list, 2))
 			if self.stratisfimal_y_vars:
 				z_vars += list(itertools.permutations(name_list, 2))
-		# x_vars_layers[i] = list(itertools.combinations(name_list, 2))
-		# x = m.addVars(x_vars, vtype=GRB.CONTINUOUS, name="x")
-		# k = m.addVars(x_vars, vtype=GRB.CONTINUOUS, name="k")
 		x = m.addVars(x_vars, vtype=GRB.BINARY, name="x")
 		if self.stratisfimal_y_vars:
 			z = m.addVars(z_vars, vtype=relax_type, lb=0, ub=self.m_val, name="z")
+		else:
+			z = None
 		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars)
 		if self.mirror_vars:
 			c_vars_orig, nc_consts = reductions.normal_c_vars(g, edges_by_layer, False)
@@ -96,68 +94,28 @@ class LayeredOptimizer:
 		if self.vertical_transitivity or self.stratisfimal_y_vars:
 			y_vars = [n.name for n in g]
 			y = m.addVars(y_vars, vtype=relax_type, lb=0, ub=self.m_val, name="y")
+		else:
+			y = None
 		m.update()
 
-		""" Fix variables """
+		""" Fix variables/set starting assignments, used in some old experiments """
 		if assignment:  # TODO (later): can be removed, not used in full subg algo (remove in place of fix_x_vars)
 			for k, v in assignment.items():
 				m.getVarByName(k).ub, m.getVarByName(k).lb = v, v
-
 		if fix_x_vars:
 			for k, v in fix_x_vars.items():
 				if k in x:
 					m.getVarByName(f"x[{k[0]},{k[1]}]").lb, m.getVarByName(f"x[{k[0]},{k[1]}]").ub = v, v
 				else:
 					m.getVarByName(f"x[{k[1]},{k[0]}]").lb, m.getVarByName(f"x[{k[1]},{k[0]}]").ub = 1 - v, 1 - v
-
-		""" Set variable starting values """
 		if start_x_vars:
 			for v in m.getVars():
 				v.Start = start_x_vars[v.varName]
-		# for k, v in start_x_vars.items():
-		# 	if k in x:
-		# 		m.getVarByName(f"x[{k[0]},{k[1]}]").Start = v
-		# 	else:
-		# 		m.getVarByName(f"x[{k[1]},{k[0]}]").Start = 1 - v
 
-		if self.heuristic_start:
-			g_igraph = type_conversions.layered_graph_to_igraph(g)
-			heuristic_layout = g_igraph.layout_sugiyama(layers=g_igraph.vs["layer"])
-			for i, coord in enumerate(heuristic_layout.coords[:g.n_nodes]):
-				g.nodes[i].y = coord[0]
-			for lay in g.layers:
-				g.layers[lay].sort(key=lambda nd1: nd1.y)
-				l_offset = 0
-				for j in range(1, len(g.layers[lay])):
-					if g.layers[lay][j].y <= g.layers[lay][j - 1].y:
-						l_offset += 1
-					g.layers[lay][j].y += l_offset
-			for v in m.getVars():
-				if v.varName[:1] == "y":
-					v.Start = g[int(v.varName[2:v.varName.index(']')])].y
-				elif v.varName[:1] == "x":
-					v.Start = 1 if g[int(v.varName[2:v.varName.index(',')])].y < g[int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])].y else 0
+		""" Heuristic starting assignments """
+		self.__heuristic_start(m, g)
 
-		# vis.draw_graph(g, "interim")
-
-		# g.barycentric_reordering(10)
-		# x_assign, c_assign = self.compute_variable_assignments(g, x_vars, c_vars)
-		# for var in m.getVars():
-		# 	if var.varName[:1] == "y":
-		# 		var.start = g[int(var.varName[2:var.varName.index(']')])].y
-		# 	elif var.varName[:1] == "x":
-		# 		if x_assign[int(var.varName[2:var.varName.index(',')]), int(
-		# 				var.varName[var.varName.index(',') + 1:var.varName.index(']')])]:
-		# 			var.start = 1
-		# 		else:
-		# 			var.start = 0
-		# 	elif var.varName[:1] == "c":
-		# 		cnm = [int(x) for x in re.findall(r"[0-9]+", var.varName)]
-		# 		if c_assign[(cnm[0], cnm[1]), (cnm[2], cnm[3])]:
-		# 			var.start = 1
-		# 		else:
-		# 			var.start = 0
-
+		""" Set higher priority for branching on x-vars """
 		if self.xvar_branch_priority:
 			for v in m.getVars():
 				if v.varName[:1] == "x":
@@ -166,42 +124,10 @@ class LayeredOptimizer:
 					v.BranchPriority = 0
 
 		""" Butterfly reduction """
-		butterfly_c_vars = set()
-		butterfly_c_pairs = []
-		if self.butterfly_reduction:
-			b_set_list = []
-			for b_v in motifs.get_butterflies(g):
-				b_set_list.append(set(b_v))
-			b_set_one_found = [0] * len(b_set_list)
-			print("Butterfly set:", b_set_list)
-			if b_set_list:
-				self.print_info.append(f"{pre_sym}Num butterflies found: {len(b_set_list)}")
-				for c_var in c_vars:
-					c_set = {c_var[0][0], c_var[0][1], c_var[1][0], c_var[1][1]}
-					if c_set in b_set_list:
-						b_ind = b_set_list.index(c_set)
-						if self.mirror_vars and b_set_one_found[b_ind] == 3:
-							c_org = [c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set]
-							cv_p = [c_v for c_v in c_org if c_v[0][0] == c_var[0][0]][0]
-							cv_r = [c_v for c_v in c_org if c_v[0][1] == c_var[0][1]][0]
-							cv_q = [c_v for c_v in c_org if c_v[0] == c_var[1]][0]
-							butterfly_c_pairs.append((c_var, cv_p))
-							butterfly_c_pairs.append((c_var, cv_r))
-							butterfly_c_pairs.append((cv_q, cv_p))
-							butterfly_c_pairs.append((cv_q, cv_r))
-						elif not self.mirror_vars and b_set_one_found[b_ind]:
-							c_org = [c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set][0]
-							butterfly_c_pairs.append((c_org, c_var))
-						else:
-							b_set_one_found[b_ind] += 1
-						butterfly_c_vars.add(c_var)
+		butterfly_c_pairs = self.get_butterfly_cvars(g, c_vars)
 
 		""" Set model objective function """
 		if not self.sequential_bendiness:
-			# z_vars = []
-			# for i, name_list in nodes_by_layer.items():
-			# 	z_vars += list(itertools.permutations(name_list, 2))
-			# z = m.addVars(z_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="z")
 			if self.bendiness_reduction:
 				b_vars = list(g.edge_names.keys())
 				b = m.addVars(b_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="b")
@@ -222,63 +148,24 @@ class LayeredOptimizer:
 			m.setObjective(opt, GRB.MINIMIZE)
 
 		""" Transitivity constraints """
-		if self.direct_transitivity:
-			self.__transitivity(m, nodes_by_layer, x_vars, x)
+		self.__transitivity(m, nodes_by_layer, x_vars, x, y, z)
 
-		""" Long-version crossing reduction code """
+		""" Edge crossing constraints """
 		n_cs = self.__edge_crossings(m, c_vars, x, c, graph_arg=g, track_x_var_usage=self.symmetry_breaking, butterflies=butterfly_c_pairs)
-		# n_cs = self.edge_crossings_2(m, c_vars, x, c, graph_arg=g, track_x_var_usage=self.symmetry_breaking, butterflies=butterfly_c_pairs)
 		for i, val in enumerate(n_cs[:-1]):
 			n_constraints_generated[i] += val
 
+		""" Bearclaw constraints """
+		self.__add_bearclaw_constraints(m, g, c_vars)
+
 		""" Symmetry constraints """
-		if self.mirror_vars and self.symmetry_constraints:
-			self.__add_symmetry_constraints(m, x_vars, c_vars, x, c)
+		self.__add_symmetry_constraints(m, x_vars, c_vars, x, c)
 
 		""" Cycle constraints """
-		if self.cycle_constraints:
-			c_vars_set = set(c_vars)
-			self.__add_cycle_constraints(m, g, c_vars_set, c)
+		self.__add_cycle_constraints(m, g, c_vars, c)
 
 		""" Break symmetry by fixing key x-var """
-		if self.symmetry_breaking:
-			x_var_usage = n_cs[-1]
-			if x_vars:
-				if x_var_usage != {}:
-					most_used_x = max(x_var_usage, key=x_var_usage.get)
-				else:
-					most_used_x = random.choice(x_vars)
-				m.getVarByName(f"x[{most_used_x[0]},{most_used_x[1]}]").lb = 0
-				m.getVarByName(f"x[{most_used_x[0]},{most_used_x[1]}]").ub = 0
-
-		""" Vertical position, implication version """
-		# Uses big-M method: https://support.gurobi.com/hc/en-us/articles/4414392016529-How-do-I-model-conditional-statements-in-Gurobi-
-		if self.vertical_transitivity:
-			for x_var in x_vars:
-				m.addGenConstrIndicator(x[x_var], True, y[x_var[0]] + 1 <= y[x_var[1]])
-				m.addGenConstrIndicator(x[x_var], False, y[x_var[0]] >= 1 + y[x_var[1]])
-				n_constraints_generated[3] += 2
-
-		""" Original vertical position constraints """
-		if self.stratisfimal_y_vars:
-			for x_var in x_vars:
-				m.addConstr(z[x_var] - self.m_val * x[x_var] <= 0, f"1.1z{x_var}")
-				m.addConstr(z[x_var] - y[x_var[0]] - (self.m_val * x[x_var]) >= -1 * self.m_val, f"1.2z{x_var}")
-				m.addConstr(y[x_var[1]] - z[x_var] - x[x_var] >= 0, f"1.3z{x_var}")
-				m.addConstr(z[x_var] <= y[x_var[0]], f"1.4z{x_var}")
-				# m.addConstr(z[x_var] >= 0, f"1.5z{x_var}")	# print(f"z{x_var}-{self.m_val}*x{x_var} <= 0"), print(f"y{x_var[1]} - z{x_var} - x{x_var} >= 0")
-
-				m.addConstr(z[x_var[1], x_var[0]] - self.m_val * (1 - x[x_var]) <= 0, f"2.1z{x_var}")
-				m.addConstr(z[x_var[1], x_var[0]] - y[x_var[1]] - self.m_val * (1 - x[x_var]) >= -1 * self.m_val,
-							f"2.2z{x_var}")
-				m.addConstr(y[x_var[0]] - z[x_var[1], x_var[0]] - (1 - x[x_var]) >= 0, f"2.3z{x_var}")
-				m.addConstr(z[x_var[1], x_var[0]] <= y[x_var[1]], f"2.4z{x_var}")
-				# m.addConstr(z[x_var[1],x_var[0]] >= 0, f"2.5z{x_var}")	# print(f"z[{x_var[1],x_var[0]}]-{self.m_val}*(1-x{x_var}) <= 0"), print(f"y{x_var[0]} - z[{x_var[1],x_var[0]}] - (1-x{x_var}) >= 0")
-
-				# m.addConstr(k[x_var] + x[x_var] - 1 >= 0)  # SOS-constraint version. Use with full LP relaxation
-				# m.addSOS(GRB.SOS_TYPE1, [k[x_var], x[x_var]])
-
-				n_constraints_generated[3] += 10
+		self.__symmetry_breaking(m, n_cs[-1], x_vars)
 
 		""" Non-sequential bendiness reduction, original Stratisfimal version"""
 		if not self.sequential_bendiness and self.bendiness_reduction:
@@ -291,8 +178,6 @@ class LayeredOptimizer:
 		if self.cutoff_time > 0:
 			m.setParam("TimeLimit", self.cutoff_time)
 		m.setParam("OutputFlag", 0)
-		# m.setParam("LogFile", "standard_log")
-		# m.setParam("LogToConsole", 0)
 		if self.aggro_presolve:
 			m.setParam("Presolve", 2)
 		n_constraints_generated[5] = sum(n_constraints_generated[:5])
@@ -306,7 +191,6 @@ class LayeredOptimizer:
 		if self.verbose:
 			self.print_info.append(f"{pre_sym}Objective: {m.objVal}")
 			self.print_info.append(f"{pre_sym}Time to optimize: {t2}")
-		# x_vars_opt = {}
 		if m.status != 2 and m.status != 9:
 			print("model returned incorrect status code:", m.status)
 			print("4: model probably never found a feasible solution")
@@ -319,65 +203,7 @@ class LayeredOptimizer:
 		num_crossings = round(m.objVal)
 
 		""" Optimize and merge collapsed subgraphs """
-		if self.collapse_subgraphs:
-			t4 = time.time()
-			# new_g, stack_node_to_nodelist, node_to_stack_node, subgraphs_collapsed, subg_types
-			subgraphs = g.create_layered_graphs_from_subgraphs()
-			for i, subgraph in enumerate(subgraphs):
-				if g.subgraph_types[i] != 0:
-					var_to_fix = -1
-					xvars_to_fix = {}
-					if g.subgraph_types[i] != 1:
-						for nd in g.contact_nodes[i]:
-							if nd in subgraph:
-								var_to_fix = nd
-					if var_to_fix != -1:
-						connect_nd = -1
-						relative_xval = -1
-						for nd, adj in g.crossing_edges.items():
-							if nd == var_to_fix:
-								connect_nd = adj[0]
-							elif var_to_fix in adj:
-								connect_nd = nd
-						if connect_nd not in g:
-							connect_nd = g.node_to_stack_node[connect_nd]
-						for nd_other in subgraph.nodes:
-							if nd_other.layer == g[connect_nd].layer:
-								relative_xval = get_x_var(self.x_var_assign, g.node_to_stack_node[nd_other.name], connect_nd)
-						if relative_xval != -1:
-							for other_nd in subgraph.layers[subgraph[var_to_fix].layer]:
-								if other_nd.name != var_to_fix:
-									xvars_to_fix[var_to_fix, other_nd.name] = 1 - relative_xval
-					optim = LayeredOptimizer(subgraph)
-					# print(xvars_to_fix)
-					if xvars_to_fix != {}:
-						num_crossings += optim.optimize_layout(fix_xvars=xvars_to_fix)[1]
-					else:
-						num_crossings += optim.optimize_layout()[1]
-					for xv, assgn in optim.x_var_assign.items():
-						self.x_var_assign[xv] = assgn
-			to_remove = []
-			for x_var in x_vars:
-				if g[x_var[0]].stacked and g[x_var[1]].stacked:
-					for otv in g.stack_node_to_nodelist[x_var[0]]:
-						for otv2 in g.stack_node_to_nodelist[x_var[1]]:
-							set_x_var(self.x_var_assign, otv, otv2, get_x_var(self.x_var_assign, x_var[0], x_var[1]))
-					to_remove.append(x_var)
-				elif g[x_var[0]].stacked:
-					for otv in g.stack_node_to_nodelist[x_var[0]]:
-						set_x_var(self.x_var_assign, otv, x_var[1], get_x_var(self.x_var_assign, x_var[0], x_var[1]))
-					to_remove.append(x_var)
-				elif g[x_var[1]].stacked:
-					for otv in g.stack_node_to_nodelist[x_var[1]]:
-						set_x_var(self.x_var_assign, x_var[0], otv, get_x_var(self.x_var_assign, x_var[0], x_var[1]))
-					to_remove.append(x_var)
-			for xv in to_remove:
-				if xv in self.x_var_assign:
-					del self.x_var_assign[xv]
-				else:
-					del self.x_var_assign[xv[1], xv[0]]
-			g = g.old_g
-			t1 += time.time() - t4
+		g, t1, num_crossings = self.__optimize_subgraphs(g, x_vars, t1, num_crossings)
 
 		""" Draw pre-bendiness graph """
 		# vis.draw_graph(g, "interim")
@@ -392,6 +218,7 @@ class LayeredOptimizer:
 		else:
 			t3 = 0
 
+		""" Draw the resulting graph """
 		if self.draw_graph:
 			if not self.bendiness_reduction:
 				if self.direct_transitivity:
@@ -400,13 +227,14 @@ class LayeredOptimizer:
 					for v in m.getVars():
 						if v.varName[:1] == "y" and int(v.varName[2:v.varName.index(']')]) in g.node_names:
 							g[int(v.varName[2:v.varName.index(']')])].y = float(v.x)
-			vis.draw_graph(g, f"{self.name}")
+			vis.draw_graph(g, self.name)
 
 		if self.verbose:
 			self.print_info.append(f"{pre_sym}Final edge crossing count: {g.num_edge_crossings()}")
 			self.print_info.append(f"{pre_sym}Number of constraints: {n_constraints_generated}")
 			self.print_info.append(f"{pre_sym}{round(t1, 3)}, {round(t2, 3)}, {round(t3, 3)}, {round(t1 + t2 + t3, 3)}")
 
+		""" Return data """
 		print(f"Number of crossings: {num_crossings}", f"\tOptimization time: {round(m.runtime, 3)}")
 		# print(f"g calc: {g.num_edge_crossings()}")
 
@@ -462,18 +290,44 @@ class LayeredOptimizer:
 				g[int(v.varName[2:v.varName.index(']')])].y = float(v.x)
 		return n_constr
 
-	def __transitivity(self, model: gp.Model, names_by_layer, x_vars, x):
-		for x_vars_list in names_by_layer.values():
-			for x_1, x_2, x_3 in itertools.combinations(x_vars_list, 3):
-				if self.mirror_vars:
-					model.addConstr(x[x_1, x_2] + x[x_2, x_3] - x[x_1, x_3] >= 0)
-					model.addConstr(x[x_1, x_3] - x[x_1, x_2] - x[x_2, x_3] >= -1)
-				else:
-					x1const, x11, x12 = get_x_var_consts(x_vars, x_1, x_2)
-					x2const, x21, x22 = get_x_var_consts(x_vars, x_2, x_3)
-					x3const, x31, x32 = get_x_var_consts(x_vars, x_1, x_3)
-					model.addConstr(x1const * x[x11, x12] + x2const * x[x21, x22] - x3const * x[x31, x32] + (1 - x1const)//2 + (1 - x2const)//2 - (1 - x3const)//2 >= 0)
-					model.addConstr(-1 * x1const * x[x11, x12] - x2const * x[x21, x22] + x3const * x[x31, x32] - (1 - x1const)//2 - (1 - x2const)//2 + (1 - x3const)//2 >= -1)
+	def __transitivity(self, model: gp.Model, names_by_layer, x_vars, x, y, z):
+		if self.direct_transitivity:
+			for x_vars_list in names_by_layer.values():
+				for x_1, x_2, x_3 in itertools.combinations(x_vars_list, 3):
+					if self.mirror_vars:
+						model.addConstr(x[x_1, x_2] + x[x_2, x_3] - x[x_1, x_3] >= 0)
+						model.addConstr(x[x_1, x_3] - x[x_1, x_2] - x[x_2, x_3] >= -1)
+					else:
+						x1const, x11, x12 = get_x_var_consts(x_vars, x_1, x_2)
+						x2const, x21, x22 = get_x_var_consts(x_vars, x_2, x_3)
+						x3const, x31, x32 = get_x_var_consts(x_vars, x_1, x_3)
+						model.addConstr(x1const * x[x11, x12] + x2const * x[x21, x22] - x3const * x[x31, x32] + (1 - x1const)//2 + (1 - x2const)//2 - (1 - x3const)//2 >= 0)
+						model.addConstr(-1 * x1const * x[x11, x12] - x2const * x[x21, x22] + x3const * x[x31, x32] - (1 - x1const)//2 - (1 - x2const)//2 + (1 - x3const)//2 >= -1)
+
+		""" Vertical position, implication version """
+		# Uses big-M method: https://support.gurobi.com/hc/en-us/articles/4414392016529-How-do-I-model-conditional-statements-in-Gurobi-
+		if self.vertical_transitivity:
+			for x_var in x_vars:
+				model.addGenConstrIndicator(x[x_var], True, y[x_var[0]] + 1 <= y[x_var[1]])
+				model.addGenConstrIndicator(x[x_var], False, y[x_var[0]] >= 1 + y[x_var[1]])
+
+		""" Original vertical position constraints as in Stratisfimal Layout """
+		if self.stratisfimal_y_vars:
+			for x_var in x_vars:
+				model.addConstr(z[x_var] - self.m_val * x[x_var] <= 0, f"1.1z{x_var}")
+				model.addConstr(z[x_var] - y[x_var[0]] - (self.m_val * x[x_var]) >= -1 * self.m_val, f"1.2z{x_var}")
+				model.addConstr(y[x_var[1]] - z[x_var] - x[x_var] >= 0, f"1.3z{x_var}")
+				model.addConstr(z[x_var] <= y[x_var[0]], f"1.4z{x_var}")
+				# m.addConstr(z[x_var] >= 0, f"1.5z{x_var}")	# print(f"z{x_var}-{self.m_val}*x{x_var} <= 0"), print(f"y{x_var[1]} - z{x_var} - x{x_var} >= 0")
+
+				model.addConstr(z[x_var[1], x_var[0]] - self.m_val * (1 - x[x_var]) <= 0, f"2.1z{x_var}")
+				model.addConstr(z[x_var[1], x_var[0]] - y[x_var[1]] - self.m_val * (1 - x[x_var]) >= -1 * self.m_val, f"2.2z{x_var}")
+				model.addConstr(y[x_var[0]] - z[x_var[1], x_var[0]] - (1 - x[x_var]) >= 0, f"2.3z{x_var}")
+				model.addConstr(z[x_var[1], x_var[0]] <= y[x_var[1]], f"2.4z{x_var}")
+				# m.addConstr(z[x_var[1],x_var[0]] >= 0, f"2.5z{x_var}")	# print(f"z[{x_var[1],x_var[0]}]-{self.m_val}*(1-x{x_var}) <= 0"), print(f"y{x_var[0]} - z[{x_var[1],x_var[0]}] - (1-x{x_var}) >= 0")
+
+				# m.addConstr(k[x_var] + x[x_var] - 1 >= 0)  # SOS-constraint version. Use with full LP relaxation
+				# m.addSOS(GRB.SOS_TYPE1, [k[x_var], x[x_var]])
 
 	def __edge_crossings(self, model: gp.Model, c_vars, x, c, graph_arg=None, track_x_var_usage=False, butterflies=None):
 		g = self.g if graph_arg is None else graph_arg
@@ -682,121 +536,231 @@ class LayeredOptimizer:
 				n_constraints += 2
 		return n_constraints, track_x_var_usage
 
+	def __symmetry_breaking(self, model: gp.Model, x_var_usage, x_vars):
+		if self.symmetry_breaking:
+			if x_vars:
+				if x_var_usage != {}:
+					most_used_x = max(x_var_usage, key=x_var_usage.get)
+				else:
+					most_used_x = random.choice(x_vars)
+				model.getVarByName(f"x[{most_used_x[0]},{most_used_x[1]}]").lb = 0
+				model.getVarByName(f"x[{most_used_x[0]},{most_used_x[1]}]").ub = 0
+
+	def get_butterfly_cvars(self, graph: LayeredGraph, c_vars):
+		butterfly_c_vars = set()
+		butterfly_c_pairs = []
+		if self.butterfly_reduction:
+			b_set_list = []
+			for b_v in motifs.get_butterflies(graph):
+				b_set_list.append(set(b_v))
+			b_set_one_found = [0] * len(b_set_list)
+			print("Butterfly set:", b_set_list)
+			if b_set_list:
+				for c_var in c_vars:
+					c_set = {c_var[0][0], c_var[0][1], c_var[1][0], c_var[1][1]}
+					if c_set in b_set_list:
+						b_ind = b_set_list.index(c_set)
+						if self.mirror_vars and b_set_one_found[b_ind] == 3:
+							c_org = [c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set]
+							cv_p = [c_v for c_v in c_org if c_v[0][0] == c_var[0][0]][0]
+							cv_r = [c_v for c_v in c_org if c_v[0][1] == c_var[0][1]][0]
+							cv_q = [c_v for c_v in c_org if c_v[0] == c_var[1]][0]
+							butterfly_c_pairs.append((c_var, cv_p))
+							butterfly_c_pairs.append((c_var, cv_r))
+							butterfly_c_pairs.append((cv_q, cv_p))
+							butterfly_c_pairs.append((cv_q, cv_r))
+						elif not self.mirror_vars and b_set_one_found[b_ind]:
+							c_org = [c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set][0]
+							butterfly_c_pairs.append((c_org, c_var))
+						else:
+							b_set_one_found[b_ind] += 1
+						butterfly_c_vars.add(c_var)
+		return butterfly_c_pairs
+
+	def __heuristic_start(self, model: gp.Model, graph: LayeredGraph):
+		if self.heuristic_start:
+			g_igraph = type_conversions.layered_graph_to_igraph(graph)
+			heuristic_layout = g_igraph.layout_sugiyama(layers=g_igraph.vs["layer"])
+			for i, coord in enumerate(heuristic_layout.coords[:graph.n_nodes]):
+				graph.nodes[i].y = coord[0]
+			for lay in graph.layers:
+				graph.layers[lay].sort(key=lambda nd1: nd1.y)
+				l_offset = 0
+				for j in range(1, len(graph.layers[lay])):
+					if graph.layers[lay][j].y <= graph.layers[lay][j - 1].y:
+						l_offset += 1
+					graph.layers[lay][j].y += l_offset
+			for v in model.getVars():
+				if v.varName[:1] == "y":
+					v.Start = graph[int(v.varName[2:v.varName.index(']')])].y
+				elif v.varName[:1] == "x":
+					v.Start = 1 if graph[int(v.varName[2:v.varName.index(',')])].y < graph[int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])].y else 0
+
 	def __add_symmetry_constraints(self, model: gp.Model, x_vars, c_vars, x, c):
-		x_v_seen = set()
-		c_v_seen = set()
-		for x_var in x_vars:
-			if (x_var[1], x_var[0]) not in x_v_seen:
-				model.addConstr(x[x_var] + x[x_var[1], x_var[0]] == 1)
-				x_v_seen.add(x_var)
-		for c_var in c_vars:
-			if (c_var[1], c_var[0]) not in c_v_seen:
-				model.addConstr(c[c_var] == c[c_var[1], c_var[0]])
-				c_v_seen.add(c_var)
+		if self.mirror_vars and self.symmetry_constraints:
+			x_v_seen = set()
+			c_v_seen = set()
+			for x_var in x_vars:
+				if (x_var[1], x_var[0]) not in x_v_seen:
+					model.addConstr(x[x_var] + x[x_var[1], x_var[0]] == 1)
+					x_v_seen.add(x_var)
+			for c_var in c_vars:
+				if (c_var[1], c_var[0]) not in c_v_seen:
+					model.addConstr(c[c_var] == c[c_var[1], c_var[0]])
+					c_v_seen.add(c_var)
 
 	def __add_cycle_constraints(self, model: gp.Model, g: LayeredGraph, cvars, c):
-		# create vertex-exchange graph
-		v_e_g, node_list, edge_signs = g.vertex_exchange_graph()
+		if self.cycle_constraints:
+			# create vertex-exchange graph
+			v_e_g, node_list, edge_signs = g.vertex_exchange_graph()
 
-		# Find BFS tree, then calculate all fundamental cycles
-		veg_bfsq = []
-		veg_visit = [False] * len(node_list)
-		n_visited = 0
-		start_search_at = 0
-		veg_parent = [-1] * len(node_list)
-		fund_cycles = []
-		while n_visited < len(node_list):
-			while veg_visit[start_search_at]:
-				start_search_at += 1
-			veg_bfsq.append(start_search_at)
-			veg_visit[start_search_at] = True
-			n_visited += 1
-			while veg_bfsq:
-				next_layer = veg_bfsq.copy()
-				veg_bfsq.clear()
-				for nd in next_layer:
-					for nd_adj in v_e_g[nd]:
-						if not veg_visit[nd_adj[0]]:
-							veg_visit[nd_adj[0]] = True
-							veg_parent[nd_adj[0]] = nd
-							veg_bfsq.append(nd_adj[0])
-							n_visited += 1
-						elif veg_parent[nd] != nd_adj[0]:
-							branch1 = nd
-							branch2 = nd_adj[0]
-							fcycle_edges = [(nd, nd_adj[0], nd_adj[1])]
-							while veg_parent[branch1] != branch2 and branch1 != veg_parent[branch2] and branch1 != branch2:
-								if veg_parent[branch1] != -1:
-									fcycle_edges.append((branch1, veg_parent[branch1], edge_signs[branch1, veg_parent[branch1]] if (branch1, veg_parent[branch1]) in edge_signs else edge_signs[veg_parent[branch1], branch1]))
-									branch1 = veg_parent[branch1]
-								if veg_parent[branch2] != -1:
-									fcycle_edges.append((branch2, veg_parent[branch2], edge_signs[branch2, veg_parent[branch2]] if (branch2, veg_parent[branch2]) in edge_signs else edge_signs[veg_parent[branch2], branch2]))
-									branch2 = veg_parent[branch2]
-							if branch1 != branch2:
-								fcycle_edges.append((branch1, branch2, edge_signs[branch1, branch2] if (branch1, branch2) in edge_signs else edge_signs[branch2, branch1]))
-							fund_cycles.append(fcycle_edges)
+			# Find BFS tree, then calculate all fundamental cycles
+			veg_bfsq = []
+			veg_visit = [False] * len(node_list)
+			n_visited = 0
+			start_search_at = 0
+			veg_parent = [-1] * len(node_list)
+			fund_cycles = []
+			while n_visited < len(node_list):
+				while veg_visit[start_search_at]:
+					start_search_at += 1
+				veg_bfsq.append(start_search_at)
+				veg_visit[start_search_at] = True
+				n_visited += 1
+				while veg_bfsq:
+					next_layer = veg_bfsq.copy()
+					veg_bfsq.clear()
+					for nd in next_layer:
+						for nd_adj in v_e_g[nd]:
+							if not veg_visit[nd_adj[0]]:
+								veg_visit[nd_adj[0]] = True
+								veg_parent[nd_adj[0]] = nd
+								veg_bfsq.append(nd_adj[0])
+								n_visited += 1
+							elif veg_parent[nd] != nd_adj[0]:
+								branch1 = nd
+								branch2 = nd_adj[0]
+								fcycle_edges = [(nd, nd_adj[0], nd_adj[1])]
+								while veg_parent[branch1] != branch2 and branch1 != veg_parent[branch2] and branch1 != branch2:
+									if veg_parent[branch1] != -1:
+										fcycle_edges.append((branch1, veg_parent[branch1], edge_signs[branch1, veg_parent[branch1]] if (branch1, veg_parent[branch1]) in edge_signs else edge_signs[veg_parent[branch1], branch1]))
+										branch1 = veg_parent[branch1]
+									if veg_parent[branch2] != -1:
+										fcycle_edges.append((branch2, veg_parent[branch2], edge_signs[branch2, veg_parent[branch2]] if (branch2, veg_parent[branch2]) in edge_signs else edge_signs[veg_parent[branch2], branch2]))
+										branch2 = veg_parent[branch2]
+								if branch1 != branch2:
+									fcycle_edges.append((branch1, branch2, edge_signs[branch1, branch2] if (branch1, branch2) in edge_signs else edge_signs[branch2, branch1]))
+								fund_cycles.append(fcycle_edges)
 
-		# Add cycle constraints from Healy and Kuusik, "The Vertex-Exchange Graph"
-		for i, fcycle in enumerate(fund_cycles):
-			label = sum((fc[2] for fc in fcycle)) % 2
-			csum = gp.LinExpr()
-			for edg in fcycle:
-				u, v = node_list[edg[0]], node_list[edg[1]]
-				if g.node_names[u[0]].layer > g.node_names[v[0]].layer:
-					u, v = v, u
-				if ((u[0], v[0]), (u[1], v[1])) in cvars or ((u[1], v[1]), (u[0], v[0])) in cvars:
-					if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y < g.node_names[v[1]].y):
-						e1 = (u[0], v[0]) if edg[2] == 0 else (u[0], v[1])  # if sign doesn't match ypos comparison then we know this is a butterfly, and we got the wrong two edges in cvars
-						e2 = (u[1], v[1]) if edg[2] == 0 else (u[1], v[0])
+			# Add cycle constraints from Healy and Kuusik, "The Vertex-Exchange Graph"
+			cvars_set = set(cvars)
+			for i, fcycle in enumerate(fund_cycles):
+				label = sum((fc[2] for fc in fcycle)) % 2
+				csum = gp.LinExpr()
+				for edg in fcycle:
+					u, v = node_list[edg[0]], node_list[edg[1]]
+					if g.node_names[u[0]].layer > g.node_names[v[0]].layer:
+						u, v = v, u
+					if ((u[0], v[0]), (u[1], v[1])) in cvars_set or ((u[1], v[1]), (u[0], v[0])) in cvars_set:
+						if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y < g.node_names[v[1]].y):
+							e1 = (u[0], v[0]) if edg[2] == 0 else (u[0], v[1])  # if sign doesn't match ypos comparison then we know this is a butterfly, and we got the wrong two edges in cvars
+							e2 = (u[1], v[1]) if edg[2] == 0 else (u[1], v[0])
+						else:
+							e1 = (u[0], v[0]) if edg[2] == 1 else (u[0], v[1])
+							e2 = (u[1], v[1]) if edg[2] == 1 else (u[1], v[0])
+					elif ((u[0], v[1]), (u[1], v[0])) in cvars_set or ((u[1], v[0]), (u[0], v[1])) in cvars_set:
+						if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):  # XAND
+							e1 = (u[0], v[1]) if edg[2] == 0 else (u[0], v[0])
+							e2 = (u[1], v[0]) if edg[2] == 0 else (u[1], v[1])
+						else:
+							e1 = (u[0], v[1]) if edg[2] == 1 else (u[0], v[0])
+							e2 = (u[1], v[0]) if edg[2] == 1 else (u[1], v[1])
 					else:
-						e1 = (u[0], v[0]) if edg[2] == 1 else (u[0], v[1])
-						e2 = (u[1], v[1]) if edg[2] == 1 else (u[1], v[0])
-				elif ((u[0], v[1]), (u[1], v[0])) in cvars or ((u[1], v[0]), (u[0], v[1])) in cvars:
-					if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):  # XAND
-						e1 = (u[0], v[1]) if edg[2] == 0 else (u[0], v[0])
-						e2 = (u[1], v[0]) if edg[2] == 0 else (u[1], v[1])
-					else:
-						e1 = (u[0], v[1]) if edg[2] == 1 else (u[0], v[0])
-						e2 = (u[1], v[0]) if edg[2] == 1 else (u[1], v[1])
+						raise Exception("problem with vertex exchange graph")
+					u, v = get_c_var(cvars_set, e1, e2)
+					csum += c[u, v]
+				if label == 0:
+					kc = model.addVar(0, len(fcycle) / 2, vtype=GRB.CONTINUOUS)
+					model.addConstr(2 * kc == csum)
 				else:
-					raise Exception("problem with vertex exchange graph")
-				u, v = get_c_var(cvars, e1, e2)
-				csum += c[u, v]
-			if label == 0:
-				kc = model.addVar(0, len(fcycle) / 2, vtype=GRB.CONTINUOUS)
-				model.addConstr(2 * kc == csum)
-			else:
-				kc = model.addVar(0, len(fcycle) / 2 - 1, vtype=GRB.CONTINUOUS)
-				model.addConstr(2 * kc + 1 == csum)
-				model.addConstr(csum >= 1)
+					kc = model.addVar(0, len(fcycle) / 2 - 1, vtype=GRB.CONTINUOUS)
+					model.addConstr(2 * kc + 1 == csum)
+					model.addConstr(csum >= 1)
 
-	# def compute_variable_assignments(self, x_vars, c_vars):
-	# 	x_assignments = {}
-	# 	c_assignments = {}
-	# 	for x_var in x_vars:
-	# 		if self.g[x_var[0]].y < self.g[x_var[1]].y:
-	# 			x_assignments[x_var] = 1
-	# 		else:
-	# 			x_assignments[x_var] = 0
-	# 	for c_var in c_vars:
-	# 		sl1 = self.g.edge_names[c_var[0]].same_layer_edge
-	# 		sl2 = self.g.edge_names[c_var[1]].same_layer_edge
-	# 		x1 = get_x_var(x_assignments, c_var[0][0], c_var[1][0])
-	# 		if sl1 and sl2:
-	# 			x2 = get_x_var(x_assignments, c_var[0][1], c_var[1][1])
-	# 			x3 = get_x_var(x_assignments, c_var[1][0], c_var[0][1])
-	# 			x4 = get_x_var(x_assignments, c_var[0][0], c_var[1][1])
-	# 			c_assignments[c_var] = x1 * x2 * x3 + x4 * (1 - x2) * (1 - x3) + (1 - x3) * (1 - x1) * x4 + x2 * (1 - x4) * x1 + (1 - x1) * x4 * (1 - x2) + x3 * x2 * (1 - x4) + (1 - x4) * x1 * x3 + (1 - x2) * (1 - x3) * (1 - x1)
-	# 		elif sl1:
-	# 			x2 = get_x_var(x_assignments, c_var[0][1], c_var[1][0])
-	# 			c_assignments[c_var] = x1 * (1 - x2) + (1 - x1) * x2
-	# 		elif sl2:
-	# 			x2 = get_x_var(x_assignments, c_var[0][0], c_var[1][1])
-	# 			c_assignments[c_var] = x1 * (1 - x2) + (1 - x1) * x2
-	# 		else:
-	# 			x2 = get_x_var(x_assignments, c_var[0][1], c_var[1][1])
-	# 			c_assignments[c_var] = x1 * (1 - x2) + (1 - x1) * x2
-	# 	return x_assignments, c_assignments
+	def __optimize_subgraphs(self, graph, x_vars, t1, num_crossings):
+		if self.collapse_subgraphs:
+			t4 = time.time()
+			# new_g, stack_node_to_nodelist, node_to_stack_node, subgraphs_collapsed, subg_types
+			subgraphs = graph.create_layered_graphs_from_subgraphs()
+			for i, subgraph in enumerate(subgraphs):
+				if graph.subgraph_types[i] != 0:
+					var_to_fix = -1
+					xvars_to_fix = {}
+					if graph.subgraph_types[i] != 1:
+						for nd in graph.contact_nodes[i]:
+							if nd in subgraph:
+								var_to_fix = nd
+					if var_to_fix != -1:
+						connect_nd = -1
+						relative_xval = -1
+						for nd, adj in graph.crossing_edges.items():
+							if nd == var_to_fix:
+								connect_nd = adj[0]
+							elif var_to_fix in adj:
+								connect_nd = nd
+						if connect_nd not in graph:
+							connect_nd = graph.node_to_stack_node[connect_nd]
+						for nd_other in subgraph.nodes:
+							if nd_other.layer == graph[connect_nd].layer:
+								relative_xval = get_x_var(self.x_var_assign, graph.node_to_stack_node[nd_other.name], connect_nd)
+						if relative_xval != -1:
+							for other_nd in subgraph.layers[subgraph[var_to_fix].layer]:
+								if other_nd.name != var_to_fix:
+									xvars_to_fix[var_to_fix, other_nd.name] = 1 - relative_xval
+					optim = LayeredOptimizer(subgraph)
+					# print(xvars_to_fix)
+					if xvars_to_fix != {}:
+						num_crossings += optim.optimize_layout(fix_xvars=xvars_to_fix)[1]
+					else:
+						num_crossings += optim.optimize_layout()[1]
+					for xv, assgn in optim.x_var_assign.items():
+						self.x_var_assign[xv] = assgn
+			to_remove = []
+			for x_var in x_vars:
+				if graph[x_var[0]].stacked and graph[x_var[1]].stacked:
+					for otv in graph.stack_node_to_nodelist[x_var[0]]:
+						for otv2 in graph.stack_node_to_nodelist[x_var[1]]:
+							set_x_var(self.x_var_assign, otv, otv2, get_x_var(self.x_var_assign, x_var[0], x_var[1]))
+					to_remove.append(x_var)
+				elif graph[x_var[0]].stacked:
+					for otv in graph.stack_node_to_nodelist[x_var[0]]:
+						set_x_var(self.x_var_assign, otv, x_var[1], get_x_var(self.x_var_assign, x_var[0], x_var[1]))
+					to_remove.append(x_var)
+				elif graph[x_var[1]].stacked:
+					for otv in graph.stack_node_to_nodelist[x_var[1]]:
+						set_x_var(self.x_var_assign, x_var[0], otv, get_x_var(self.x_var_assign, x_var[0], x_var[1]))
+					to_remove.append(x_var)
+			for xv in to_remove:
+				if xv in self.x_var_assign:
+					del self.x_var_assign[xv]
+				else:
+					del self.x_var_assign[xv[1], xv[0]]
+			return graph.old_g, t1 + time.time() - t4, num_crossings
+		else:
+			return graph, t1, num_crossings
+
+	def __add_bearclaw_constraints(self, m: gp.Model, g: LayeredGraph, cvars):  # TODO
+		cvset = set(cvars)
+		if self.bearclaw_constraints:
+			bearclaws = motifs.get_bearclaws(g)
+			for claw in bearclaws:
+				claw_cvs = gp.LinExpr()
+				is_left_claw = claw[0][0] == claw[1][0]
+				c11, c12 = get_c_var(cvset, claw[3], claw[1])
+				c11, c12 = get_c_var(cvset, claw[3], claw[1])
+				c11, c12 = get_c_var(cvset, claw[3], claw[1])
+				c11, c12 = get_c_var(cvset, claw[3], claw[1])
+				c11, c12 = get_c_var(cvset, claw[3], claw[1])
 
 	def __optimize_with_subgraph_reduction(self, n_partitions, cluster, top_level_g, crosses, contacts, stack_to_nodeset, node_to_stack):
 		# TODO (later): remove all the parameters to standard_opt, replace non-top-level calls with creation of new optimizer object

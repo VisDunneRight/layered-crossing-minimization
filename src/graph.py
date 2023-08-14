@@ -525,6 +525,22 @@ class LayeredGraph:
 			max_connectedness += len(self.layers[l_num]) * len(self.layers[l_num + 1])
 		return len(self.edges) / max_connectedness
 
+	def is_connected(self):
+		if self.adj_list == {}:
+			self.create_normal_adj_list()
+		visited = [False] * self.n_nodes
+		visited[0] = True
+		bfsq = [0]
+		while bfsq:
+			next_layer = bfsq.copy()
+			bfsq.clear()
+			for nd in next_layer:
+				for nd_adj in self.adj_list[nd]:
+					if not visited[nd_adj]:
+						bfsq.append(nd_adj)
+						visited[nd_adj] = True
+		return all(visited)
+
 	def collapse_ap_cases(self, leaves_only=False):
 		# 1) Recursive DFS to label all articulation points
 		idx = 0
