@@ -1,6 +1,5 @@
 import random
 from scipy.optimize import linprog
-import numpy as np
 import itertools
 import time
 from src import motifs, vis
@@ -20,8 +19,6 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		del self.xvar_branch_priority
 		if self.vertical_transitivity:
 			self.stratisfimal_y_vars = True
-		self.nodes_by_layer = self.g.get_names_by_layer()
-		self.edges_by_layer = self.g.get_edge_names_by_layer()
 		self.unbound_val = 12345
 		self.constraints = []
 		self.constraints_eq = []
@@ -44,16 +41,16 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 	# TODO: implement. https://docs.scipy.org/doc/scipy/reference/optimize.linprog-highs.html#optimize-linprog-highs
 	def __optimize_layout_standard_highs(self, fix_x_vars=None):
 		if not self.vertical_transitivity and not self.direct_transitivity:
-			self.vertical_transitivity = True
+			self.direct_transitivity = True
+		if self.polyhedral_constraints:
+			self.claw_constraints, self.dome_path_constraints = True, True
 		g = self.g
 		t1 = time.time()
 
 		""" Collapse valid subgraphs """
-		if self.collapse_subgraphs:
-			g = g.collapse_ap_cases()
+		if self.collapse_leaves:
+			g = g.collapse_leaves()
 			self.x_var_assign = {x_v: 2 for n_l in g.get_names_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
-			self.nodes_by_layer = g.get_names_by_layer()
-			self.edges_by_layer = g.get_edge_names_by_layer()
 
 		vis.draw_graph(g, "interim")
 
@@ -69,7 +66,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		c_var_constants = {}
 		counter = 0
 		xs = 0
-		for name_list in self.nodes_by_layer.values():
+		for name_list in g.get_names_by_layer().values():
 			combinatorics = itertools.permutations(name_list, 2) if self.mirror_vars else itertools.combinations(name_list, 2)
 			for x_pair in combinatorics:
 				x_vars[x_pair] = counter
@@ -78,12 +75,12 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 				# counter_eq += 1
 		xf, zs = counter, counter
 		if self.vertical_transitivity:
-			for name_list in self.nodes_by_layer.values():
+			for name_list in g.get_names_by_layer().values():
 				for z_pair in itertools.permutations(name_list, 2):
 					z_vars[z_pair] = counter
 					counter += 1
 		zf, cs = counter, counter
-		for i, edge_list in self.edges_by_layer.items():
+		for i, edge_list in g.get_edge_names_by_layer().items():
 			if self.mirror_vars:
 				for pr in itertools.permutations(edge_list, 2):
 					if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
@@ -129,10 +126,16 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		butterfly_c_pairs = self.get_butterfly_cvars(g, c_vars)
 
 		""" Transitivity constraints """
-		self.__transitivity_matrix(x_vars, y_vars, z_vars)
+		self.__transitivity_matrix(x_vars, y_vars, z_vars, g)
 
 		""" Edge crossing constraints """
 		xvar_usage = self.__edge_crossings_matrix(c_vars, x_vars, butterfly_c_pairs, track_x_var_usage=self.symmetry_breaking)
+
+		""" 3-claw constraints """
+		self.__add_3claw_constraints_matrix(g, c_vars)
+
+		""" Dome path constraints """
+		self.__add_domepath_constraints_matrix(g, x_vars, c_vars)
 
 		""" Symmetry constraints """
 		self.__symmetry_constraints_matrix(c_vars, x_vars)
@@ -163,6 +166,12 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 			for v in z_vars.values():
 				self.integrality[v] = 1
 
+		if len(self.c_t) == 0:  # Add dummy variables if there are none, to prevent errors with linprog
+			self.__add_late_breaking_variable(integral=False)
+			self.__add_late_breaking_variable(integral=False)
+		if len(self.constraints) == 0:  # Add dummy constraint if there are none to prevent error with linprog
+			self.__add_matrix_constraint([], [], 0)
+
 		# print(x_vars)
 		# print(z_vars)
 		# print(c_vars)
@@ -170,6 +179,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		# print(self.constraints)
 		# print(self.b_ub)
 		# print(self.c_t)
+		# print(self.integrality)
 
 		""" Optimize model """
 		t1 = time.time() - t1
@@ -177,9 +187,13 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		options = {"time_limit": self.cutoff_time} if self.cutoff_time > 0 else {}
 		res = linprog(self.c_t, method='highs', A_ub=self.constraints, A_eq=self.constraints_eq if self.constraints_eq != [] else None, b_ub=self.b_ub, b_eq=self.b_eq, bounds=self.bounds, integrality=self.integrality, options=options)
 		t2 = time.time() - t2
-		n_cr = round(res.fun) if res.fun != np.inf else res.fun
-		for xv, idx in x_vars.items():
-			self.x_var_assign[xv] = round(res.x[idx])
+		n_cr = round(res.fun) if res.fun is not None else float('inf')
+		if res.x is not None:
+			for xv, idx in x_vars.items():
+				self.x_var_assign[xv] = round(res.x[idx])
+		else:
+			for xv, idx in x_vars.items():
+				self.x_var_assign[xv] = 0 if xv in self.x_var_assign else 1
 
 		""" Optimize and merge collapsed subgraphs """
 		g, t1, num_crossings = self.__optimize_subgraphs_matrix(g, x_vars, t1, n_cr)
@@ -203,7 +217,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 
 		""" Return data """
 		if self.return_experiment_data:
-			return len(x_vars), len(c_vars), self.nvars, len(self.constraints), n_cr, t2, res.status, int(res.nit), round(t1, 3)
+			return len(x_vars), len(c_vars), self.nvars, len(self.constraints), n_cr, t2, bool(res.success), int(res.nit), round(t1, 3)
 
 		return round(t1 + t2, 3), n_cr
 
@@ -283,9 +297,9 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 				# model.addConstr(x1_rev * x[x1] + (1 - x2_rev * x[x2]) + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 1, f"2se{c_var}")
 		return x_var_usage
 
-	def __transitivity_matrix(self, x, y, z):
+	def __transitivity_matrix(self, x, y, z, g):
 		if self.direct_transitivity:
-			for x_vars_list in self.nodes_by_layer.values():
+			for x_vars_list in g.get_names_by_layer().values():
 				for x_1, x_2, x_3 in itertools.combinations(x_vars_list, 3):
 					if self.mirror_vars:
 						self.__add_matrix_constraint([x[x_1, x_2], x[x_2, x_3], x[x_1, x_3]], [-1, -1, 1], 0)
@@ -396,45 +410,45 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 			# Add cycle constraints from Healy and Kuusik, "The Vertex-Exchange Graph"
 			cvars_set = set(c)
 			for i, fcycle in enumerate(fund_cycles):
-				label = sum((fc[2] for fc in fcycle)) % 2
-				c_idxs = []
-				for edg in fcycle:
-					u, v = node_list[edg[0]], node_list[edg[1]]
-					if g.node_names[u[0]].layer > g.node_names[v[0]].layer:
-						u, v = v, u
-					if ((u[0], v[0]), (u[1], v[1])) in cvars_set or ((u[1], v[1]), (u[0], v[0])) in cvars_set:
-						if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y < g.node_names[v[1]].y):
-							e1 = (u[0], v[0]) if edg[2] == 0 else (u[0], v[1])  # if sign doesn't match ypos comparison then we know this is a butterfly, and we got the wrong two edges in cvars
-							e2 = (u[1], v[1]) if edg[2] == 0 else (u[1], v[0])
+				if len(fcycle) <= 6:
+					label = sum((fc[2] for fc in fcycle)) % 2
+					c_idxs = []
+					for edg in fcycle:
+						u, v = node_list[edg[0]], node_list[edg[1]]
+						if g.node_names[u[0]].layer > g.node_names[v[0]].layer:
+							u, v = v, u
+						if ((u[0], v[0]), (u[1], v[1])) in cvars_set or ((u[1], v[1]), (u[0], v[0])) in cvars_set:
+							if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y < g.node_names[v[1]].y):
+								e1 = (u[0], v[0]) if edg[2] == 0 else (u[0], v[1])  # if sign doesn't match ypos comparison then we know this is a butterfly, and we got the wrong two edges in cvars
+								e2 = (u[1], v[1]) if edg[2] == 0 else (u[1], v[0])
+							else:
+								e1 = (u[0], v[0]) if edg[2] == 1 else (u[0], v[1])
+								e2 = (u[1], v[1]) if edg[2] == 1 else (u[1], v[0])
+						elif ((u[0], v[1]), (u[1], v[0])) in cvars_set or ((u[1], v[0]), (u[0], v[1])) in cvars_set:
+							if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):  # XAND
+								e1 = (u[0], v[1]) if edg[2] == 0 else (u[0], v[0])
+								e2 = (u[1], v[0]) if edg[2] == 0 else (u[1], v[1])
+							else:
+								e1 = (u[0], v[1]) if edg[2] == 1 else (u[0], v[0])
+								e2 = (u[1], v[0]) if edg[2] == 1 else (u[1], v[1])
 						else:
-							e1 = (u[0], v[0]) if edg[2] == 1 else (u[0], v[1])
-							e2 = (u[1], v[1]) if edg[2] == 1 else (u[1], v[0])
-					elif ((u[0], v[1]), (u[1], v[0])) in cvars_set or ((u[1], v[0]), (u[0], v[1])) in cvars_set:
-						if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):  # XAND
-							e1 = (u[0], v[1]) if edg[2] == 0 else (u[0], v[0])
-							e2 = (u[1], v[0]) if edg[2] == 0 else (u[1], v[1])
-						else:
-							e1 = (u[0], v[1]) if edg[2] == 1 else (u[0], v[0])
-							e2 = (u[1], v[0]) if edg[2] == 1 else (u[1], v[1])
+							raise Exception("problem with vertex exchange graph")
+						u, v = get_c_var(cvars_set, e1, e2)
+						c_idxs.append(c[u, v])
+					if label == 0:
+						# model.addConstr(csum <= len(fcycle) - 1)
+						self.__add_matrix_constraint(c_idxs, [1] * len(c_idxs), len(fcycle) - 1)
+						# self.__add_late_breaking_variable(bound=(0, len(fcycle) / 2), integral=False)
+						# self.__add_matrix_constraint(c_idxs + [self.nvars - 1], [1] * len(c_idxs) + [-2], 0, equality=True)
 					else:
-						raise Exception("problem with vertex exchange graph")
-					u, v = get_c_var(cvars_set, e1, e2)
-					c_idxs.append(c[u, v])
-				if label == 0:
-					self.__add_late_breaking_variable(bound=(0, len(fcycle) / 2), integral=False)
-					self.__add_matrix_constraint(c_idxs + [self.nvars - 1], [1] * len(c_idxs) + [-2], 0, equality=True)
-					# kc = model.addVar(0, len(fcycle) / 2, vtype=GRB.CONTINUOUS)
-					# model.addConstr(2 * kc == csum)
-				else:
-					self.__add_late_breaking_variable(bound=(0, len(fcycle) / 2 - 1), integral=False)
-					self.__add_matrix_constraint(c_idxs + [self.nvars - 1], [1] * len(c_idxs) + [-2], 1, equality=True)
-					self.__add_matrix_constraint(c_idxs, [-1] * len(c_idxs), -1)
-					# kc = model.addVar(0, len(fcycle) / 2 - 1, vtype=GRB.CONTINUOUS)
-					# model.addConstr(2 * kc + 1 == csum)
-					# model.addConstr(csum >= 1)
+						# model.addConstr(csum >= 1)
+						self.__add_matrix_constraint(c_idxs, [-1] * len(c_idxs), -1)
+						# self.__add_late_breaking_variable(bound=(0, len(fcycle) / 2 - 1), integral=False)
+						# self.__add_matrix_constraint(c_idxs + [self.nvars - 1], [1] * len(c_idxs) + [-2], 1, equality=True)
+						# self.__add_matrix_constraint(c_idxs, [-1] * len(c_idxs), -1)
 
 	def __optimize_subgraphs_matrix(self, graph, x, t1, num_crossings):
-		if self.collapse_subgraphs:
+		if self.collapse_subgraphs or self.collapse_leaves:
 			t4 = time.time()
 			# new_g, stack_node_to_nodelist, node_to_stack_node, subgraphs_collapsed, subg_types
 			subgraphs = graph.create_layered_graphs_from_subgraphs()
@@ -471,6 +485,14 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 						num_crossings += optim.optimize_layout()[1]
 					for xv, assgn in optim.x_var_assign.items():
 						self.x_var_assign[xv] = assgn
+				else:
+					for j, nd in enumerate(subgraph.nodes):
+						for nd2 in subgraph.nodes[j+1:]:
+							if nd.layer == nd2.layer:
+								if (nd.name, nd2.name) in self.x_var_assign:
+									self.x_var_assign[nd.name, nd2.name] = 0
+								else:
+									self.x_var_assign[nd2.name, nd.name] = 1
 			to_remove = []
 			for x_var in x:
 				if graph[x_var[0]].stacked and graph[x_var[1]].stacked:
@@ -494,6 +516,39 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 			return graph.old_g, t1 + time.time() - t4, num_crossings
 		else:
 			return graph, t1, num_crossings
+
+	def __add_3claw_constraints_matrix(self, g, c_vars):
+		if self.claw_constraints:
+			bearclaws = motifs.get_3claws(g)
+			print(f"3-claws found: {len(bearclaws)}")
+			for claw in bearclaws:
+				claw_cvs = [
+							# c_vars[get_c_var(c_vars, claw[3], claw[4])],
+							c_vars[get_c_var(c_vars, claw[3], claw[1])],
+							# c_vars[get_c_var(c_vars, claw[3], claw[5])],
+							c_vars[get_c_var(c_vars, claw[3], claw[2])],
+							c_vars[get_c_var(c_vars, claw[0], claw[4])],
+							c_vars[get_c_var(c_vars, claw[0], claw[5])],
+							# c_vars[get_c_var(c_vars, claw[4], claw[5])],
+							c_vars[get_c_var(c_vars, claw[4], claw[2])],
+							c_vars[get_c_var(c_vars, claw[1], claw[5])]]
+				self.__add_matrix_constraint(claw_cvs, [-1] * 9, -1)
+
+	def __add_domepath_constraints_matrix(self, g, x_vars, c_vars):
+		if self.dome_path_constraints:
+			domes = motifs.get_domepaths(g)
+			print(f"Dome-paths found: {len(domes)}")
+			for dome in domes:
+				if dome[0][0] == dome[1][0]:
+					klc, kl1, kl2 = get_x_var_consts(x_vars, dome[2][0], dome[0][0])
+					kmc, km1, km2 = get_x_var_consts(x_vars, dome[2][0], dome[3][0])
+					lmc, lm1, lm2 = get_x_var_consts(x_vars, dome[0][0], dome[3][0])
+					cikjl1, cikjl2 = get_c_var(c_vars, dome[2], dome[1])
+					ciljm1, ciljm2 = get_c_var(c_vars, dome[0], dome[3])
+					# m.addConstr(klc * x[kl1, kl2] - 2 * kmc * x[km1, km2] + lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] + (1 - klc)//2 - (1 - kmc) + (1 - lmc)//2 <= 0)
+					self.__add_matrix_constraint([x_vars[kl1, kl2], x_vars[km1, km2], x_vars[lm1, lm2], c_vars[cikjl1, cikjl2], c_vars[ciljm1, ciljm2]], [klc, -2*kmc, lmc, -1, -1], 0 - (1 - klc)//2 + (1 - kmc) - (1 - lmc)//2)
+					# m.addConstr(-klc * x[kl1, kl2] + 2 * kmc * x[km1, km2] - lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] - (1 - klc)//2 + (1 - kmc) - (1 - lmc)//2 <= 0)
+					self.__add_matrix_constraint([x_vars[kl1, kl2], x_vars[km1, km2], x_vars[lm1, lm2], c_vars[cikjl1, cikjl2], c_vars[ciljm1, ciljm2]], [-klc, 2*kmc, -lmc, -1, -1], (1 - klc)//2 - (1 - kmc) + (1 - lmc)//2)
 
 	def __sequential_bendiness_matrix(self):
 		if self.bendiness_reduction and self.sequential_bendiness:

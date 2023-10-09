@@ -5,7 +5,7 @@ import itertools
 import gurobipy as gp
 from gurobipy import GRB
 from sklearn.cluster import SpectralClustering
-from src import vis, reductions, motifs, type_conversions, read_data, heuristics
+from src import vis, reductions, motifs, type_conversions, read_data
 from src.graph import LayeredGraph
 from src.helpers import *
 
@@ -45,20 +45,27 @@ class LayeredOptimizer:
 		self.symmetry_constraints = parameters["symmetry_constraints"] if "symmetry_constraints" in parameters else True
 		self.cycle_constraints = parameters["cycle_constraints"] if "cycle_constraints" in parameters else False
 		self.collapse_subgraphs = parameters["collapse_subgraphs"] if "collapse_subgraphs" in parameters else False
-		self.bearclaw_constraints = parameters["bearclaw_constraints"] if "bearclaw_constraints" in parameters else False
+		self.collapse_leaves = parameters["collapse_leaves"] if "collapse_leaves" in parameters else False
+		self.claw_constraints = parameters["claw_constraints"] if "claw_constraints" in parameters else False
+		self.dome_path_constraints = parameters["dome_path_constraints"] if "dome_path_constraints" in parameters else False
+		self.polyhedral_constraints = parameters["polyhedral_constraints"] if "polyhedral_constraints" in parameters else False
 		self.return_experiment_data = parameters["return_experiment_data"] if "return_experiment_data" in parameters else False
 		self.name = parameters["name"] if "name" in parameters else "graph1"
 		self.print_info = []
+		if self.polyhedral_constraints:
+			self.claw_constraints, self.dome_path_constraints = True, True
 
-	def __optimize_layout_standard(self, graph_arg=None, bendiness_reduction=False, assignment=None, name="graph1", fix_x_vars=None, start_x_vars=None, is_subgraph=False, use_top_level_params=False):
+	def __optimize_layout_standard(self, graph_arg=None, assignment=None, name="graph1", fix_x_vars=None, start_x_vars=None, is_subgraph=False, use_top_level_params=False):
 		g = self.g if graph_arg is None else graph_arg
+		if self.polyhedral_constraints:
+			self.claw_constraints, self.dome_path_constraints = True, True
 		if not self.direct_transitivity and not self.vertical_transitivity:
-			self.vertical_transitivity = True
+			self.direct_transitivity = True
 		t1 = time.time()
 
 		""" Collapse valid subgraphs """
-		if self.collapse_subgraphs:
-			g = g.collapse_ap_cases()
+		if self.collapse_leaves:
+			g = g.collapse_leaves()
 			self.x_var_assign = {x_v: 2 for n_l in g.get_names_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
 			# vis.draw_graph(g, "after collapse", groups={nd.name: 1 if nd.stacked else 0 for nd in g.nodes})
 
@@ -155,8 +162,11 @@ class LayeredOptimizer:
 		for i, val in enumerate(n_cs[:-1]):
 			n_constraints_generated[i] += val
 
-		""" Bearclaw constraints """
-		self.__add_bearclaw_constraints(m, g, c_vars)
+		""" 3-claw constraints """
+		self.__add_3claw_constraints(m, g, c_vars, c)
+
+		""" Dome path constraints """
+		self.__add_dome_path_constraints(m, g, c_vars, c, x_vars, x)
 
 		""" Symmetry constraints """
 		self.__add_symmetry_constraints(m, x_vars, c_vars, x, c)
@@ -191,12 +201,13 @@ class LayeredOptimizer:
 		if self.verbose:
 			self.print_info.append(f"{pre_sym}Objective: {m.objVal}")
 			self.print_info.append(f"{pre_sym}Time to optimize: {t2}")
-		if m.status != 2 and m.status != 9:
-			print("model returned incorrect status code:", m.status)
+		if (m.status != 2 and m.status != 9) or m.SolCount == 0:
+			print("model returned status code:", m.status)
 			print("4: model probably never found a feasible solution")
 			print("11: solve interrupted")
 			print("otherwise check https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html")
-			return 0, 0, 0, 0, 0, m.objVal, m.status, 0, 0, "INCORRECT STATUS"
+			print("or, was cutoff without finding a solution. #solutions found:", m.SolCount)
+			return 0, 0, 0, 0, 0, float('inf'), m.status, 0, 0, "INCORRECT STATUS"
 		for v in m.getVars():
 			if v.varName[:1] == "x":
 				self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
@@ -481,60 +492,60 @@ class LayeredOptimizer:
 					n_constr_2 += 8
 		return n_constr_0, n_constr_1, n_constr_2, x_var_usage
 
-	def __edge_crossings_junger(self, model: gp.Model, c_vars, x_vars, x, c, graph_arg=None, track_x_var_usage=False, butterflies=None):
-		g = self.g if graph_arg is None else graph_arg
-		n_constraints = 0
-		x_var_usage = {}
-		for c_var in c_vars:
-			if (butterflies is None or c_var not in butterflies) and c_var[0][0] != c_var[1][0]:
-				if not self.mirror_vars:
-					if c_var[0][1] < c_var[1][1]:
-						x1const, x11, x12 = get_x_var_consts(x_vars, c_var[0][1], c_var[1][1])
-						x2const, x21, x22 = get_x_var_consts(x_vars, c_var[0][0], c_var[1][0])
-						model.addConstr(c[c_var] + x1const * x[x11, x12] - x2const * x[x21, x22] + (1 - x1const)//2  - (1 - x2const)//2 >= 0)
-						model.addConstr(c[c_var] - x1const * x[x11, x12] + x2const * x[x21, x22] - (1 - x1const)//2  + (1 - x2const)//2 >= 0)
-						if track_x_var_usage:
-							if (x11, x12) not in x_var_usage:
-								x_var_usage[x11, x12] = 0
-							if (x21, x22) not in x_var_usage:
-								x_var_usage[x21, x22] = 0
-							x_var_usage[x11, x12] += 1
-							x_var_usage[x21, x22] += 1
-					else:
-						x1const, x11, x12 = get_x_var_consts(x_vars, c_var[1][1], c_var[0][1])
-						x2const, x21, x22 = get_x_var_consts(x_vars, c_var[0][0], c_var[1][0])
-						model.addConstr(c[c_var] + x1const * x[x11, x12] + x2const * x[x21, x22] - 1  + (1 - x1const)//2  + (1 - x2const)//2 >= 0)
-						model.addConstr(c[c_var] - x1const * x[x11, x12] - x2const * x[x21, x22] + 1  - (1 - x1const)//2  - (1 - x2const)//2 >= 0)
-						if track_x_var_usage:
-							if (x11, x12) not in x_var_usage:
-								x_var_usage[x11, x12] = 0
-							if (x21, x22) not in x_var_usage:
-								x_var_usage[x21, x22] = 0
-							x_var_usage[x11, x12] += 1
-							x_var_usage[x21, x22] += 1
-				else:
-					if c_var[0][1] < c_var[1][1]:
-						model.addConstr(c[c_var] + x[c_var[0][1], c_var[1][1]] - x[c_var[0][0], c_var[1][0]] >= 0)
-						model.addConstr(c[c_var] - x[c_var[0][1], c_var[1][1]] + x[c_var[0][0], c_var[1][0]] >= 0)
-						if track_x_var_usage:
-							if (c_var[0][1], c_var[1][1]) not in x_var_usage:
-								x_var_usage[c_var[0][1], c_var[1][1]] = 0
-							if (c_var[0][0], c_var[1][0]) not in x_var_usage:
-								x_var_usage[c_var[0][0], c_var[1][0]] = 0
-							x_var_usage[c_var[0][1], c_var[1][1]] += 2
-							x_var_usage[c_var[0][0], c_var[1][0]] += 2
-					else:
-						model.addConstr(c[c_var] + x[c_var[1][1], c_var[0][1]] + x[c_var[0][0], c_var[1][0]] - 1 >= 0)
-						model.addConstr(c[c_var] - x[c_var[1][1], c_var[0][1]] - x[c_var[0][0], c_var[1][0]] + 1 >= 0)
-						if track_x_var_usage:
-							if (c_var[0][0], c_var[1][0]) not in x_var_usage:
-								x_var_usage[c_var[0][0], c_var[1][0]] = 0
-							if (c_var[1][1], c_var[0][1]) not in x_var_usage:
-								x_var_usage[c_var[1][1], c_var[0][1]] = 0
-							x_var_usage[c_var[0][0], c_var[1][0]] += 2
-							x_var_usage[c_var[1][1], c_var[0][1]] += 2
-				n_constraints += 2
-		return n_constraints, track_x_var_usage
+	# def __edge_crossings_junger(self, model: gp.Model, c_vars, x_vars, x, c, graph_arg=None, track_x_var_usage=False, butterflies=None):
+	# 	g = self.g if graph_arg is None else graph_arg
+	# 	n_constraints = 0
+	# 	x_var_usage = {}
+	# 	for c_var in c_vars:
+	# 		if (butterflies is None or c_var not in butterflies) and c_var[0][0] != c_var[1][0]:
+	# 			if not self.mirror_vars:
+	# 				if c_var[0][1] < c_var[1][1]:
+	# 					x1const, x11, x12 = get_x_var_consts(x_vars, c_var[0][1], c_var[1][1])
+	# 					x2const, x21, x22 = get_x_var_consts(x_vars, c_var[0][0], c_var[1][0])
+	# 					model.addConstr(c[c_var] + x1const * x[x11, x12] - x2const * x[x21, x22] + (1 - x1const)//2 - (1 - x2const)//2 >= 0)
+	# 					model.addConstr(c[c_var] - x1const * x[x11, x12] + x2const * x[x21, x22] - (1 - x1const)//2 + (1 - x2const)//2 >= 0)
+	# 					if track_x_var_usage:
+	# 						if (x11, x12) not in x_var_usage:
+	# 							x_var_usage[x11, x12] = 0
+	# 						if (x21, x22) not in x_var_usage:
+	# 							x_var_usage[x21, x22] = 0
+	# 						x_var_usage[x11, x12] += 1
+	# 						x_var_usage[x21, x22] += 1
+	# 				else:
+	# 					x1const, x11, x12 = get_x_var_consts(x_vars, c_var[1][1], c_var[0][1])
+	# 					x2const, x21, x22 = get_x_var_consts(x_vars, c_var[0][0], c_var[1][0])
+	# 					model.addConstr(c[c_var] + x1const * x[x11, x12] + x2const * x[x21, x22] - 1 + (1 - x1const)//2 + (1 - x2const)//2 >= 0)
+	# 					model.addConstr(c[c_var] - x1const * x[x11, x12] - x2const * x[x21, x22] + 1 - (1 - x1const)//2 - (1 - x2const)//2 >= 0)
+	# 					if track_x_var_usage:
+	# 						if (x11, x12) not in x_var_usage:
+	# 							x_var_usage[x11, x12] = 0
+	# 						if (x21, x22) not in x_var_usage:
+	# 							x_var_usage[x21, x22] = 0
+	# 						x_var_usage[x11, x12] += 1
+	# 						x_var_usage[x21, x22] += 1
+	# 			else:
+	# 				if c_var[0][1] < c_var[1][1]:
+	# 					model.addConstr(c[c_var] + x[c_var[0][1], c_var[1][1]] - x[c_var[0][0], c_var[1][0]] >= 0)
+	# 					model.addConstr(c[c_var] - x[c_var[0][1], c_var[1][1]] + x[c_var[0][0], c_var[1][0]] >= 0)
+	# 					if track_x_var_usage:
+	# 						if (c_var[0][1], c_var[1][1]) not in x_var_usage:
+	# 							x_var_usage[c_var[0][1], c_var[1][1]] = 0
+	# 						if (c_var[0][0], c_var[1][0]) not in x_var_usage:
+	# 							x_var_usage[c_var[0][0], c_var[1][0]] = 0
+	# 						x_var_usage[c_var[0][1], c_var[1][1]] += 2
+	# 						x_var_usage[c_var[0][0], c_var[1][0]] += 2
+	# 				else:
+	# 					model.addConstr(c[c_var] + x[c_var[1][1], c_var[0][1]] + x[c_var[0][0], c_var[1][0]] - 1 >= 0)
+	# 					model.addConstr(c[c_var] - x[c_var[1][1], c_var[0][1]] - x[c_var[0][0], c_var[1][0]] + 1 >= 0)
+	# 					if track_x_var_usage:
+	# 						if (c_var[0][0], c_var[1][0]) not in x_var_usage:
+	# 							x_var_usage[c_var[0][0], c_var[1][0]] = 0
+	# 						if (c_var[1][1], c_var[0][1]) not in x_var_usage:
+	# 							x_var_usage[c_var[1][1], c_var[0][1]] = 0
+	# 						x_var_usage[c_var[0][0], c_var[1][0]] += 2
+	# 						x_var_usage[c_var[1][1], c_var[0][1]] += 2
+	# 			n_constraints += 2
+	# 	return n_constraints, track_x_var_usage
 
 	def __symmetry_breaking(self, model: gp.Model, x_var_usage, x_vars):
 		if self.symmetry_breaking:
@@ -655,40 +666,42 @@ class LayeredOptimizer:
 			# Add cycle constraints from Healy and Kuusik, "The Vertex-Exchange Graph"
 			cvars_set = set(cvars)
 			for i, fcycle in enumerate(fund_cycles):
-				label = sum((fc[2] for fc in fcycle)) % 2
-				csum = gp.LinExpr()
-				for edg in fcycle:
-					u, v = node_list[edg[0]], node_list[edg[1]]
-					if g.node_names[u[0]].layer > g.node_names[v[0]].layer:
-						u, v = v, u
-					if ((u[0], v[0]), (u[1], v[1])) in cvars_set or ((u[1], v[1]), (u[0], v[0])) in cvars_set:
-						if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y < g.node_names[v[1]].y):
-							e1 = (u[0], v[0]) if edg[2] == 0 else (u[0], v[1])  # if sign doesn't match ypos comparison then we know this is a butterfly, and we got the wrong two edges in cvars
-							e2 = (u[1], v[1]) if edg[2] == 0 else (u[1], v[0])
+				if len(fcycle) <= 6:
+					label = sum((fc[2] for fc in fcycle)) % 2
+					csum = gp.LinExpr()
+					for edg in fcycle:
+						u, v = node_list[edg[0]], node_list[edg[1]]
+						if g.node_names[u[0]].layer > g.node_names[v[0]].layer:
+							u, v = v, u
+						if ((u[0], v[0]), (u[1], v[1])) in cvars_set or ((u[1], v[1]), (u[0], v[0])) in cvars_set:
+							if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y < g.node_names[v[1]].y):
+								e1 = (u[0], v[0]) if edg[2] == 0 else (u[0], v[1])  # if sign doesn't match ypos comparison then we know this is a butterfly, and we got the wrong two edges in cvars
+								e2 = (u[1], v[1]) if edg[2] == 0 else (u[1], v[0])
+							else:
+								e1 = (u[0], v[0]) if edg[2] == 1 else (u[0], v[1])
+								e2 = (u[1], v[1]) if edg[2] == 1 else (u[1], v[0])
+						elif ((u[0], v[1]), (u[1], v[0])) in cvars_set or ((u[1], v[0]), (u[0], v[1])) in cvars_set:
+							if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):  # XAND
+								e1 = (u[0], v[1]) if edg[2] == 0 else (u[0], v[0])
+								e2 = (u[1], v[0]) if edg[2] == 0 else (u[1], v[1])
+							else:
+								e1 = (u[0], v[1]) if edg[2] == 1 else (u[0], v[0])
+								e2 = (u[1], v[0]) if edg[2] == 1 else (u[1], v[1])
 						else:
-							e1 = (u[0], v[0]) if edg[2] == 1 else (u[0], v[1])
-							e2 = (u[1], v[1]) if edg[2] == 1 else (u[1], v[0])
-					elif ((u[0], v[1]), (u[1], v[0])) in cvars_set or ((u[1], v[0]), (u[0], v[1])) in cvars_set:
-						if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):  # XAND
-							e1 = (u[0], v[1]) if edg[2] == 0 else (u[0], v[0])
-							e2 = (u[1], v[0]) if edg[2] == 0 else (u[1], v[1])
-						else:
-							e1 = (u[0], v[1]) if edg[2] == 1 else (u[0], v[0])
-							e2 = (u[1], v[0]) if edg[2] == 1 else (u[1], v[1])
+							raise Exception("problem with vertex exchange graph")
+						u, v = get_c_var(cvars_set, e1, e2)
+						csum += c[u, v]
+					if label == 0:
+						# kc = model.addVar(0, len(fcycle) / 2, vtype=GRB.CONTINUOUS)
+						# model.addConstr(2 * kc == csum)
+						model.addConstr(csum <= len(fcycle) - 1)
 					else:
-						raise Exception("problem with vertex exchange graph")
-					u, v = get_c_var(cvars_set, e1, e2)
-					csum += c[u, v]
-				if label == 0:
-					kc = model.addVar(0, len(fcycle) / 2, vtype=GRB.CONTINUOUS)
-					model.addConstr(2 * kc == csum)
-				else:
-					kc = model.addVar(0, len(fcycle) / 2 - 1, vtype=GRB.CONTINUOUS)
-					model.addConstr(2 * kc + 1 == csum)
-					model.addConstr(csum >= 1)
+						# kc = model.addVar(0, len(fcycle) / 2 - 1, vtype=GRB.CONTINUOUS)
+						# model.addConstr(2 * kc + 1 == csum)
+						model.addConstr(csum >= 1)
 
 	def __optimize_subgraphs(self, graph, x_vars, t1, num_crossings):
-		if self.collapse_subgraphs:
+		if self.collapse_leaves or self.collapse_subgraphs:
 			t4 = time.time()
 			# new_g, stack_node_to_nodelist, node_to_stack_node, subgraphs_collapsed, subg_types
 			subgraphs = graph.create_layered_graphs_from_subgraphs()
@@ -725,6 +738,14 @@ class LayeredOptimizer:
 						num_crossings += optim.optimize_layout()[1]
 					for xv, assgn in optim.x_var_assign.items():
 						self.x_var_assign[xv] = assgn
+				else:
+					for j, nd in enumerate(subgraph.nodes):
+						for nd2 in subgraph.nodes[j+1:]:
+							if nd.layer == nd2.layer:
+								if (nd.name, nd2.name) in self.x_var_assign:
+									self.x_var_assign[nd.name, nd2.name] = 0
+								else:
+									self.x_var_assign[nd2.name, nd.name] = 1
 			to_remove = []
 			for x_var in x_vars:
 				if graph[x_var[0]].stacked and graph[x_var[1]].stacked:
@@ -749,18 +770,38 @@ class LayeredOptimizer:
 		else:
 			return graph, t1, num_crossings
 
-	def __add_bearclaw_constraints(self, m: gp.Model, g: LayeredGraph, cvars):  # TODO
-		cvset = set(cvars)
-		if self.bearclaw_constraints:
-			bearclaws = motifs.get_bearclaws(g)
+	def __add_3claw_constraints(self, m: gp.Model, g: LayeredGraph, cvars, c):
+		if self.claw_constraints:
+			cvset = set(cvars)
+			bearclaws = motifs.get_3claws(g)
+			print(f"3-claws found: {len(bearclaws)}")
 			for claw in bearclaws:
 				claw_cvs = gp.LinExpr()
-				is_left_claw = claw[0][0] == claw[1][0]
-				c11, c12 = get_c_var(cvset, claw[3], claw[1])
-				c11, c12 = get_c_var(cvset, claw[3], claw[1])
-				c11, c12 = get_c_var(cvset, claw[3], claw[1])
-				c11, c12 = get_c_var(cvset, claw[3], claw[1])
-				c11, c12 = get_c_var(cvset, claw[3], claw[1])
+				# claw_cvs += c[get_c_var(cvset, claw[3], claw[4])]
+				claw_cvs += c[get_c_var(cvset, claw[3], claw[1])]
+				# claw_cvs += c[get_c_var(cvset, claw[3], claw[5])]
+				claw_cvs += c[get_c_var(cvset, claw[3], claw[2])]
+				claw_cvs += c[get_c_var(cvset, claw[0], claw[4])]
+				claw_cvs += c[get_c_var(cvset, claw[0], claw[5])]
+				# claw_cvs += c[get_c_var(cvset, claw[4], claw[5])]
+				claw_cvs += c[get_c_var(cvset, claw[4], claw[2])]
+				claw_cvs += c[get_c_var(cvset, claw[1], claw[5])]
+				m.addConstr(claw_cvs >= 1)
+
+	def __add_dome_path_constraints(self, m: gp.Model, g: LayeredGraph, cvars, c, xvars, x):
+		if self.dome_path_constraints:
+			cvset = set(cvars)
+			domes = motifs.get_domepaths(g)
+			print(f"Dome-paths found: {len(domes)}")
+			for dome in domes:
+				if dome[0][0] == dome[1][0]:
+					klc, kl1, kl2 = get_x_var_consts(xvars, dome[2][0], dome[0][0])
+					kmc, km1, km2 = get_x_var_consts(xvars, dome[2][0], dome[3][0])
+					lmc, lm1, lm2 = get_x_var_consts(xvars, dome[0][0], dome[3][0])
+					cikjl1, cikjl2 = get_c_var(cvset, dome[2], dome[1])
+					ciljm1, ciljm2 = get_c_var(cvset, dome[0], dome[3])
+					m.addConstr(klc * x[kl1, kl2] - 2 * kmc * x[km1, km2] + lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] + (1 - klc)//2 - (1 - kmc) + (1 - lmc)//2 <= 0)
+					m.addConstr(-klc * x[kl1, kl2] + 2 * kmc * x[km1, km2] - lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] - (1 - klc)//2 + (1 - kmc) - (1 - lmc)//2 <= 0)
 
 	def __optimize_with_subgraph_reduction(self, n_partitions, cluster, top_level_g, crosses, contacts, stack_to_nodeset, node_to_stack):
 		# TODO (later): remove all the parameters to standard_opt, replace non-top-level calls with creation of new optimizer object
@@ -819,7 +860,7 @@ class LayeredOptimizer:
 					if node_to_stack[contact_other] - 1 in top_level_subgraphs and top_level_subgraphs[node_to_stack[contact_other]] == top_level_subgraphs[node_to_stack[contact_other] - 1]:
 						sides[contact_other] = 1 - get_x_var(top_x_vars, node_to_stack[contact_other] - 1, node_to_stack[contact_node])
 
-		self.g.create_double_adj_list(forward_only=True)
+		# self.g.create_double_adj_list(forward_only=True)
 		layered_subg_list = []
 		x_vars_opt = None
 		unconstrained_opt_vals = []
@@ -852,7 +893,7 @@ class LayeredOptimizer:
 								extra_node_closest_subg[cnode] = cluster[subg_node]
 							g_prime.add_edge(cnode, subg_node)
 							sides_prime[cnode] = sides[subg_node]
-				for adj_node in self.g.double_adj_list[subg_node]:
+				for adj_node in self.g.get_double_adj_list()[subg_node]:
 					if adj_node in subg:
 						g_prime.add_edge(subg_node, adj_node)
 			gp_layers = g_prime.get_names_by_layer()
@@ -876,8 +917,8 @@ class LayeredOptimizer:
 						elif node != contact_node:
 							vars_to_fix[contact_node, node] = x_val
 
-			unconstrained_opt_val = self.__optimize_layout_standard(graph_arg=g_prime, bendiness_reduction=False)[1]
-			opt_val, x_vars_opt = self.__optimize_layout_standard(graph_arg=g_prime, bendiness_reduction=False, is_subgraph=True, fix_x_vars=vars_to_fix, return_x_vars=True, name=f"subgraph {i + 1}", verbose=self.subg_verbose)
+			unconstrained_opt_val = self.__optimize_layout_standard(graph_arg=g_prime)[1]
+			opt_val, x_vars_opt = self.__optimize_layout_standard(graph_arg=g_prime, is_subgraph=True, fix_x_vars=vars_to_fix, return_x_vars=True, name=f"subgraph {i + 1}", verbose=self.subg_verbose)
 			if unconstrained_opt_val != opt_val:
 				self.print_info.append(f"\tSubgraph {i+1} has {opt_val} crossings but could have as few as {unconstrained_opt_val}")
 			else:
@@ -967,7 +1008,7 @@ class LayeredOptimizer:
 		return loss
 
 	def __find_y_assignment_given_x(self, x_vars):
-		l_to_vlist = {l: [v for v in x_vars if self.g[v[0]].layer == l] for l in range(1, self.g.n_layers + 1)}
+		l_to_vlist = {lay: [v for v in x_vars if self.g[v[0]].layer == lay] for lay in range(1, self.g.n_layers + 1)}
 		y_assign = {}
 		for v_list in l_to_vlist.values():
 			counts = {x_var[0]: 0 for x_var in v_list}

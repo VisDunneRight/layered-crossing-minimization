@@ -4,7 +4,6 @@ import copy
 
 
 def gansner_ordering(g: graph.LayeredGraph, n_iter):
-	g.create_double_adj_list()
 	order = __gansner_init_ordering(g)
 	cr_best = g.num_edge_crossings()
 	best = copy.deepcopy(order)
@@ -28,7 +27,7 @@ def gansner_ordering(g: graph.LayeredGraph, n_iter):
 
 
 def __gansner_init_ordering(gr: graph.LayeredGraph):
-	adj = gr.create_normal_adj_list()
+	adj = gr.get_adj_list()
 	bfsq = [random.choice(gr.layers[1]).name]
 	seen = [False] * (len(gr.nodes) + 1)
 	seen[bfsq[0]] = True
@@ -59,10 +58,10 @@ def __gansner_wmedian(gr: graph.LayeredGraph, order, c_iter):
 
 def __gansner_median_value(gr: graph.LayeredGraph, v, adj_rank):
 	if adj_rank > gr[v].layer:
-		p = [gr[nd].y for nd in gr.double_adj_list[v][1]]
+		p = [gr[nd].y for nd in gr.get_double_adj_list()[v][1]]
 		p.sort()
 	elif adj_rank < gr[v].layer:
-		p = [gr[nd].y for nd in gr.double_adj_list[v][0]]
+		p = [gr[nd].y for nd in gr.get_double_adj_list()[v][0]]
 		p.sort()
 	if len(p) == 0:
 		return -1
@@ -98,8 +97,8 @@ def calc_if_swap_improves(rank, gr: graph.LayeredGraph, v, w):  # requirement: v
 	# indices.update({w_adj: rank[gr[v].layer - 1].index(w_adj) for w_adj in gr.double_adj_list[w][0]})
 	# indices.update({w_adj: rank[gr[v].layer + 1].index(w_adj) for w_adj in gr.double_adj_list[w][1]})
 	for i in range(2):
-		for v_adj in gr.double_adj_list[v][i]:
-			for w_adj in gr.double_adj_list[w][i]:
+		for v_adj in gr.get_double_adj_list()[v][i]:
+			for w_adj in gr.get_double_adj_list()[w][i]:
 				if v_adj != w_adj:
 					if rank[v_adj] < rank[w_adj]:
 						n_cr_swap += 1
@@ -109,7 +108,6 @@ def calc_if_swap_improves(rank, gr: graph.LayeredGraph, v, w):  # requirement: v
 
 
 def sugiyama_barycenter(g: graph.LayeredGraph, n_iter):
-	g.create_double_adj_list()
 	order = __gansner_init_ordering(g)
 	cr_best = g.num_edge_crossings()
 	best = copy.deepcopy(order)

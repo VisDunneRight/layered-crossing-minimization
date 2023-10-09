@@ -266,6 +266,7 @@ def min_width(s_g, w, c):
             g.add_edge(k, j)
     t = time.time()
     vertex_promotion(g)
+    g.invalidate_data()
     return g, time.time() - t
 
 
@@ -280,7 +281,7 @@ def promote_vertex(layering, g_dl, v):
 
 
 def vertex_promotion(g: graph.LayeredGraph):
-    double_adj = g.create_double_adj_list()
+    double_adj = g.get_double_adj_list()
     layering = [g.node_names[i].layer for i in range(g.n_nodes)]
     layer_backup = layering.copy()
     for i in range(100):

@@ -125,10 +125,23 @@ def draw_altair_scatter(data_points, x_axis, y_axis, color_field, x_title, y_tit
 def draw_altair_line_chart(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name, log_y_scale):
     data = alt.Data(values=data_points)
     dom = list(set(dp[f"{color_field}"] for dp in data_points))
-    rng = ["#26547C", "#F0567A", "#E09D00", "#4ACB2A"]
+    # rng = ["#26547C", "#F0567A", "#E09D00", "#4ACB2A"]
+    rng = ["#e15759", "#b07aa1", "#9c755f", "#f28e2b", "#ff9da7", "#4e79a7", "#59a14f", "#edc948", "#76b7b2"]
     chart = alt.Chart(data).mark_line(point={"filled": False, "fill": "white"}).encode(
         x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
         y=alt.Y(f'{y_axis}:Q', scale=alt.Scale(type="log") if log_y_scale else None, axis=alt.Axis(title=y_title)),
+        color=alt.Color(f'{color_field}:N', scale=alt.Scale(domain=dom, range=rng))
+    )
+    chart.save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})
+
+
+def draw_altair_simple_line_chart(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name):
+    data = alt.Data(values=data_points)
+    dom = list(set(dp[f"{color_field}"] for dp in data_points))
+    rng = ["#000000", "#e15759", "#b07aa1", "#9c755f", "#f28e2b", "#ff9da7", "#4e79a7", "#59a14f", "#edc948", "#76b7b2"]
+    chart = alt.Chart(data).mark_line().encode(
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
+        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title)),
         color=alt.Color(f'{color_field}:N', scale=alt.Scale(domain=dom, range=rng))
     )
     chart.save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})
