@@ -4,26 +4,36 @@
 <img src="Images/Rome-Lib/example.svg" width="70%" height="70%" class="center"/>
 </p>
 
-Redacted to preserve anonymity
+This repository is written and maintained by [Connor Wilson](https://vis.khoury.northeastern.edu/people/Connor-Wilson/), who can be reached at [wilson.conn@northeastern.edu](mailto:wilson.conn@northeastern.edu).
+
+It comprises research performed at Northeastern University's [Data Visualization Lab](https://vis.khoury.northeastern.edu) by [Connor Wilson](https://vis.khoury.northeastern.edu/people/Connor-Wilson/), [Eduardo Puerta](https://vis.khoury.northeastern.edu/people/Eduardo-Puerta/), [Tarik Crnovrsanin](https://www.tarikc.net), and [Sara Di Bartolomeo](https://vis.khoury.northeastern.edu/people/Sara-Di-Bartolomeo/), under the advising of [Cody Dunne](https://vis.khoury.northeastern.edu/people/Cody-Dunne/).
+
+A free copy of our paper, *Evaluating and extending speedup techniques for optimal crossing minimization in layered graph drawings*, is available at [https://osf.io/5vq79]().
 
 # Quickstart Guide
-1. A Gurobi license is required to run this app. Visit [Gurobi for Academics and Researchers](https://www.gurobi.com/academia/academic-program-and-licenses/) for instructions on obtaining an individual academic license 
+1. A Gurobi license is recommended to run this app, but not required. Visit [Gurobi for Academics and Researchers](https://www.gurobi.com/academia/academic-program-and-licenses/) for instructions on obtaining an individual academic license 
    1. The only requirement is to fill out an online form, processing typically takes no more than a few minutes.
 2. Install the required packages
 3. Run ```main.py``` to optimize an example Rome-Lib graph.
 
 # Overview of class `LayeredOptimizer`
 Defined in `src/optimization.py`, `LayeredOptimizer` reads as input a path to graph file or a `LayeredGraph` object.
-Supported file types include `.graphml`, and text files containing an edge list where each line of the file is an edge `u, v` such that `u` and `v` are integer IDs for nodes.
-Any path to a Rome-Lib, AT&T, or DAGmar graph included in this repo will also be read automatically.
+If you do not have a Gurobi license, the `HiGHSLayeredOptimizer` class defined in `src/optimization_open_src.py` can be used instead.
+Besides using a different ILP solver on the back end, it functions identically to `LayeredOptimizer`, with the exception that some switch techniques are not available.
+
+Supported file types for the input graph include `.graphml`, and text files containing an edge list where each line of the file is an edge `u, v` such that `u` and `v` are integer IDs for nodes.
+Any path to a Rome-Lib or AT&T graph included in this repo will also be read automatically.
 
 ```Python
 from src.optimization import LayeredOptimizer
+from src.optimization_open_src import HiGHSLayeredOptimizer
+
 optimizer = LayeredOptimizer("[path_to_file]")
+optimizer_open_source = HiGHSLayeredOptimizer("[path_to_file]")
 ```
 
 Then, set the desired options for your `optimizer`:
-1. Vertical position transitivity is default. To switch to direct transitivity, set `optimizer.direct_transitivity = True` and `optimizer.vertical_transitivity = False`.
+1. Direct transitivity is the default. To switch to vertical position transitivity, set `optimizer.vertical_transitivity = True` and `optimizer.direct_transitivity = False`.
 2. Switches from our paper are set using the following options (note that all switches are off by default):
    1. Symmetry breaking is set using
    ```Python
@@ -33,29 +43,41 @@ Then, set the desired options for your `optimizer`:
    ```Python
    optimizer.butterfly_reduction = True
    ```
-   3. Mirrored variables with symmetry constraints is set using
+   3. Polyhedral constraints is set using
+   ```Python
+   optimizer.polyhedral_constraints = True
+   ```
+   The 3-claw and dome-path constraints can also be toggled individually by instead using
+   ```Python
+   optimizer.claw_constraints, optimizer.dome_path_constraints
+   ```
+   4. Mirrored variables with symmetry constraints is set using
    ```Python
    optimizer.mirror_vars = True
    ```
-   4. Heuristic starting assignments is set using
+   5. Cycle constraints is set using 
    ```Python
-   optimizer.heuristic_start = True
+   optimizer.cycle_constraints = True
    ```
-   5. Aggressive presolve is set using 
+   6. Leaf node collapse is set using 
    ```Python
-   optimizer.aggro_presolve = True
+   optimizer.collapse_leaves = True
    ```
-   6. Branching on x-vars is set using 
+   7. Branching on x-vars is set using 
    ```Python
    optimizer.xvar_branch_priority = True
    ```
-   7. MIP relaxation is set using 
+   8. Heuristic starting assignments is set using
+   ```Python
+   optimizer.heuristic_start = True
+   ```
+   9. Continuous variables is set using 
    ```Python
    optimizer.mip_relax = True
    ```
 3. Additional options that may be helpful are:
    1. `optimizer.cutoff_time` sets the amount of time (in seconds) the optimizer will run before terminating and returning its best found solution
-   2. `optimizer.draw_graph` generates the image of the layout as an svg in the /Images folder. It is recommended to also set `optimizer.bendiness_reduction` and `optimizer.sequential_bendiness` for a prettier, edge-length minimized drawing.
+   2. `optimizer.draw_graph` generates the image of the layout as an svg in the /Images folder. It is recommended to also set `optimizer.bendiness_reduction` to `True` for a prettier, edge-length minimized drawing.
       1. `optimizer.name` sets the name of the file
    3. `optimizer.verbose` prints more information about the solving process
 
@@ -103,3 +125,4 @@ optimizer.optimize_layout()
 2. `src/experiments.py` contains functions for all experiments run in our paper. Running this file performs every experiment in our paper (note: this takes an extraordinarily long time to complete, likely close to one month of computation). The methods for running the experiment are detailed at the end of the file.
 3. `src/layering.py` contains functions performing the layer assignment step for graphs without predetermined layer assignments, using the algorithms described in our paper.
 4. `src/vis.py` contains a function `draw_graph` used to generate images such as the one at the start of this readme. It takes as input a layered graph object and a name for the file.
+5. `scripts` contains a number of bash scripts. The ones with "exp" in their name were used to run experiments for our paper on a HPC cluster.
