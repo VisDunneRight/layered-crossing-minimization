@@ -49,7 +49,7 @@ def test_method_consistency_for_counts(test_graphs):
 		assert gr.n_nodes == start and gr.n_layers == lstart and len(gr.nodes) == start and len(gr.layers) == lstart, f"failed on {grf}"
 		asdf3 = gr.get_edges_by_layer()
 		assert gr.n_nodes == start and gr.n_layers == lstart and len(gr.nodes) == start and len(gr.layers) == lstart, f"failed on {grf}"
-		# heuristics.sugiyama_barycenter(gr, 5)
+		# heuristics.barycenter(gr, 5)
 		# assert gr.n_nodes == start and gr.n_layers == lstart and len(gr.nodes) == start and len(gr.layers) == lstart, f"failed on {grf}"
 		gr.add_anchors()
 		assert gr.n_nodes == start and gr.n_layers == lstart and len(gr.nodes) == start and len(gr.layers) == lstart, f"failed on {grf}"
