@@ -6,17 +6,17 @@ from src.helpers import *
 
 class LayeredNode:
 	def __init__(self, node_name, node_layer, is_anchor=False, stacked=False):
-		self.name = node_name
+		self.id = node_name
 		self.layer = node_layer
 		self.y = node_name
 		self.is_anchor_node = is_anchor
 		self.stacked = stacked
 
 	def __str__(self):
-		return f"ID={self.name}/L={self.layer}"
+		return f"ID={self.id}/L={self.layer}"
 
 	def __repr__(self):
-		return f"ID={self.name}/L={self.layer}"
+		return f"ID={self.id}/L={self.layer}"
 
 
 class LayeredEdge:
@@ -100,7 +100,7 @@ class LayeredGraph:
 	def get_names(self):
 		names = []
 		for n in self.nodes:
-			names.append(n.name)
+			names.append(n.id)
 		return names
 
 	def get_names_by_layer(self):
@@ -108,7 +108,7 @@ class LayeredGraph:
 			for n in self.nodes:
 				if n.layer not in self.names_by_layer:
 					self.names_by_layer[n.layer] = []
-				self.names_by_layer[n.layer].append(n.name)
+				self.names_by_layer[n.layer].append(n.id)
 		return self.names_by_layer
 
 	def get_edge_names_by_layer(self, only_diff_layer=False):
@@ -117,7 +117,7 @@ class LayeredGraph:
 				if not only_diff_layer or edge.n1.layer != edge.n2.layer:
 					if edge.n1.layer not in self.edge_names_by_layer:
 						self.edge_names_by_layer[edge.n1.layer] = []
-					self.edge_names_by_layer[edge.n1.layer].append((edge.n1.name, edge.n2.name))
+					self.edge_names_by_layer[edge.n1.layer].append((edge.n1.id, edge.n2.id))
 		return self.edge_names_by_layer
 
 	def get_edges_by_layer(self, only_diff_layer=False):
@@ -314,44 +314,44 @@ class LayeredGraph:
 			min_l = min((self.node_names[node].layer for node in subgraph))
 			max_l = max((self.node_names[node].layer for node in subgraph))
 			sn1 = new_g.add_node(min_l, stacked=True)
-			new_g.stack_node_to_nodelist[sn1.name] = set()
+			new_g.stack_node_to_nodelist[sn1.id] = set()
 			for level in range(min_l, max_l):
 				sn2 = new_g.add_node(level + 1, stacked=True)
-				new_g.stack_node_to_nodelist[sn2.name] = set()
-				new_g.add_edge(sn1.name, sn2.name, stacked=True, weight=0)
+				new_g.stack_node_to_nodelist[sn2.id] = set()
+				new_g.add_edge(sn1.id, sn2.id, stacked=True, weight=0)
 				sn1 = sn2
 			for node in subgraph:
 				new_g.node_to_stack_node[node] = starting_node + (self.node_names[node].layer - min_l)
 				new_g.stack_node_to_nodelist[starting_node + (self.node_names[node].layer - min_l)].add(node)
 		for edge in self.edges:
-			if subgraph_assignments[edge.n1.name] != subgraph_assignments[edge.n2.name]:
+			if subgraph_assignments[edge.n1.id] != subgraph_assignments[edge.n2.id]:
 				if only_subgraphs:
-					if subgraph_assignments[edge.n1.name] != 0 and subgraph_assignments[edge.n2.name] != 0:
-						new_g.add_edge(new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name])
-					elif subgraph_assignments[edge.n1.name] != 0:
-						new_g.add_edge(new_g.node_to_stack_node[edge.n1.name], edge.n2.name)
-					elif subgraph_assignments[edge.n2.name] != 0:
-						new_g.add_edge(edge.n1.name, new_g.node_to_stack_node[edge.n2.name])
+					if subgraph_assignments[edge.n1.id] != 0 and subgraph_assignments[edge.n2.id] != 0:
+						new_g.add_edge(new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id])
+					elif subgraph_assignments[edge.n1.id] != 0:
+						new_g.add_edge(new_g.node_to_stack_node[edge.n1.id], edge.n2.id)
+					elif subgraph_assignments[edge.n2.id] != 0:
+						new_g.add_edge(edge.n1.id, new_g.node_to_stack_node[edge.n2.id])
 				else:
-					if (new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name]) in new_g.edge_names:
-						new_g.edge_names[new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name]].weight += 1    # FIXME handling of cases with multiple crossing edges between the same two stack nodes
+					if (new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id]) in new_g.edge_names:
+						new_g.edge_names[new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id]].weight += 1    # FIXME handling of cases with multiple crossing edges between the same two stack nodes
 					else:
-						new_g.add_edge(new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name])
+						new_g.add_edge(new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id])
 				# crossing_edges[node_to_group[edge.n1.name]].append((edge.n1.name, edge.n2.name))
 				# crossing_edges[node_to_group[edge.n2.name]].append((edge.n1.name, edge.n2.name))
-				if edge.n1.name not in new_g.crossing_edges:
-					new_g.crossing_edges[edge.n1.name] = []
-				new_g.crossing_edges[edge.n1.name].append(edge.n2.name)
+				if edge.n1.id not in new_g.crossing_edges:
+					new_g.crossing_edges[edge.n1.id] = []
+				new_g.crossing_edges[edge.n1.id].append(edge.n2.id)
 				if only_subgraphs:
-					new_g.contact_nodes[subgraph_assignments[edge.n1.name] - 1].append(edge.n1.name)
-					new_g.contact_nodes[subgraph_assignments[edge.n2.name] - 1].append(edge.n2.name)
+					new_g.contact_nodes[subgraph_assignments[edge.n1.id] - 1].append(edge.n1.id)
+					new_g.contact_nodes[subgraph_assignments[edge.n2.id] - 1].append(edge.n2.id)
 				else:
-					new_g.contact_nodes[subgraph_assignments[edge.n1.name]].append(edge.n1.name)
-					new_g.contact_nodes[subgraph_assignments[edge.n2.name]].append(edge.n2.name)
-			elif not only_subgraphs or subgraph_assignments[edge.n1.name] != 0:
-				new_g.edge_names[new_g.node_to_stack_node[edge.n1.name], new_g.node_to_stack_node[edge.n2.name]].weight += 1
+					new_g.contact_nodes[subgraph_assignments[edge.n1.id]].append(edge.n1.id)
+					new_g.contact_nodes[subgraph_assignments[edge.n2.id]].append(edge.n2.id)
+			elif not only_subgraphs or subgraph_assignments[edge.n1.id] != 0:
+				new_g.edge_names[new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id]].weight += 1
 			elif only_subgraphs:
-				new_g.add_edge(edge.n1.name, edge.n2.name)
+				new_g.add_edge(edge.n1.id, edge.n2.id)
 
 		new_g.n_nodes = len(new_g.nodes)
 		return new_g
@@ -392,15 +392,15 @@ class LayeredGraph:
 			if edge.length > 1:
 				to_remove.append(edge)
 				last_node = self.add_node(edge.n1.layer + 1, is_anchor=True)
-				to_add.append((edge.n1.name, last_node.name))
+				to_add.append((edge.n1.id, last_node.id))
 				for i in range(edge.length-2):
 					next_node = self.add_node(i + edge.n1.layer + 2, is_anchor=True)
-					to_add.append((last_node.name, next_node.name))
+					to_add.append((last_node.id, next_node.id))
 					last_node = next_node
-				to_add.append((last_node.name, edge.n2.name))
+				to_add.append((last_node.id, edge.n2.id))
 		for v in to_remove:
 			self.edges.remove(v)
-			del self.edge_names[v.n1.name, v.n2.name]
+			del self.edge_names[v.n1.id, v.n2.id]
 		for e in to_add:
 			self.add_edge(e[0], e[1])
 
@@ -411,23 +411,23 @@ class LayeredGraph:
 	def create_double_adj_list(self, forward_only=False):
 		for node in self.nodes:
 			if forward_only:
-				self.double_adj_list[node.name] = []
+				self.double_adj_list[node.id] = []
 			else:
-				self.double_adj_list[node.name] = [[], []]
+				self.double_adj_list[node.id] = [[], []]
 		for edge in self.edges:
 			if forward_only:
-				self.double_adj_list[edge.n1.name].append(edge.n2.name)
+				self.double_adj_list[edge.n1.id].append(edge.n2.id)
 			else:
-				self.double_adj_list[edge.n1.name][1].append(edge.n2.name)
-				self.double_adj_list[edge.n2.name][0].append(edge.n1.name)
+				self.double_adj_list[edge.n1.id][1].append(edge.n2.id)
+				self.double_adj_list[edge.n2.id][0].append(edge.n1.id)
 		return self.double_adj_list
 
 	def create_normal_adj_list(self):
 		for node in self.nodes:
-			self.adj_list[node.name] = []
+			self.adj_list[node.id] = []
 		for edge in self.edges:
-			self.adj_list[edge.n1.name].append(edge.n2.name)
-			self.adj_list[edge.n2.name].append(edge.n1.name)
+			self.adj_list[edge.n1.id].append(edge.n2.id)
+			self.adj_list[edge.n2.id].append(edge.n1.id)
 		return self.adj_list
 
 	# Clean up graph by removing empty layers and making sure the first layer has label 1.
@@ -457,10 +457,10 @@ class LayeredGraph:
 				removals.append(edge)
 		if remove_sl:
 			for to_remove in removals:
-				del self.edge_names[to_remove.n1.name, to_remove.n2.name]
+				del self.edge_names[to_remove.n1.id, to_remove.n2.id]
 				self.edges.remove(to_remove)
 		self.n_layers = len(self.layers)
-		self.nodes.sort(key=lambda x: x.name)
+		self.nodes.sort(key=lambda x: x.id)
 		self.invalidate_data()
 		# for i in self.layers.keys():
 		#     print(i, [n.name for n in self.layers[i]], [n.layer for n in self.layers[i]])
@@ -490,17 +490,17 @@ class LayeredGraph:
 		# self.relayer()
 		# self.y_val_setup()
 		for level in self.layers:
-			self.layers[level].sort(key=lambda x: -len(adjacency[x.name]))
+			self.layers[level].sort(key=lambda x: -len(adjacency[x.id]))
 		for i in range(n_iter):
 			for j in range(1, len(self.layers) + 1):
-				averages = [sum((self.node_names[m].y for m in adjacency[n.name]))/len(adjacency[n.name]) for n in self.layers[j]]
+				averages = [sum((self.node_names[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
 				taken = set()
 				for k, node in enumerate(self.layers[j]):
 					insert_at = find_closest(averages[k], taken)
 					taken.add(insert_at)
 					node.y = insert_at
 			for j in range(len(self.layers), 0, -1):
-				averages = [sum((self.node_names[m].y for m in adjacency[n.name])) / len(adjacency[n.name]) for n in self.layers[j]]
+				averages = [sum((self.node_names[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
 				taken = set()
 				for k, node in enumerate(self.layers[j]):
 					insert_at = find_closest(averages[k], taken)
@@ -531,7 +531,7 @@ class LayeredGraph:
 		for edge_list in e_b_l.values():
 			for e1, e2 in itertools.combinations(edge_list, 2):
 				if len({e1.n1, e1.n2, e2.n1, e2.n2}) == 4:
-					if (get_x_var(x_vars, e1.n1.name, e2.n1.name) and not get_x_var(x_vars, e1.n2.name, e2.n2.name)) or (not get_x_var(x_vars, e1.n1.name, e2.n1.name) and get_x_var(x_vars, e1.n2.name, e2.n2.name)):
+					if (get_x_var(x_vars, e1.n1.id, e2.n1.id) and not get_x_var(x_vars, e1.n2.id, e2.n2.id)) or (not get_x_var(x_vars, e1.n1.id, e2.n1.id) and get_x_var(x_vars, e1.n2.id, e2.n2.id)):
 						n_ec += 1
 		return n_ec
 
@@ -673,10 +673,10 @@ class LayeredGraph:
 		adj_list = self.get_adj_list()
 		leaf_subgs = {}
 		for nd in self.nodes:
-			if len(adj_list[nd.name]) == 1:
-				if adj_list[nd.name][0] not in leaf_subgs:
-					leaf_subgs[adj_list[nd.name][0]] = [[], []]
-				leaf_subgs[adj_list[nd.name][0]][0 if nd.layer < self.nodes[adj_list[nd.name][0]].layer else 1].append(nd.name)
+			if len(adj_list[nd.id]) == 1:
+				if adj_list[nd.id][0] not in leaf_subgs:
+					leaf_subgs[adj_list[nd.id][0]] = [[], []]
+				leaf_subgs[adj_list[nd.id][0]][0 if nd.layer < self.nodes[adj_list[nd.id][0]].layer else 1].append(nd.id)
 
 		subgraphs_marked = [0] * self.n_nodes
 		subg_identifier = 1
@@ -737,35 +737,35 @@ class LayeredGraph:
 		for ln in range(1, self.n_layers + 1):
 			for nd1, nd2 in itertools.combinations(self.layers[ln], 2):
 				veg[nd_idx] = []
-				nd_list.append((nd1.name, nd2.name))
-				nd_set[nd1.name, nd2.name] = nd_idx
+				nd_list.append((nd1.id, nd2.id))
+				nd_set[nd1.id, nd2.id] = nd_idx
 				nd_idx += 1
 		ebl = self.get_edges_by_layer()
 		for ln in range(1, self.n_layers):
 			for ed1, ed2 in itertools.combinations(ebl[ln], 2):
-				if len({ed1.n1.name, ed1.n2.name, ed2.n1.name, ed2.n2.name}) == 4:
+				if len({ed1.n1.id, ed1.n2.id, ed2.n1.id, ed2.n2.id}) == 4:
 					if (ed1.n1.y > ed2.n1.y and ed1.n2.y > ed2.n2.y) or (ed1.n1.y < ed2.n1.y and ed1.n2.y < ed2.n2.y):
 						sign = 0
 					else:
 						sign = 1
-					if (ed1.n1.name, ed2.n1.name) in nd_set:
-						if (ed1.n2.name, ed2.n2.name) in nd_set:
-							veg[nd_set[ed1.n1.name, ed2.n1.name]].append((nd_set[ed1.n2.name, ed2.n2.name], sign))
-							veg[nd_set[ed1.n2.name, ed2.n2.name]].append((nd_set[ed1.n1.name, ed2.n1.name], sign))
-							ed_sign[nd_set[ed1.n1.name, ed2.n1.name], nd_set[ed1.n2.name, ed2.n2.name]] = sign
+					if (ed1.n1.id, ed2.n1.id) in nd_set:
+						if (ed1.n2.id, ed2.n2.id) in nd_set:
+							veg[nd_set[ed1.n1.id, ed2.n1.id]].append((nd_set[ed1.n2.id, ed2.n2.id], sign))
+							veg[nd_set[ed1.n2.id, ed2.n2.id]].append((nd_set[ed1.n1.id, ed2.n1.id], sign))
+							ed_sign[nd_set[ed1.n1.id, ed2.n1.id], nd_set[ed1.n2.id, ed2.n2.id]] = sign
 						else:
-							veg[nd_set[ed1.n1.name, ed2.n1.name]].append((nd_set[ed2.n2.name, ed1.n2.name], sign))
-							veg[nd_set[ed2.n2.name, ed1.n2.name]].append((nd_set[ed1.n1.name, ed2.n1.name], sign))
-							ed_sign[nd_set[ed1.n1.name, ed2.n1.name], nd_set[ed2.n2.name, ed1.n2.name]] = sign
+							veg[nd_set[ed1.n1.id, ed2.n1.id]].append((nd_set[ed2.n2.id, ed1.n2.id], sign))
+							veg[nd_set[ed2.n2.id, ed1.n2.id]].append((nd_set[ed1.n1.id, ed2.n1.id], sign))
+							ed_sign[nd_set[ed1.n1.id, ed2.n1.id], nd_set[ed2.n2.id, ed1.n2.id]] = sign
 					else:
-						if (ed1.n2.name, ed2.n2.name) in nd_set:
-							veg[nd_set[ed2.n1.name, ed1.n1.name]].append((nd_set[ed1.n2.name, ed2.n2.name], sign))
-							veg[nd_set[ed1.n2.name, ed2.n2.name]].append((nd_set[ed2.n1.name, ed1.n1.name], sign))
-							ed_sign[nd_set[ed2.n1.name, ed1.n1.name], nd_set[ed1.n2.name, ed2.n2.name]] = sign
+						if (ed1.n2.id, ed2.n2.id) in nd_set:
+							veg[nd_set[ed2.n1.id, ed1.n1.id]].append((nd_set[ed1.n2.id, ed2.n2.id], sign))
+							veg[nd_set[ed1.n2.id, ed2.n2.id]].append((nd_set[ed2.n1.id, ed1.n1.id], sign))
+							ed_sign[nd_set[ed2.n1.id, ed1.n1.id], nd_set[ed1.n2.id, ed2.n2.id]] = sign
 						else:
-							veg[nd_set[ed2.n1.name, ed1.n1.name]].append((nd_set[ed2.n2.name, ed1.n2.name], sign))
-							veg[nd_set[ed2.n2.name, ed1.n2.name]].append((nd_set[ed2.n1.name, ed1.n1.name], sign))
-							ed_sign[nd_set[ed2.n1.name, ed1.n1.name], nd_set[ed2.n2.name, ed1.n2.name]] = sign
+							veg[nd_set[ed2.n1.id, ed1.n1.id]].append((nd_set[ed2.n2.id, ed1.n2.id], sign))
+							veg[nd_set[ed2.n2.id, ed1.n2.id]].append((nd_set[ed2.n1.id, ed1.n1.id], sign))
+							ed_sign[nd_set[ed2.n1.id, ed1.n1.id], nd_set[ed2.n2.id, ed1.n2.id]] = sign
 		return veg, nd_list, ed_sign
 
 	def wiggle_node(self, x_vars, edge_b_l, node, pos_or_neg):
@@ -774,8 +774,8 @@ class LayeredGraph:
 		x_vars_changed = x_vars
 		relevant_x_vars = {}
 		for n_other in self.layers[self[node].layer]:
-			if n_other.name != node:
-				relevant_x_vars[node, n_other.name] = get_x_var(x_vars, node, n_other.name)
+			if n_other.id != node:
+				relevant_x_vars[node, n_other.id] = get_x_var(x_vars, node, n_other.id)
 
 	def write_out(self, path):
 		with open(path, 'wb') as bfd:

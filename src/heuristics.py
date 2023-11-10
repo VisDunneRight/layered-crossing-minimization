@@ -1,5 +1,4 @@
-import sys
-
+from sys import maxsize
 from src import graph, read_data, vis
 import random
 import copy
@@ -10,7 +9,7 @@ def __layer_sweep(g: graph.LayeredGraph, n_iter, fn):
 	order = [0] * g.n_nodes
 	for lay in g.layers.values():
 		for i, nd in enumerate(lay):
-			order[nd.name] = i
+			order[nd.id] = i
 	best = copy.deepcopy(order)
 	for i in range(n_iter):
 		if i % 2 == 0:
@@ -57,7 +56,7 @@ def weighted_median(g: graph.LayeredGraph, n_iter):  # Gansner et al. suggest us
 def __gansner_init_ordering(gr: graph.LayeredGraph):
 	""" Uses BFS to assign initial orderings based on order discovered """
 	adj = gr.get_adj_list()
-	bfsq = [random.choice(gr.layers[1]).name]
+	bfsq = [random.choice(gr.layers[1]).id]
 	seen = [False] * (len(gr.nodes) + 1)
 	seen[bfsq[0]] = True
 	layer_seencts = [0] * (len(gr.layers) + 1)
@@ -165,13 +164,13 @@ def __median_sort_fn(g, layer, order, forward):
 	ln = 1 - int(forward)
 
 	for nd in layer:  # first resort adjacencies by their index in the order
-		adj[nd.name][ln].sort(key=lambda x: order[x])
+		adj[nd.id][ln].sort(key=lambda x: order[x])
 	# The next line is a generator for the median sorted order, ignoring vertices with no adjacent nodes in the previous layer
-	lsort = iter(sorted((v for v in layer if len(adj[v.name][ln]) != 0), key=lambda x: adj[x.name][ln][len(adj[x.name][ln])//2] if len(adj[x.name][ln])%2==1 else (adj[x.name][ln][len(adj[x.name][ln])//2] + adj[x.name][ln][len(adj[x.name][ln])//2-1])/2))
-	layer = [v if len(adj[v.name][ln]) == 0 else next(lsort) for v in layer]
+	lsort = iter(sorted((v for v in layer if len(adj[v.id][ln]) != 0), key=lambda x: adj[x.id][ln][len(adj[x.id][ln]) // 2] if len(adj[x.id][ln]) % 2 == 1 else (adj[x.id][ln][len(adj[x.id][ln]) // 2] + adj[x.id][ln][len(adj[x.id][ln]) // 2 - 1]) / 2))
+	layer = [v if len(adj[v.id][ln]) == 0 else next(lsort) for v in layer]
 	for i, node in enumerate(layer):
 		node.y = i
-		order[node.name] = i
+		order[node.id] = i
 
 
 def barycenter(g: graph.LayeredGraph, n_iter=20):
@@ -184,11 +183,11 @@ def __barycenter_sort_fn(g, layer, order, forward):
 	ln = 1 - int(forward)
 
 	# The next line is a generator for the barycentric sorted order, ignoring vertices with no adjacent nodes in the previous layer
-	lsort = iter(sorted((v for v in layer if len(adj[v.name][ln]) != 0), key=lambda nd: (sum(order[ndk] for ndk in adj[nd.name][ln]) / len(adj[nd.name][ln]))))
-	layer = [v if len(adj[v.name][ln]) == 0 else next(lsort) for v in layer]
+	lsort = iter(sorted((v for v in layer if len(adj[v.id][ln]) != 0), key=lambda nd: (sum(order[ndk] for ndk in adj[nd.id][ln]) / len(adj[nd.id][ln]))))
+	layer = [v if len(adj[v.id][ln]) == 0 else next(lsort) for v in layer]
 	for i, node in enumerate(layer):
 		node.y = i
-		order[node.name] = i
+		order[node.id] = i
 
 
 def global_sifting(g: graph.LayeredGraph, maxfails=0):
@@ -199,8 +198,8 @@ def global_sifting(g: graph.LayeredGraph, maxfails=0):
 	flat_order = [0] * len(g.nodes)  # nodeID -> order (index in layer)
 	for lay in g.layers.values():
 		for j, v in enumerate(lay):
-			flat_order[v.name] = j
-	sift_order = sorted([v.name for v in g.nodes], key=lambda x: -len(adj[x]))
+			flat_order[v.id] = j
+	sift_order = sorted([v.id for v in g.nodes], key=lambda x: -len(adj[x]))
 	n_cr = g.num_edge_crossings()
 	best_cr = n_cr
 	fails = 0
@@ -225,24 +224,24 @@ def global_sifting(g: graph.LayeredGraph, maxfails=0):
 
 def __sift(v, layer, ranks, d_adj, cr_num):
 	best_cr = cr_num
-	idx = next((i for i, nd in enumerate(layer) if nd.name == v))
+	idx = next((i for i, nd in enumerate(layer) if nd.id == v))
 	for i in range(idx, 0, -1):
-		cr_num += __cr_diff(layer[i-1].name, layer[i].name, ranks, d_adj)
+		cr_num += __cr_diff(layer[i-1].id, layer[i].id, ranks, d_adj)
 		layer[i-1], layer[i] = layer[i], layer[i-1]
 		if cr_num < best_cr:
 			best_cr = cr_num
 	for i in range(0, len(layer) - 1):
-		cr_num += __cr_diff(layer[i].name, layer[i + 1].name, ranks, d_adj)
+		cr_num += __cr_diff(layer[i].id, layer[i + 1].id, ranks, d_adj)
 		layer[i], layer[i + 1] = layer[i + 1], layer[i]
 		if cr_num < best_cr:
 			best_cr = cr_num
 	i = len(layer) - 1
 	while cr_num != best_cr:
-		cr_num += __cr_diff(layer[i - 1].name, layer[i].name, ranks, d_adj)
+		cr_num += __cr_diff(layer[i - 1].id, layer[i].id, ranks, d_adj)
 		layer[i - 1], layer[i] = layer[i], layer[i - 1]
 		i -= 1
 	for j, nd in enumerate(layer):
-		ranks[nd.name] = j
+		ranks[nd.id] = j
 	return best_cr
 
 
@@ -268,7 +267,7 @@ def __insert_sort_fn(g, layer, order, forward):
 	adj = g.get_double_adj_list()
 	ln = 1 - int(forward)
 	new_layer_order = {}
-	to_select = [v.name for v in layer]
+	to_select = [v.id for v in layer]
 	sum_c = {nd: 0 for nd in to_select}
 	c_matrix = [[0] * len(layer) for _ in range(len(layer))]
 	for i, v in enumerate(to_select):
@@ -279,7 +278,7 @@ def __insert_sort_fn(g, layer, order, forward):
 		sum_c[v] = sum(c_matrix[order[v]])
 	idx = 0
 	while len(new_layer_order) < len(layer):
-		min_v = sys.maxsize
+		min_v = maxsize
 		min_nd = -1
 		for v in sum_c:
 			if sum_c[v] < min_v:
@@ -290,10 +289,10 @@ def __insert_sort_fn(g, layer, order, forward):
 		for v in sum_c:
 			sum_c[v] -= c_matrix[order[v]][order[min_nd]]
 		idx += 1
-	layer.sort(key=lambda x: new_layer_order[x.name])
+	layer.sort(key=lambda x: new_layer_order[x.id])
 	for i, node in enumerate(layer):
 		node.y = i
-		order[node.name] = i
+		order[node.id] = i
 
 
 def greedy_switching(g: graph.LayeredGraph, n_iter=20):
@@ -305,11 +304,61 @@ def __switching_sort_fn(g, layer, order, forward):
 	adj = g.get_double_adj_list()
 	ln = 1 - int(forward)
 	for i in range(len(layer) - 1):
-		if __calc_if_swap_improves_1layer(order, adj, layer[i].name, layer[i + 1].name, ln):
+		if __calc_if_swap_improves_1layer(order, adj, layer[i].id, layer[i + 1].id, ln):
 			layer[i], layer[i + 1] = layer[i + 1], layer[i]
 	for i, node in enumerate(layer):
 		node.y = i
-		order[node.name] = i
+		order[node.id] = i
+
+
+def split(g: graph.LayeredGraph, n_iter=20):
+	""" Split heuristic, P. Eades and D. Kelly, 1986 """
+	__layer_sweep(g, n_iter, __split_sort_fn)
+
+
+def __split_sort_fn(g, layer, order, forward):
+	adj = g.get_double_adj_list()
+	ln = 1 - int(forward)
+	c_matrix = [[0] * len(layer) for _ in range(len(layer))]
+	for i, v in enumerate(layer):
+		for j, w in enumerate(layer):
+			if v.id != w.id:
+				c_matrix[i][j] = sum((1 for ed1 in adj[v.id][ln] for ed2 in adj[w.id][ln] if order[ed1] > order[ed2]))
+	new_order = [v.id for v in layer]
+	node_to_idx = {v.id: k for k, v in enumerate(layer)}
+
+	def split_recur(list_to_order, idx_start):
+		if len(list_to_order) > 1:
+			pivot = 0
+			low = 0
+			high = len(list_to_order) - 1
+			p_low = []
+			p_high = []
+			for id_w in range(1, len(list_to_order)):
+				if c_matrix[node_to_idx[list_to_order[id_w]]][node_to_idx[list_to_order[pivot]]] < c_matrix[node_to_idx[list_to_order[pivot]]][node_to_idx[list_to_order[id_w]]]:
+					p_low.append(list_to_order[id_w])
+					low += 1
+				else:
+					p_high.append(list_to_order[id_w])
+					high -= 1
+			idx = idx_start
+			for l1 in p_low:
+				new_order[idx] = l1
+				idx += 1
+			new_order[idx] = list_to_order[pivot]
+			idx += 1
+			for h1 in p_high:
+				new_order[idx] = h1
+				idx += 1
+			split_recur(p_low, idx_start)
+			split_recur(p_high, idx_start + len(p_low) + 1)
+
+	split_recur([vid for vid in new_order], 0)
+	n_ord_rev = {v: k for k, v in enumerate(new_order)}
+	layer.sort(key=lambda x: n_ord_rev[x.id])
+	for i, node in enumerate(layer):
+		node.y = i
+		order[node.id] = i
 
 
 if __name__ == '__main__':
@@ -319,9 +368,11 @@ if __name__ == '__main__':
 	# global_sifting(graph)
 	# weighted_median(graph)
 	# greedy_insert(graph)
-	greedy_switching(graph)
+	# greedy_switching(graph)
+	split(graph)
 
 	# op = optimization.LayeredOptimizer(graph)
+	# op.draw_graph = True
 	# op.optimize_layout()
 	vis.draw_graph(graph, "interim", nested=True)
 	print(graph.num_edge_crossings())

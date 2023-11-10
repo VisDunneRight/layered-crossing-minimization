@@ -4,17 +4,17 @@ import igraph as ig
 
 
 def layered_graph_to_nx_graph(g: graph.LayeredGraph):
-	edge_list = [(e.n1.name, e.n2.name) for e in g.edges]
+	edge_list = [(e.n1.id, e.n2.id) for e in g.edges]
 	return nx.Graph(incoming_graph_data=edge_list)
 
 
 def layered_graph_to_igraph(g: graph.LayeredGraph):
-	old_id_to_idx = {v.name: i for i, v in enumerate(g.nodes)}
-	edges = [(old_id_to_idx[e.n1.name], old_id_to_idx[e.n2.name]) for e in g.edges]
+	old_id_to_idx = {v.id: i for i, v in enumerate(g.nodes)}
+	edges = [(old_id_to_idx[e.n1.id], old_id_to_idx[e.n2.id]) for e in g.edges]
 	ret_g = ig.Graph(n=len(g.nodes))
 	ret_g.add_edges(edges)
 	ret_g.vs["layer"] = [v.layer for v in g.nodes]
-	ret_g.vs["id"] = [v.name for v in g.nodes]
+	ret_g.vs["id"] = [v.id for v in g.nodes]
 	return ret_g
 
 

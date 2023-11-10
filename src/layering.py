@@ -287,8 +287,8 @@ def vertex_promotion(g: graph.LayeredGraph):
     for i in range(100):
         promotions = 0
         for v in g.nodes:
-            if len(double_adj[v.name][1]) > 0:
-                if promote_vertex(layering, double_adj, v.name) < 0:
+            if len(double_adj[v.id][1]) > 0:
+                if promote_vertex(layering, double_adj, v.id) < 0:
                     promotions += 1
                     layer_backup = layering.copy()
                 else:

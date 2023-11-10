@@ -99,7 +99,7 @@ class LayeredOptimizer:
 			c_vars_orig, nc_consts = reductions.normal_c_vars(g, edges_by_layer, False)
 		c = m.addVars(c_vars, vtype=relax_type, name="c")
 		if self.vertical_transitivity or self.stratisfimal_y_vars:
-			y_vars = [n.name for n in g]
+			y_vars = [n.id for n in g]
 			y = m.addVars(y_vars, vtype=relax_type, lb=0, ub=self.m_val, name="y")
 		else:
 			y = None
@@ -274,7 +274,7 @@ class LayeredOptimizer:
 		m2.setObjective(b.sum(), GRB.MINIMIZE)
 		n_orig = sum((1 for node in g.nodes if not node.is_anchor_node))
 		if subgraph_seq:
-			n_orig = max((n.name for n in g.nodes))
+			n_orig = max((n.id for n in g.nodes))
 		for var, val in x_var_opt.items():
 			if val == 0:
 				if g[int(var[0])].is_anchor_node and int(var[1]) > n_orig:
@@ -725,11 +725,11 @@ class LayeredOptimizer:
 							connect_nd = graph.node_to_stack_node[connect_nd]
 						for nd_other in subgraph.nodes:
 							if nd_other.layer == graph[connect_nd].layer:
-								relative_xval = get_x_var(self.x_var_assign, graph.node_to_stack_node[nd_other.name], connect_nd)
+								relative_xval = get_x_var(self.x_var_assign, graph.node_to_stack_node[nd_other.id], connect_nd)
 						if relative_xval != -1:
 							for other_nd in subgraph.layers[subgraph[var_to_fix].layer]:
-								if other_nd.name != var_to_fix:
-									xvars_to_fix[var_to_fix, other_nd.name] = 1 - relative_xval
+								if other_nd.id != var_to_fix:
+									xvars_to_fix[var_to_fix, other_nd.id] = 1 - relative_xval
 					optim = LayeredOptimizer(subgraph)
 					# print(xvars_to_fix)
 					if xvars_to_fix != {}:
@@ -742,10 +742,10 @@ class LayeredOptimizer:
 					for j, nd in enumerate(subgraph.nodes):
 						for nd2 in subgraph.nodes[j+1:]:
 							if nd.layer == nd2.layer:
-								if (nd.name, nd2.name) in self.x_var_assign:
-									self.x_var_assign[nd.name, nd2.name] = 0
+								if (nd.id, nd2.id) in self.x_var_assign:
+									self.x_var_assign[nd.id, nd2.id] = 0
 								else:
-									self.x_var_assign[nd2.name, nd.name] = 1
+									self.x_var_assign[nd2.id, nd.id] = 1
 			to_remove = []
 			for x_var in x_vars:
 				if graph[x_var[0]].stacked and graph[x_var[1]].stacked:
@@ -807,7 +807,7 @@ class LayeredOptimizer:
 		# TODO (later): remove all the parameters to standard_opt, replace non-top-level calls with creation of new optimizer object
 		self.print_info.append("")
 
-		subgraphs = [set(node.name for node in self.g.nodes if cluster[node.name] == i) for i in range(n_partitions)]
+		subgraphs = [set(node.id for node in self.g.nodes if cluster[node.id] == i) for i in range(n_partitions)]
 		top_level_subgraphs = {v: cluster[next(iter(stack_to_nodeset[v]))] for v in top_level_g.node_names.keys()}
 		# 2-subgraph optimization version
 		# top_x_vars = {}
@@ -839,7 +839,7 @@ class LayeredOptimizer:
 		t = time.time()
 		vis.draw_graph(top_level_g, "interim", gravity=True, groups=top_level_subgraphs)
 		vis.draw_graph(self.g, "overall", groups=cluster)
-		f_subg_l = {node.layer: node.name for node in top_level_g.nodes if top_level_subgraphs[node.name] == fix_subg}
+		f_subg_l = {node.layer: node.id for node in top_level_g.nodes if top_level_subgraphs[node.id] == fix_subg}
 		fix_x_vars_for_merge = {}
 		for x_var in top_x_vars:
 			for low_n1 in stack_to_nodeset[x_var[0]]:
@@ -876,7 +876,7 @@ class LayeredOptimizer:
 					vars_to_fix[x_var] = fix_x_vars_for_merge[x_var]
 
 			for subg_node in subg:
-				g_prime.add_node(self.g[subg_node].layer, name=self.g[subg_node].name, is_anchor=self.g[subg_node].is_anchor_node)
+				g_prime.add_node(self.g[subg_node].layer, name=self.g[subg_node].id, is_anchor=self.g[subg_node].is_anchor_node)
 			for subg_node in subg:
 				if subg_node in sides:
 					for cnode, clist in crosses.items():

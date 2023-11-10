@@ -64,7 +64,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
             if node.stacked:
                 ctx.set_source_rgb(222/256, 23/256, 56/256)
             elif groups is not None:
-                ctx.set_source_rgb(palette[groups[node.name]][0], palette[groups[node.name]][1], palette[groups[node.name]][2])
+                ctx.set_source_rgb(palette[groups[node.id]][0], palette[groups[node.id]][1], palette[groups[node.id]][2])
             else:
                 ctx.set_source_rgb(163/256, 185/256, 182/256)  # light gray-cyan
             if node.is_anchor_node:
@@ -80,12 +80,12 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
                 ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius, 0, 2 * math.pi)
             ctx.stroke()
             ctx.set_source_rgb(0.1, 0.1, 0.1)
-            if len(str(node.name)) == 1:
+            if len(str(node.id)) == 1:
                 ctx.move_to((node.layer - 1 - min_l)*node_x_distance + offset - 3, node.y*node_y_distance + offset + 4)
             else:
                 ctx.move_to((node.layer - 1 - min_l) * node_x_distance + offset - 7, node.y * node_y_distance + offset + 4)
             if not node.is_anchor_node:
-                ctx.show_text(str(node.name))
+                ctx.show_text(str(node.id))
         else:
             ctx.set_source_rgb(0.2, 0.2, 0.2)
             ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, line_width//2, 0, 2 * math.pi)

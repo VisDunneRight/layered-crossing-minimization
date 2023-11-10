@@ -44,9 +44,9 @@ def kargers_algo_cut_finder(g: graph.LayeredGraph, n_iter):
     graph_cuts = []
     corresponding_cross = []
     for i in range(n_iter):
-        edges = [[e.n1.name, e.n2.name] for e in g.edges]
+        edges = [[e.n1.id, e.n2.id] for e in g.edges]
         random.shuffle(edges)
-        combined = {n.name: {n.name} for n in g.nodes}
+        combined = {n.id: {n.id} for n in g.nodes}
         num_nodes = g.n_nodes
         while num_nodes > 2:
             contract = edges.pop()

@@ -103,7 +103,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		cf, ys = counter, counter
 		if self.vertical_transitivity:
 			for nd in g.nodes:
-				y_vars[nd.name] = counter
+				y_vars[nd.id] = counter
 				counter += 1
 		yf = counter
 		self.nvars = counter
@@ -472,11 +472,11 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 							connect_nd = graph.node_to_stack_node[connect_nd]
 						for nd_other in subgraph.nodes:
 							if nd_other.layer == graph[connect_nd].layer:
-								relative_xval = get_x_var(self.x_var_assign, graph.node_to_stack_node[nd_other.name], connect_nd)
+								relative_xval = get_x_var(self.x_var_assign, graph.node_to_stack_node[nd_other.id], connect_nd)
 						if relative_xval != -1:
 							for other_nd in subgraph.layers[subgraph[var_to_fix].layer]:
-								if other_nd.name != var_to_fix:
-									xvars_to_fix[var_to_fix, other_nd.name] = 1 - relative_xval
+								if other_nd.id != var_to_fix:
+									xvars_to_fix[var_to_fix, other_nd.id] = 1 - relative_xval
 					optim = HiGHSLayeredOptimizer(subgraph)
 					# print(xvars_to_fix)
 					if xvars_to_fix != {}:
@@ -489,10 +489,10 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 					for j, nd in enumerate(subgraph.nodes):
 						for nd2 in subgraph.nodes[j+1:]:
 							if nd.layer == nd2.layer:
-								if (nd.name, nd2.name) in self.x_var_assign:
-									self.x_var_assign[nd.name, nd2.name] = 0
+								if (nd.id, nd2.id) in self.x_var_assign:
+									self.x_var_assign[nd.id, nd2.id] = 0
 								else:
-									self.x_var_assign[nd2.name, nd.name] = 1
+									self.x_var_assign[nd2.id, nd.id] = 1
 			to_remove = []
 			for x_var in x:
 				if graph[x_var[0]].stacked and graph[x_var[1]].stacked:
@@ -558,7 +558,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 			y_vars_br = {}
 			b_vars_br = {}
 			for nd in g.nodes:
-				y_vars_br[nd.name] = ct
+				y_vars_br[nd.id] = ct
 				ct += 1
 			for ed in g.edge_names:
 				b_vars_br[ed] = ct
@@ -606,4 +606,4 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 
 			seq_res = linprog(c_t, method="highs", A_ub=a_ub, b_ub=b_ub)
 			for nd in g.nodes:
-				nd.y = seq_res.x[y_vars_br[nd.name]]
+				nd.y = seq_res.x[y_vars_br[nd.id]]

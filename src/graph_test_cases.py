@@ -16,8 +16,8 @@ def test_all_unique_ids(test_graphs):
 		gr = read_data.read(grf)
 		seen_ids = set()
 		for nd in gr.nodes:
-			assert nd.name not in seen_ids, f"failed on {grf} with double node {nd.name}"
-			seen_ids.add(nd.name)
+			assert nd.id not in seen_ids, f"failed on {grf} with double node {nd.id}"
+			seen_ids.add(nd.id)
 		print("pass")
 
 
@@ -26,7 +26,7 @@ def test_ascending_names_from_zero(test_graphs):
 	for grf in test_graphs:
 		print(f"\t{grf}... ", end='')
 		gr = read_data.read(grf)
-		nds = sorted([nd.name for nd in gr.nodes])
+		nds = sorted([nd.id for nd in gr.nodes])
 		comp = list(range(len(gr.nodes)))
 		assert nds == comp, f"failed on {grf}"
 		print("pass")
@@ -69,9 +69,9 @@ def extract_graph_raw_data(layered_g):
 	nds = []
 	eds = []
 	for nd in layered_g:
-		nds.append((nd.name, nd.layer, nd.is_anchor_node, nd.stacked))
+		nds.append((nd.id, nd.layer, nd.is_anchor_node, nd.stacked))
 	for ed in layered_g.edges:
-		eds.append((ed.n1.name, ed.n2.name))
+		eds.append((ed.n1.id, ed.n2.id))
 	return nds, eds
 
 
@@ -121,9 +121,9 @@ def test_optimization_on_graphs_with_non_ascending_names(test_graphs):
 		nd1 = gr.nodes.pop(2)
 		nd2 = gr.nodes.pop(5)
 		nd3 = gr.nodes.pop(7)
-		nd1.name = 230
-		nd2.name = 304
-		nd3.name = 455
+		nd1.id = 230
+		nd2.id = 304
+		nd3.id = 455
 		gr.nodes.append()
 
 
