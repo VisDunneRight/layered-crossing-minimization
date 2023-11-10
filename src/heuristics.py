@@ -25,6 +25,8 @@ def __layer_sweep(g: graph.LayeredGraph, n_iter, fn):
 			best = copy.deepcopy(order)
 	for nd, yv in enumerate(best):
 		g[nd].y = yv
+	for lay in g.layers.values():
+		lay.sort(key=lambda node: node.y)
 
 
 def weighted_median(g: graph.LayeredGraph, n_iter):  # Gansner et al. suggest using n_iter=24
@@ -51,6 +53,8 @@ def weighted_median(g: graph.LayeredGraph, n_iter):  # Gansner et al. suggest us
 	for lay in best:
 		for i, nd in enumerate(lay):
 			g[nd].y = i
+	for lay in g.layers.values():
+		lay.sort(key=lambda node: node.y)
 
 
 def __gansner_init_ordering(gr: graph.LayeredGraph):
@@ -165,9 +169,9 @@ def __median_sort_fn(g, layer, order, forward):
 
 	for nd in layer:  # first resort adjacencies by their index in the order
 		adj[nd.id][ln].sort(key=lambda x: order[x])
-	# The next line is a generator for the median sorted order, ignoring vertices with no adjacent nodes in the previous layer
-	lsort = iter(sorted((v for v in layer if len(adj[v.id][ln]) != 0), key=lambda x: adj[x.id][ln][len(adj[x.id][ln]) // 2] if len(adj[x.id][ln]) % 2 == 1 else (adj[x.id][ln][len(adj[x.id][ln]) // 2] + adj[x.id][ln][len(adj[x.id][ln]) // 2 - 1]) / 2))
-	layer = [v if len(adj[v.id][ln]) == 0 else next(lsort) for v in layer]
+
+	layer.sort(key=lambda x: order[x.id] if len(adj[x.id][ln]) == 0 else (order[adj[x.id][ln][len(adj[x.id][ln]) // 2]] if len(adj[x.id][ln]) % 2 == 1 else order[adj[x.id][ln][len(adj[x.id][ln]) // 2 - 1]]))
+
 	for i, node in enumerate(layer):
 		node.y = i
 		order[node.id] = i
@@ -220,6 +224,7 @@ def global_sifting(g: graph.LayeredGraph, maxfails=0):
 		sift_order = sift_order[::-1]
 	for nd, yv in enumerate(flat_order):
 		g[nd].y = yv
+	print(best_cr)
 
 
 def __sift(v, layer, ranks, d_adj, cr_num):
@@ -361,6 +366,55 @@ def __split_sort_fn(g, layer, order, forward):
 		order[node.id] = i
 
 
+def degree_weighted_barycenter(g: graph.LayeredGraph, threshold=0.05):
+	"""
+	Degree-weighted barycenter, P. Eades, X. Lin, and R. Tamassia, 1996.
+	Note: This algorithm has been modified to return the result with best crossing number seen over all iterations
+	"""
+	adj = g.get_double_adj_list()
+	converged = False
+	best_cr = g.num_edge_crossings()
+	best_yvals = [node.y for node in g.nodes]
+	while not converged:
+		converged = True
+		for i in range(2, g.n_layers):
+			for nd in g.layers[i]:
+				old_y = nd.y
+				if len(adj[nd.id][1]) > 0 and len(adj[nd.id][0]) > 0:
+					nd.y = sum(g[nd_adj].y for nd_adj in adj[nd.id][0]) / (2 * len(adj[nd.id][0])) + sum(g[nd_adj].y for nd_adj in adj[nd.id][1]) / (2 * len(adj[nd.id][1]))
+				elif len(adj[nd.id][1]) > 0:
+					nd.y = sum(g[nd_adj].y for nd_adj in adj[nd.id][1]) / len(adj[nd.id][1])
+				elif len(adj[nd.id][0]) > 0:
+					nd.y = sum(g[nd_adj].y for nd_adj in adj[nd.id][0]) / len(adj[nd.id][0])
+				if abs(nd.y - old_y) > threshold:
+					converged = False
+		cur_cr = g.num_edge_crossings()
+		print(cur_cr)
+		if cur_cr < best_cr:
+			best_cr = cur_cr
+			best_yvals = [node.y for node in g.nodes]
+	for k, node in enumerate(g.nodes):
+		node.y = best_yvals[k]
+	for lay in g.layers.values():
+		lay.sort(key=lambda node: node.y)
+		for i in range(len(lay) - 1):
+			if lay[i].y == lay[i + 1].y:
+				if i > 0 and abs(lay[i].y - lay[i - 1].y) > threshold/2:
+					lay[i].y -= threshold/2
+				elif i < len(lay) - 2 and abs(lay[i + 2].y - lay[i + 1].y) > threshold/2:
+					lay[i + 1].y += threshold/2
+				else:
+					print("Two nodes converged to same position:", lay[i], lay[i+1])
+	print(g.num_edge_crossings())
+
+
+def switching_with_preprocessing(g: graph.LayeredGraph, n_iter=20):
+	""" Greedy Switching with BC preprocessing, suggested by E. Makinen, 1990 """
+	barycenter(g, n_iter=n_iter)
+	print("here", g.num_edge_crossings())
+	greedy_switching(g, n_iter=n_iter)
+
+
 if __name__ == '__main__':
 	graph = read_data.read("../Rome-Lib/graficon70nodi/grafo1233.70")
 	# barycenter(graph)
@@ -369,7 +423,9 @@ if __name__ == '__main__':
 	# weighted_median(graph)
 	# greedy_insert(graph)
 	# greedy_switching(graph)
-	split(graph)
+	# split(graph)
+	# switching_with_preprocessing(graph)
+	degree_weighted_barycenter(graph)
 
 	# op = optimization.LayeredOptimizer(graph)
 	# op.draw_graph = True
