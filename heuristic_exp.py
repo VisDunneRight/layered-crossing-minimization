@@ -97,26 +97,33 @@ def run_heuristic_exp_checkpoint(dataset):
                 insert_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", ["Index", "File", "Crossings", "Runtime"])
             for j in range(fold, 101, 10):
                 for fileid in range(idx, 100):
+                    print(hname, f"n={j} file", fileid)
                     run_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", f"random graphs/matuszewski/{data_names[dataset]}/n{j}/graph{fileid}.lgbin", heuristic_fns[i], 100 * ((j-1) // 10) + fileid)
-            fold, idx = 10, 0
+                idx = 0
+            fold = 10
         elif dataset == 1:
             if fold == 15 and idx == 0:
                 insert_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", ["Index", "File", "Crossings", "Runtime"])
             for j in range(fold, 96, 5):
                 for fileid in range(idx, 100):
+                    print(hname, f"d={j} file", fileid)
                     run_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", f"random graphs/matuszewski/{data_names[dataset]}/d{j}/graph{fileid}.lgbin", heuristic_fns[i], 100 * ((j - 15) // 5) + fileid)
-            fold, idx = 15, 0
+                idx = 0
+            fold = 15
         elif dataset == 2:
             if fold == 2 and idx == 0:
                 insert_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", ["Index", "File", "Crossings", "Runtime"])
             for j in range(fold, 26):
                 for fileid in range(idx, 100):
+                    print(hname, f"k={j} file", fileid)
                     run_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", f"random graphs/matuszewski/{data_names[dataset]}/k{j}/graph{fileid}.lgbin", heuristic_fns[i], 100 * (j - 2) + fileid)
-            fold, idx = 2, 0
+                idx = 0
+            fold = 2
         elif dataset == 3:
             if idx == 0:
                 insert_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", ["Index", "File", "Crossings", "Runtime"])
             for fileid in range(3983):
+                print(hname, "file", fileid)
                 run_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", rome_names[fileid], heuristic_fns[i], fileid)
             idx = 0
 
