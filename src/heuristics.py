@@ -1,5 +1,5 @@
 from sys import maxsize
-from src import graph, read_data, vis
+from src import graph
 import random
 import copy
 
@@ -19,7 +19,7 @@ def __layer_sweep(g: graph.LayeredGraph, n_iter, fn):
 			for j in range(g.n_layers - 1, 0, -1):
 				fn(g, g.layers[j], order, False)
 		cr_order = g.num_edge_crossings()
-		print(cr_order)
+		# print(cr_order)
 		if cr_order < cr_best:
 			cr_best = cr_order
 			best = copy.deepcopy(order)
@@ -27,9 +27,10 @@ def __layer_sweep(g: graph.LayeredGraph, n_iter, fn):
 		g[nd].y = yv
 	for lay in g.layers.values():
 		lay.sort(key=lambda node: node.y)
+	return cr_best
 
 
-def weighted_median(g: graph.LayeredGraph, n_iter):  # Gansner et al. suggest using n_iter=24
+def weighted_median(g: graph.LayeredGraph, n_iter=24):  # Gansner et al. suggest using n_iter=24
 	""" The ordering() function defined by Gansner et al., also called the "Weighted Median Heuristic" """
 
 	order = __gansner_init_ordering(g)
@@ -49,12 +50,13 @@ def weighted_median(g: graph.LayeredGraph, n_iter):  # Gansner et al. suggest us
 		if cr_order < cr_best:
 			cr_best = cr_order
 			best = copy.deepcopy(order)
-		print(cr_order)
+		# print(cr_order)
 	for lay in best:
 		for i, nd in enumerate(lay):
 			g[nd].y = i
 	for lay in g.layers.values():
 		lay.sort(key=lambda node: node.y)
+	return cr_best
 
 
 def __gansner_init_ordering(gr: graph.LayeredGraph):
@@ -158,9 +160,9 @@ def __calc_if_swap_improves_1layer(rank, d_adj, v, w, ln):  # requirement: v is 
 	return n_cr_swap < n_cr_noswap
 
 
-def median(g: graph.LayeredGraph, n_iter=20):
+def median(g: graph.LayeredGraph, n_iter=24):
 	""" Original Median heuristic plus layer-by-layer sweep, P. Eades and N. C. Wormald, 1986 """
-	__layer_sweep(g, n_iter, __median_sort_fn)
+	return __layer_sweep(g, n_iter, __median_sort_fn)
 
 
 def __median_sort_fn(g, layer, order, forward):
@@ -177,9 +179,9 @@ def __median_sort_fn(g, layer, order, forward):
 		order[node.id] = i
 
 
-def barycenter(g: graph.LayeredGraph, n_iter=20):
+def barycenter(g: graph.LayeredGraph, n_iter=24):
 	""" Barycenter heuristic, K. Sugiyama et al., 1981 """
-	__layer_sweep(g, n_iter, __barycenter_sort_fn)
+	return __layer_sweep(g, n_iter, __barycenter_sort_fn)
 
 
 def __barycenter_sort_fn(g, layer, order, forward):
@@ -224,7 +226,7 @@ def global_sifting(g: graph.LayeredGraph, maxfails=0):
 		sift_order = sift_order[::-1]
 	for nd, yv in enumerate(flat_order):
 		g[nd].y = yv
-	print(best_cr)
+	return best_cr
 
 
 def __sift(v, layer, ranks, d_adj, cr_num):
@@ -263,9 +265,9 @@ def __cr_diff(v, w, rank, d_adj):  # returns change to CRnum after swapping v, w
 	return diff
 
 
-def greedy_insert(g: graph.LayeredGraph, n_iter=20):
+def greedy_insert(g: graph.LayeredGraph, n_iter=24):
 	""" Greedy-Insert heuristic, P. Eades and D. Kelly, 1986 """
-	__layer_sweep(g, n_iter, __insert_sort_fn)
+	return __layer_sweep(g, n_iter, __insert_sort_fn)
 
 
 def __insert_sort_fn(g, layer, order, forward):
@@ -300,9 +302,9 @@ def __insert_sort_fn(g, layer, order, forward):
 		order[node.id] = i
 
 
-def greedy_switching(g: graph.LayeredGraph, n_iter=20):
+def greedy_switching(g: graph.LayeredGraph, n_iter=24):
 	""" Greedy Switching heuristic, P. Eades and D. Kelly, 1986 """
-	__layer_sweep(g, n_iter, __switching_sort_fn)
+	return __layer_sweep(g, n_iter, __switching_sort_fn)
 
 
 def __switching_sort_fn(g, layer, order, forward):
@@ -316,9 +318,9 @@ def __switching_sort_fn(g, layer, order, forward):
 		order[node.id] = i
 
 
-def split(g: graph.LayeredGraph, n_iter=20):
+def split(g: graph.LayeredGraph, n_iter=24):
 	""" Split heuristic, P. Eades and D. Kelly, 1986 """
-	__layer_sweep(g, n_iter, __split_sort_fn)
+	return __layer_sweep(g, n_iter, __split_sort_fn)
 
 
 def __split_sort_fn(g, layer, order, forward):
@@ -389,7 +391,7 @@ def degree_weighted_barycenter(g: graph.LayeredGraph, threshold=0.05):
 				if abs(nd.y - old_y) > threshold:
 					converged = False
 		cur_cr = g.num_edge_crossings()
-		print(cur_cr)
+		# print(cur_cr)
 		if cur_cr < best_cr:
 			best_cr = cur_cr
 			best_yvals = [node.y for node in g.nodes]
@@ -405,30 +407,48 @@ def degree_weighted_barycenter(g: graph.LayeredGraph, threshold=0.05):
 					lay[i + 1].y += threshold/2
 				else:
 					print("Two nodes converged to same position:", lay[i], lay[i+1])
-	print(g.num_edge_crossings())
+	return best_cr
 
 
-def switching_with_preprocessing(g: graph.LayeredGraph, n_iter=20):
-	""" Greedy Switching with BC preprocessing, suggested by E. Makinen, 1990 """
+# def maximum_crossing_edge(g: graph.LayeredGraph):
+# 	""" Maximum Crossing Edge heuristic, M. Stallmann, 2012 """
+
+
+def switching_with_preprocessing(g: graph.LayeredGraph, n_iter=12):
+	""" Greedy Switching with barycenter preprocessing, suggested by E. Makinen, 1990 """
 	barycenter(g, n_iter=n_iter)
-	print("here", g.num_edge_crossings())
-	greedy_switching(g, n_iter=n_iter)
+	return greedy_switching(g, n_iter=n_iter)
 
 
-if __name__ == '__main__':
-	graph = read_data.read("../Rome-Lib/graficon70nodi/grafo1233.70")
-	# barycenter(graph)
-	# median(graph)
-	# global_sifting(graph)
-	# weighted_median(graph)
-	# greedy_insert(graph)
-	# greedy_switching(graph)
-	# split(graph)
-	# switching_with_preprocessing(graph)
-	degree_weighted_barycenter(graph)
+def improved_sifting(g: graph.LayeredGraph, n_iter=12, maxfails=0):
+	""" Sifting with barycenter preprocessing, suggested by Gunther et al., 2001 """
+	barycenter(g, n_iter=n_iter)
+	return global_sifting(g, maxfails=maxfails)
 
-	# op = optimization.LayeredOptimizer(graph)
-	# op.draw_graph = True
-	# op.optimize_layout()
-	vis.draw_graph(graph, "interim", nested=True)
-	print(graph.num_edge_crossings())
+
+def barycenter_split(g: graph.LayeredGraph, n_iter=12):
+	""" Best-performing combination heuristic of Marti and Laguna, 2003 """
+	barycenter(g, n_iter=n_iter)
+	return split(g, n_iter=n_iter)
+
+
+# if __name__ == '__main__':
+# 	graph = read_data.read("../random graphs/matuszewski/5_by_n/n30/graph2.lgbin")
+# 	graph = read_data.read("../Rome-Lib/graficon70nodi/grafo1233.70")
+# 	barycenter(graph)
+# 	median(graph)
+# 	global_sifting(graph)
+# 	weighted_median(graph)
+# 	greedy_insert(graph)
+# 	greedy_switching(graph)
+# 	split(graph)
+# 	switching_with_preprocessing(graph)
+# 	degree_weighted_barycenter(graph)
+# 	improved_sifting(graph)
+# 	barycenter_split(graph)
+#
+# 	op = optimization.LayeredOptimizer(graph)
+# 	op.draw_graph = True
+# 	op.optimize_layout()
+# 	vis.draw_graph(graph, "interim", nested=True)
+# 	print(graph.num_edge_crossings())

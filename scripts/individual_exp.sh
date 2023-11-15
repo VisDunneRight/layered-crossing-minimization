@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J IndividualSwitchExperiment               # Job name
 #SBATCH -N 1                   # Number of nodes
-#SBATCH -n 4                  # Number of tasks
+#SBATCH -n 1                  # Number of tasks
 #SBATCH --time 24:00:00
 #SBATCH --mem=8G
 #SBATCH --constraint=broadwell

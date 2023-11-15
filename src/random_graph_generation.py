@@ -1,3 +1,5 @@
+import time
+
 import src.read_data
 import src.vis
 from src import graph
@@ -11,6 +13,8 @@ def true_random_layered_graph(k, n, d):
 	:param n: number of nodes per layer
 	:param d: average edge density of the resultant graph
 	:return: LayeredGraph object g
+
+	Uniformly random connected layered graph. Will retry until the sampled graph is connected.
 	"""
 
 	n_edges_per_layer = round(d * (n ** 2))
@@ -55,6 +59,8 @@ def random_layered_graph_connect_help(k, n, d):
 	:param n: number of nodes per layer
 	:param d: average edge density of the resultant graph
 	:return: LayeredGraph object g
+
+	Random connected layered graph, but will select from the set of unconnected nodes if necessary to try to ensure graph is connected.
 	"""
 
 	n_edges_per_layer = round(d * (n ** 2))
@@ -107,6 +113,50 @@ def random_layered_graph_connect_help(k, n, d):
 
 		if g.is_connected():
 			return g
+		else:
+			print("fail")
+
+
+def random_layered_graph_connect_help_edgecount(k, n, n_edges):
+	"""
+	:param k: number of layers
+	:param n: number of nodes per layer
+	:param n_edges: number of edges in the resultant graph
+	:return: LayeredGraph object g
+
+	Randomly samples edges over the full network instead of keeping the edge count constant across layers
+	as in the above methods.
+	"""
+
+	assert n_edges >= n * k, "graph will not be connected"
+
+	while True:
+		g = graph.LayeredGraph()
+
+		for i in range(k):  # add nodes
+			for j in range(n):
+				g.add_node(i + 1)
+
+		not_seen = set(range(n * k))
+		n_added = 0
+		for i in range(n_edges):
+			n1 = random.randint(0, g.n_nodes - 1)
+			if len(not_seen) == n_edges - n_added:
+				n1 = random.choice(sorted(not_seen))
+			adj_layers = [g[n1].layer + 1] if g[n1].layer == 1 else ([g[n1].layer - 1] if g[n1].layer == g.n_layers else [g[n1].layer - 1, g[n1].layer + 1])
+			n2_layer = random.choice(adj_layers)
+			n2 = random.randint(0, n-1) + ((n2_layer - 1) * n)
+			g.add_edge(n1, n2)
+			if n1 in not_seen:
+				not_seen.remove(n1)
+			if n2 in not_seen:
+				not_seen.remove(n2)
+			n_added += 1
+
+		if g.is_connected():
+			return g
+		else:
+			print("fail")
 
 
 def generate_gange_dataset(seed=None):
@@ -163,10 +213,48 @@ def generate_random_fixed_density_set(seed=None):
 			ng.write_out(f"../random graphs/fixed_density_exp/k{k}/graph{i}.lgbin")
 
 
+def generate_extended_matuszewski_datsets(seed=None):
+	if seed is not None:
+		random.seed(seed)
+	if "random graphs" not in os.listdir(".."):
+		os.mkdir("../random graphs")
+	if "matuszewski" not in os.listdir("../random graphs"):
+		os.mkdir("../random graphs/matuszewski")
+		os.mkdir("../random graphs/matuszewski/5_by_n")
+		os.mkdir("../random graphs/matuszewski/k_by_10")
+		os.mkdir("../random graphs/matuszewski/10_by_10_density")
+
+	for n in range(10, 101, 10):
+		if f"n{n}" not in os.listdir("../random graphs/matuszewski/5_by_n"):
+			os.mkdir(f"../random graphs/matuszewski/5_by_n/n{n}")
+			for i in range(100):
+				ng = random_layered_graph_connect_help_edgecount(5, n, 8 * n)
+				print(f"n={n} graph {i}")
+				ng.write_out(f"../random graphs/matuszewski/5_by_n/n{n}/graph{i}.lgbin")
+
+	for k in range(2, 26):
+		if f"k{k}" not in os.listdir("../random graphs/matuszewski/k_by_10"):
+			os.mkdir(f"../random graphs/matuszewski/k_by_10/k{k}")
+			for i in range(100):
+				ng = random_layered_graph_connect_help_edgecount(k, 10, 20 * (k-1))
+				print(f"k={k} graph {i}")
+				ng.write_out(f"../random graphs/matuszewski/k_by_10/k{k}/graph{i}.lgbin")
+
+	for d in range(15, 96, 5):
+		if f"" not in os.listdir("../random graphs/matuszewski/10_by_10_density"):
+			os.mkdir(f"../random graphs/matuszewski/10_by_10_density/d{d}")
+			for i in range(100):
+				ng = random_layered_graph_connect_help(10, 10, d / 100)
+				print(f"d={d} graph {i}")
+				ng.write_out(f"../random graphs/matuszewski/10_by_10_density/d{d}/graph{i}.lgbin")
+
+
 if __name__ == '__main__':
 	# generate_gange_dataset(seed=22)
 	# generate_random_density_set(seed=49)
 	# generate_random_fixed_density_set(seed=71)
+	generate_extended_matuszewski_datsets()
 
-	gr = src.read_data.read("../random graphs/fixed_density_exp/k20/graph2.lgbin")
-	src.vis.draw_graph(gr, "rand", gravity=True, nested=True)
+	# gr = src.read_data.read("../random graphs/matuszewski/k_by_10/k20/graph2.lgbin")
+	# gr = random_layered_graph_connect_help_edgecount(3, 10, 35)
+	# src.vis.draw_graph(gr, "rand", gravity=True, nested=True)
