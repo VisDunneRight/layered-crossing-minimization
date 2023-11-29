@@ -6,7 +6,7 @@ import os
 # from altair_saver import save
 
 
-def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, gravity=False):
+def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, gravity=False, edge_thickness=False):
     if nested:
         if "Images" not in os.listdir(".."):
             os.mkdir("../Images")
@@ -17,7 +17,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     line_width = 4
     font_size = 12
     palette = [(171/256, 221/256, 164/256), (94/256, 79/256, 162/256), (244/256, 109/256, 67/256), (254/256, 224/256, 139/256), (50/256, 136/256, 189/256), (158/256, 1/256, 66/256), (253/256, 174/256, 97/256), (102/256, 194/256, 165/256), (213/256, 62/256, 79/256), (230/256, 145/256, 152/256)]
-    width = (g.n_layers - 1) * node_x_distance + offset * 2
+    width = (g.n_layers - 1) * node_x_distance + offset * 10
     min_l = min((n.layer for n in g.nodes)) - 1
     min_y = min((n.y for n in g.nodes))
     for n in g.nodes:
@@ -43,11 +43,12 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     ctx.set_source_rgb(1, 1, 1)
     ctx.rectangle(0, 0, width, height)
     ctx.fill()
-
     ctx.set_source_rgb(0.2, 0.2, 0.2)
     ctx.set_line_width(line_width)
     for edge in g.edges:  # curve_to(c1x, c1y, c2x, c2y, ex, ey), control points c1, c2, end point e
         ctx.move_to((edge.n1.layer - 1 - min_l) * node_x_distance + offset, edge.n1.y * node_y_distance + offset)
+        if edge_thickness:
+            ctx.set_line_width(edge.weight)
         if edge.same_layer_edge:
             ctx.curve_to((edge.n1.layer - 1 - min_l) * node_x_distance + offset + node_x_distance//1.5 - (node_x_distance//2)//(abs(edge.n1.y-edge.n2.y)), edge.n1.y * node_y_distance + offset, (edge.n1.layer - 1 - min_l) * node_x_distance + offset + node_x_distance//1.5 - (node_x_distance//2)//(abs(edge.n1.y-edge.n2.y)), edge.n2.y * node_y_distance + offset, (edge.n1.layer - 1 - min_l) * node_x_distance + offset, edge.n2.y * node_y_distance + offset)
         elif edge.n1.y == edge.n2.y:
@@ -56,6 +57,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
             # ctx.curve_to((edge.n1.layer - 1) * node_x_distance + offset + node_x_distance, edge.n1.y * node_y_distance + offset, (edge.n2.layer - 1) * node_x_distance + offset - node_x_distance, edge.n2.y * node_y_distance + offset, (edge.n2.layer - 1) * node_x_distance + offset, edge.n2.y * node_y_distance + offset)
             ctx.curve_to((edge.n1.layer - 1 - min_l) * node_x_distance + offset + node_x_distance//1.5, edge.n1.y * node_y_distance + offset, (edge.n2.layer - 1 - min_l) * node_x_distance + offset - node_x_distance//1.5, edge.n2.y * node_y_distance + offset, (edge.n2.layer - 1 - min_l) * node_x_distance + offset, edge.n2.y * node_y_distance + offset)
         ctx.stroke()
+    ctx.set_line_width(line_width)
 
     ctx.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
     ctx.set_font_size(font_size)
@@ -80,12 +82,16 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
                 ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius, 0, 2 * math.pi)
             ctx.stroke()
             ctx.set_source_rgb(0.1, 0.1, 0.1)
-            if len(str(node.id)) == 1:
+            if len(str(node.name)) == 1:
                 ctx.move_to((node.layer - 1 - min_l)*node_x_distance + offset - 3, node.y*node_y_distance + offset + 4)
-            else:
+            elif len(str(node.name)) == 2:
                 ctx.move_to((node.layer - 1 - min_l) * node_x_distance + offset - 7, node.y * node_y_distance + offset + 4)
+            elif len(str(node.name)) == 3:
+                ctx.move_to((node.layer - 1 - min_l) * node_x_distance + offset - 11, node.y * node_y_distance + offset + 4)
+            else:
+                ctx.move_to((node.layer - 1 - min_l) * node_x_distance + offset - 11, node.y * node_y_distance + offset + 4 + (2 * (node.layer % 2) - 1) * 25)
             if not node.is_anchor_node:
-                ctx.show_text(str(node.id))
+                ctx.show_text(str(node.name))
         else:
             ctx.set_source_rgb(0.2, 0.2, 0.2)
             ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, line_width//2, 0, 2 * math.pi)
@@ -99,12 +105,6 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
             #         node_radius // 3, 0, 2 * math.pi)
             # ctx.stroke()
 
-
-# data = alt.Data(values=[{'x': 'A', 'y': 5, 'col': 'red'},
-#                         {'x': 'B', 'y': 3, 'col': 'red'},
-#                         {'x': 'C', 'y': 6, 'col': 'blue'},
-#                         {'x': 'D', 'y': 7, 'col': 'blue'},
-#                         {'x': 'E', 'y': 2, 'col': 'red'}])
 
 def draw_altair_scatter(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name, log_y_scale, plot_loess=False, loess_features=None):
     data = alt.Data(values=data_points)

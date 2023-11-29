@@ -43,9 +43,9 @@ def test_method_consistency_for_counts(test_graphs):
 		assert gr.n_nodes == start and gr.n_layers == lstart and len(gr.nodes) == start and len(gr.layers) == lstart, f"failed on {grf}"
 		adj = gr.create_normal_adj_list()
 		assert gr.n_nodes == start and gr.n_layers == lstart and len(gr.nodes) == start and len(gr.layers) == lstart, f"failed on {grf}"
-		asdf1 = gr.get_edge_names_by_layer()
+		asdf1 = gr.get_edge_ids_by_layer()
 		assert gr.n_nodes == start and gr.n_layers == lstart and len(gr.nodes) == start and len(gr.layers) == lstart, f"failed on {grf}"
-		asdf2 = gr.get_names_by_layer()
+		asdf2 = gr.get_ids_by_layer()
 		assert gr.n_nodes == start and gr.n_layers == lstart and len(gr.nodes) == start and len(gr.layers) == lstart, f"failed on {grf}"
 		asdf3 = gr.get_edges_by_layer()
 		assert gr.n_nodes == start and gr.n_layers == lstart and len(gr.nodes) == start and len(gr.layers) == lstart, f"failed on {grf}"
@@ -87,10 +87,10 @@ def test_method_consistency_for_graph_structure(test_graphs):
 		adj = gr.create_normal_adj_list()
 		n_test, e_test = extract_graph_raw_data(gr)
 		assert n_orig == n_test and e_orig == e_test, f"failed on {grf}"
-		asdf1 = gr.get_edge_names_by_layer()
+		asdf1 = gr.get_edge_ids_by_layer()
 		n_test, e_test = extract_graph_raw_data(gr)
 		assert n_orig == n_test and e_orig == e_test, f"failed on {grf}"
-		asdf2 = gr.get_names_by_layer()
+		asdf2 = gr.get_ids_by_layer()
 		n_test, e_test = extract_graph_raw_data(gr)
 		assert n_orig == n_test and e_orig == e_test, f"failed on {grf}"
 		asdf3 = gr.get_edges_by_layer()

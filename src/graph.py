@@ -5,12 +5,13 @@ from src.helpers import *
 
 
 class LayeredNode:
-	def __init__(self, node_name, node_layer, is_anchor=False, stacked=False):
-		self.id = node_name
+	def __init__(self, node_id, node_layer, is_anchor=False, stacked=False, name=None):
+		self.id = node_id
 		self.layer = node_layer
-		self.y = node_name
+		self.y = node_id
 		self.is_anchor_node = is_anchor
 		self.stacked = stacked
+		self.name = node_id if name is None else name
 
 	def __str__(self):
 		return f"ID={self.id}/L={self.layer}"
@@ -69,23 +70,32 @@ class LayeredGraph:
 		self.nodes = []
 		self.layers = {}
 		self.edges = []
+		self.node_ids = {}
 		self.node_names = {}
-		self.edge_names = {}
-		self.names_by_layer = {}
-		self.edge_names_by_layer = {}
+		self.edge_ids = {}
+		self.ids_by_layer = {}
+		self.edge_ids_by_layer = {}
 		self.edges_by_layer = {}
+		self.name_to_id = {}
 		self.adj_list = {}
 		self.double_adj_list = {}
-		self.time = 0
+		self.node_data = {}
+		self.edge_data = {}
 
 	def __getitem__(self, item):
-		return self.node_names[item]
+		if type(item) == int:
+			return self.node_ids[item]
+		else:
+			return self.node_names[item]
 
 	def __iter__(self):
 		return iter(self.nodes)
 
 	def __contains__(self, item):
-		return item in self.node_names
+		if type(item) == int:
+			return item in self.node_ids
+		else:
+			return item in self.node_names
 
 	def get_node(self, node_id):
 		if 0 <= node_id < len(self.nodes):
@@ -93,32 +103,32 @@ class LayeredGraph:
 		return None
 
 	def get_edge(self, node1_name, node2_name):
-		if (node1_name, node2_name) in self.edge_names:
-			return self.edge_names[node1_name, node2_name]
+		if (node1_name, node2_name) in self.edge_ids:
+			return self.edge_ids[node1_name, node2_name]
 		return None
 
-	def get_names(self):
+	def get_ids(self):
 		names = []
 		for n in self.nodes:
 			names.append(n.id)
 		return names
 
-	def get_names_by_layer(self):
-		if self.names_by_layer == {}:
+	def get_ids_by_layer(self):
+		if self.ids_by_layer == {}:
 			for n in self.nodes:
-				if n.layer not in self.names_by_layer:
-					self.names_by_layer[n.layer] = []
-				self.names_by_layer[n.layer].append(n.id)
-		return self.names_by_layer
+				if n.layer not in self.ids_by_layer:
+					self.ids_by_layer[n.layer] = []
+				self.ids_by_layer[n.layer].append(n.id)
+		return self.ids_by_layer
 
-	def get_edge_names_by_layer(self, only_diff_layer=False):
-		if self.edge_names_by_layer == {}:
+	def get_edge_ids_by_layer(self, only_diff_layer=False):
+		if self.edge_ids_by_layer == {}:
 			for edge in self.edges:
 				if not only_diff_layer or edge.n1.layer != edge.n2.layer:
-					if edge.n1.layer not in self.edge_names_by_layer:
-						self.edge_names_by_layer[edge.n1.layer] = []
-					self.edge_names_by_layer[edge.n1.layer].append((edge.n1.id, edge.n2.id))
-		return self.edge_names_by_layer
+					if edge.n1.layer not in self.edge_ids_by_layer:
+						self.edge_ids_by_layer[edge.n1.layer] = []
+					self.edge_ids_by_layer[edge.n1.layer].append((edge.n1.id, edge.n2.id))
+		return self.edge_ids_by_layer
 
 	def get_edges_by_layer(self, only_diff_layer=False):
 		if self.edges_by_layer == {}:
@@ -128,6 +138,12 @@ class LayeredGraph:
 						self.edges_by_layer[edge.n1.layer] = []
 					self.edges_by_layer[edge.n1.layer].append(edge)
 		return self.edges_by_layer
+
+	def get_name_to_id(self):
+		if self.name_to_id == {}:
+			for i, nd in enumerate(self.nodes):
+				self.name_to_id[nd.name] = i
+		return self.name_to_id
 
 	def get_adj_list(self):
 		if self.adj_list == {}:
@@ -144,54 +160,72 @@ class LayeredGraph:
 			self.adj_list = {}
 		if self.double_adj_list != {}:
 			self.double_adj_list = {}
-		if self.names_by_layer != {}:
-			self.names_by_layer = {}
-		if self.edge_names_by_layer != {}:
-			self.edge_names_by_layer = {}
+		if self.ids_by_layer != {}:
+			self.ids_by_layer = {}
+		if self.edge_ids_by_layer != {}:
+			self.edge_ids_by_layer = {}
 		if self.edges_by_layer != {}:
 			self.edges_by_layer = {}
+		if self.name_to_id != {}:
+			self.name_to_id = {}
 
-	def add_node(self, layer, name=None, is_anchor=False, stacked=False):
-		if name is None:
-			name = self.n_nodes
-		elif name in self.node_names:
-			raise Exception(f"node {name} already exists in graph")
-		x = LayeredNode(name, layer, is_anchor=is_anchor, stacked=stacked)
+	def add_node(self, layer, idx=None, name=None, is_anchor=False, stacked=False, data=None):
+		if idx is None:
+			idx = self.n_nodes
+		elif id in self.node_ids:
+			raise Exception(f"node {idx} already exists in graph")
+		elif name is not None and name in self.node_names:
+			raise Exception(f"node with name {name} already exists in graph")
+		x = LayeredNode(idx, layer, is_anchor=is_anchor, stacked=stacked, name=name)
 		if layer not in self.layers:
 			self.layers[layer] = []
 			self.n_layers += 1
+		if data is not None:
+			for k, v in data.items():
+				if k not in self.node_data:
+					self.node_data[k] = {}
+				self.node_data[k][idx] = v
 		self.nodes.append(x)
 		self.layers[layer].append(x)
-		self.node_names[name] = x
+		self.node_ids[idx] = x
+		if name is not None:
+			self.node_names[name] = x
+		# else:
+		# 	self.node_names[idx] = x
 		self.n_nodes += 1
 		self.invalidate_data()
 		return x
 
-	def add_nodes(self, names_and_layers):
-		for nl in names_and_layers:
-			self.add_node(nl[1], name=nl[0])
+	def add_nodes(self, ids_and_layers):
+		for nl in ids_and_layers:
+			self.add_node(nl[1], idx=nl[0])
 
-	def add_edge(self, n1_name, n2_name, stacked=False, weight=1):
-		if n1_name not in self.node_names or n2_name not in self.node_names:
-			print(f"failed to add edge ({n1_name}, {n2_name}): node DNE")
+	def add_edge(self, n1_id, n2_id, stacked=False, weight=1, data=None):
+		if n1_id not in self.node_ids or n2_id not in self.node_ids:
+			print(f"failed to add edge ({n1_id}, {n2_id}): node DNE")
 			return
-		if self.node_names[n1_name].layer > self.node_names[n2_name].layer:
-			e = LayeredEdge(self.node_names[n2_name], self.node_names[n1_name], stacked=stacked, weight=weight)
+		if self.node_ids[n1_id].layer > self.node_ids[n2_id].layer:
+			e = LayeredEdge(self.node_ids[n2_id], self.node_ids[n1_id], stacked=stacked, weight=weight)
 			self.edges.append(e)
-			self.edge_names[n2_name, n1_name] = e
+			self.edge_ids[n2_id, n1_id] = e
 		else:
-			e = LayeredEdge(self.node_names[n1_name], self.node_names[n2_name], stacked=stacked, weight=weight)
+			e = LayeredEdge(self.node_ids[n1_id], self.node_ids[n2_id], stacked=stacked, weight=weight)
 			self.edges.append(e)
-			self.edge_names[n1_name, n2_name] = e
+			self.edge_ids[n1_id, n2_id] = e
+		if data is not None:
+			for k, v in data.items():
+				if k not in self.edge_data:
+					self.edge_data[k] = {}
+				self.edge_data[k][n1_id, n2_id] = v
 		self.invalidate_data()
 		return e
 
 	def add_graph_by_edges(self, edge_list):
 		for edge in edge_list:
-			if edge[0] not in self.node_names:
-				self.add_node(edge[1], name=edge[0])
-			elif edge[2] not in self.node_names:
-				self.add_node(edge[3], name=edge[2])
+			if edge[0] not in self.node_ids:
+				self.add_node(edge[1], idx=edge[0])
+			elif edge[2] not in self.node_ids:
+				self.add_node(edge[3], idx=edge[2])
 			self.add_edge(edge[0], edge[2])
 
 	def add_edges(self, edge_list):
@@ -200,21 +234,21 @@ class LayeredGraph:
 
 	# def stack_subgraph(self, cut_nodes: set, crossing_edges):  # DEPRECATED
 	# 	"""
-	# 	Saves subgraph to new list in stacked_nodes/stacked_edges, deletes originals from nodes/edges/node_names
+	# 	Saves subgraph to new list in stacked_nodes/stacked_edges, deletes originals from nodes/edges/node_ids
 	# 	Creates 1 new node, edge per layer with stacked=True and corresponding weight
 	# 	"""
 	# 	level_seen = set()
 	# 	self.stacked_nodes.append([])
 	# 	self.stacked_edges.append([])
 	# 	self.big_stack_nodes.append([])
-	# 	for node in sorted(list(cut_nodes), key=lambda nod: self.node_names[nod].layer):
-	# 		if self.node_names[node].layer not in level_seen:
-	# 			level_seen.add(self.node_names[node].layer)
-	# 			x = self.add_node(self.node_names[node].layer, stacked=True)
+	# 	for node in sorted(list(cut_nodes), key=lambda nod: self.node_ids[nod].layer):
+	# 		if self.node_ids[node].layer not in level_seen:
+	# 			level_seen.add(self.node_ids[node].layer)
+	# 			x = self.add_node(self.node_ids[node].layer, stacked=True)
 	# 			self.big_stack_nodes[-1].append(x)
-	# 		self.stacked_nodes[-1].append(self.node_names[node])
-	# 		self.nodes.remove(self.node_names[node])
-	# 		del self.node_names[node]
+	# 		self.stacked_nodes[-1].append(self.node_ids[node])
+	# 		self.nodes.remove(self.node_ids[node])
+	# 		del self.node_ids[node]
 	# 	cut_edges = []
 	# 	layer_counts = {}
 	# 	for edge in self.edges:
@@ -227,11 +261,11 @@ class LayeredGraph:
 	# 	for edge in cut_edges:
 	# 		self.stacked_edges[-1].append(edge)
 	# 		self.edges.remove(edge)
-	# 		del self.edge_names[edge.n1.name, edge.n2.name]
+	# 		del self.edge_ids[edge.n1.name, edge.n2.name]
 	# 	for edge in crossing_edges:
 	# 		self.stacked_edges[-1].append(edge)
 	# 		self.edges.remove(edge)
-	# 		del self.edge_names[edge.n1.name, edge.n2.name]
+	# 		del self.edge_ids[edge.n1.name, edge.n2.name]
 	# 		if edge.n1.name in cut_nodes:
 	# 			j = 0
 	# 			while self.big_stack_nodes[-1][j].layer != edge.n1.layer:
@@ -247,10 +281,10 @@ class LayeredGraph:
 
 	# def stack_entire_graph(self, list_of_subgraphs):  # DEPRECATED
 	# 	"""
-	# 	Saves subgraphs to new lists in stacked_nodes/stacked_edges, deletes originals from nodes/edges/node_names
+	# 	Saves subgraphs to new lists in stacked_nodes/stacked_edges, deletes originals from nodes/edges/node_ids
 	# 	Creates 1 new node, edge per layer for each subgraph with stacked=True and corresponding weight
 	# 	"""
-	# 	min_max_layers = [(min((self.node_names[node].layer for node in subg_nodes)), max((self.node_names[node].layer for node in subg_nodes))) for subg_nodes in list_of_subgraphs]
+	# 	min_max_layers = [(min((self.node_ids[node].layer for node in subg_nodes)), max((self.node_ids[node].layer for node in subg_nodes))) for subg_nodes in list_of_subgraphs]
 	# 	node_to_group = {}
 	# 	layer_counts = [{} for _ in range(len(list_of_subgraphs))]
 	# 	for i, subg_list in enumerate(list_of_subgraphs):
@@ -263,10 +297,10 @@ class LayeredGraph:
 	# 		for j in range(min_max_layers[i][0], min_max_layers[i][1]+1):
 	# 			x = self.add_node(j, stacked=True)
 	# 			self.big_stack_nodes[-1].append(x)
-	# 	for edge in list(self.edge_names).copy():
+	# 	for edge in list(self.edge_ids).copy():
 	# 		if node_to_group[edge[0]] != node_to_group[edge[1]]:
-	# 			bsn1 = self.big_stack_nodes[node_to_group[edge[0]]][self.node_names[edge[0]].layer - min_max_layers[node_to_group[edge[0]]][0]]
-	# 			bsn2 = self.big_stack_nodes[node_to_group[edge[1]]][self.node_names[edge[1]].layer - min_max_layers[node_to_group[edge[1]]][0]]
+	# 			bsn1 = self.big_stack_nodes[node_to_group[edge[0]]][self.node_ids[edge[0]].layer - min_max_layers[node_to_group[edge[0]]][0]]
+	# 			bsn2 = self.big_stack_nodes[node_to_group[edge[1]]][self.node_ids[edge[1]].layer - min_max_layers[node_to_group[edge[1]]][0]]
 	# 			self.add_edge(bsn1.name, bsn2.name, stacked=True)
 	# 	for edge in self.edges:
 	# 		if not edge.stacked and node_to_group[edge.n1.name] == node_to_group[edge.n2.name]:
@@ -280,17 +314,18 @@ class LayeredGraph:
 	# 	for node in self.nodes:
 	# 		if not node.stacked:
 	# 			self.stacked_nodes[node_to_group[node.name]].append(node)
-	# 			del self.node_names[node.name]
+	# 			del self.node_ids[node.name]
 	# 	self.nodes = [node for node in self.nodes if node.stacked]
 	# 	for edge in self.edges:
 	# 		if not edge.stacked:
 	# 			self.stacked_edges[node_to_group[edge.n1.name]].append(edge)
-	# 			del self.edge_names[edge.n1.name, edge.n2.name]
+	# 			del self.edge_ids[edge.n1.name, edge.n2.name]
 	# 	self.edges = [edge for edge in self.edges if edge.stacked]
 
-	def stacked_graph_from_subgraph_nodes(self, subgraph_assignments, only_subgraphs=False):
+	def stacked_graph_from_subgraph_nodes(self, subgraph_assignments, only_subgraphs=False, keep_indices_same=True):
 		"""
-		:param: subgraph_assignments: List mapping with index node ID and elt subgraph assignment, integer in {0,...,#subgraphs-1}
+		:param: subgraph_assignments: List with node IDs as indices and subgraph assignment as values, assignment is integer in {0,...,#subgraphs-1}
+		:param: only_subgraphs: True if only the subgraph assignments >=1 are to be collapsed (assignment=0 for all uncollapsed nodes), else False to collapse all nodes
 		:return: new stacked graph object G', mapping of node ID -> stack node ID in G'
 		"""
 		new_g = CollapsedGraph(self)
@@ -299,20 +334,24 @@ class LayeredGraph:
 		new_g.stack_node_to_nodelist = {}
 		new_g.crossing_edges = {}
 		new_g.contact_nodes = [[] for _ in range(len(new_g.subgraphs))]
+		old_node_to_new_node = {}
 
 		# for i, subg_list in enumerate(subgraphs):
 		#     for node in subg_list:
 		#         node_to_group[node] = i
 		if only_subgraphs:
 			for i, nd_val in enumerate(subgraph_assignments):
-				if nd_val == 0:
-					new_g.add_node(self.nodes[i].layer, name=i)
+				if nd_val == 0 and keep_indices_same:
+					old_node_to_new_node[i] = new_g.add_node(self.nodes[i].layer, name=self.nodes[i].name)
+				elif nd_val == 0:
+					new_g.add_node(self.nodes[i].layer, idx=i)
 
-		new_g.n_nodes = self.n_nodes
+		if not keep_indices_same:
+			new_g.n_nodes = self.n_nodes
 		for subgraph in new_g.subgraphs:
 			starting_node = new_g.n_nodes
-			min_l = min((self.node_names[node].layer for node in subgraph))
-			max_l = max((self.node_names[node].layer for node in subgraph))
+			min_l = min((self.node_ids[node].layer for node in subgraph))
+			max_l = max((self.node_ids[node].layer for node in subgraph))
 			sn1 = new_g.add_node(min_l, stacked=True)
 			new_g.stack_node_to_nodelist[sn1.id] = set()
 			for level in range(min_l, max_l):
@@ -321,20 +360,20 @@ class LayeredGraph:
 				new_g.add_edge(sn1.id, sn2.id, stacked=True, weight=0)
 				sn1 = sn2
 			for node in subgraph:
-				new_g.node_to_stack_node[node] = starting_node + (self.node_names[node].layer - min_l)
-				new_g.stack_node_to_nodelist[starting_node + (self.node_names[node].layer - min_l)].add(node)
+				new_g.node_to_stack_node[node] = starting_node + (self.node_ids[node].layer - min_l)
+				new_g.stack_node_to_nodelist[starting_node + (self.node_ids[node].layer - min_l)].add(node)
 		for edge in self.edges:
 			if subgraph_assignments[edge.n1.id] != subgraph_assignments[edge.n2.id]:
 				if only_subgraphs:
 					if subgraph_assignments[edge.n1.id] != 0 and subgraph_assignments[edge.n2.id] != 0:
 						new_g.add_edge(new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id])
 					elif subgraph_assignments[edge.n1.id] != 0:
-						new_g.add_edge(new_g.node_to_stack_node[edge.n1.id], edge.n2.id)
+						new_g.add_edge(new_g.node_to_stack_node[edge.n1.id], old_node_to_new_node[edge.n2.id].id)
 					elif subgraph_assignments[edge.n2.id] != 0:
-						new_g.add_edge(edge.n1.id, new_g.node_to_stack_node[edge.n2.id])
+						new_g.add_edge(old_node_to_new_node[edge.n1.id].id, new_g.node_to_stack_node[edge.n2.id])
 				else:
-					if (new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id]) in new_g.edge_names:
-						new_g.edge_names[new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id]].weight += 1    # FIXME handling of cases with multiple crossing edges between the same two stack nodes
+					if (new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id]) in new_g.edge_ids:
+						new_g.edge_ids[new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id]].weight += edge.weight    # FIXME handling of cases with multiple crossing edges between the same two stack nodes
 					else:
 						new_g.add_edge(new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id])
 				# crossing_edges[node_to_group[edge.n1.name]].append((edge.n1.name, edge.n2.name))
@@ -349,9 +388,9 @@ class LayeredGraph:
 					new_g.contact_nodes[subgraph_assignments[edge.n1.id]].append(edge.n1.id)
 					new_g.contact_nodes[subgraph_assignments[edge.n2.id]].append(edge.n2.id)
 			elif not only_subgraphs or subgraph_assignments[edge.n1.id] != 0:
-				new_g.edge_names[new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id]].weight += 1
+				new_g.edge_ids[new_g.node_to_stack_node[edge.n1.id], new_g.node_to_stack_node[edge.n2.id]].weight += edge.weight
 			elif only_subgraphs:
-				new_g.add_edge(edge.n1.id, edge.n2.id)
+				new_g.add_edge(old_node_to_new_node[edge.n1.id].id, old_node_to_new_node[edge.n2.id].id)
 
 		new_g.n_nodes = len(new_g.nodes)
 		return new_g
@@ -359,21 +398,21 @@ class LayeredGraph:
 	# def unstack_graph_nodes(self, stack_index):  # DEPRECATED
 	# 	self.nodes = [node for node in self.nodes if node not in self.big_stack_nodes[stack_index]]
 	# 	for s_node in self.big_stack_nodes[stack_index]:
-	# 		del self.node_names[s_node.name]
+	# 		del self.node_ids[s_node.name]
 	# 	for old_node in self.stacked_nodes[stack_index]:
 	# 		self.nodes.append(old_node)
-	# 		self.node_names[old_node.name] = old_node
+	# 		self.node_ids[old_node.name] = old_node
 	# 	self.big_stack_nodes[stack_index].clear()
 
 	# def unstack_all_graph_edges(self):  # DEPRECATED
 	# 	stacked_edge = [edge for edge in self.edges if edge.stacked]
 	# 	self.edges = [edge for edge in self.edges if not edge.stacked]
 	# 	for edge in stacked_edge:
-	# 		del self.edge_names[edge.n1.name, edge.n2.name]
+	# 		del self.edge_ids[edge.n1.name, edge.n2.name]
 	# 	for stack_edge in self.stacked_edges:
 	# 		for edge in stack_edge:
 	# 			self.edges.append(edge)
-	# 			self.edge_names[edge.n1.name, edge.n2.name] = edge
+	# 			self.edge_ids[edge.n1.name, edge.n2.name] = edge
 	# 	self.stacked_edges = []
 
 	def adjacency_matrix(self):
@@ -400,7 +439,7 @@ class LayeredGraph:
 				to_add.append((last_node.id, edge.n2.id))
 		for v in to_remove:
 			self.edges.remove(v)
-			del self.edge_names[v.n1.id, v.n2.id]
+			del self.edge_ids[v.n1.id, v.n2.id]
 		for e in to_add:
 			self.add_edge(e[0], e[1])
 
@@ -457,13 +496,16 @@ class LayeredGraph:
 				removals.append(edge)
 		if remove_sl:
 			for to_remove in removals:
-				del self.edge_names[to_remove.n1.id, to_remove.n2.id]
+				del self.edge_ids[to_remove.n1.id, to_remove.n2.id]
 				self.edges.remove(to_remove)
+				print(f"Same-layer edge {to_remove} removed")
+		# print(self.nodes)
+		# for i in range(1, len(self.layers) + 1):  # change ids to 0 index
+		# 	self.layers[i - 1] = self.layers[i]
+		# 	del self.layers[i]
 		self.n_layers = len(self.layers)
 		self.nodes.sort(key=lambda x: x.id)
 		self.invalidate_data()
-		# for i in self.layers.keys():
-		#     print(i, [n.name for n in self.layers[i]], [n.layer for n in self.layers[i]])
 
 	def y_val_setup(self):
 		for level in self.layers:
@@ -492,15 +534,15 @@ class LayeredGraph:
 		for level in self.layers:
 			self.layers[level].sort(key=lambda x: -len(adjacency[x.id]))
 		for i in range(n_iter):
-			for j in range(1, len(self.layers) + 1):
-				averages = [sum((self.node_names[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
+			for j in range(len(self.layers)):
+				averages = [sum((self.node_ids[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
 				taken = set()
 				for k, node in enumerate(self.layers[j]):
 					insert_at = find_closest(averages[k], taken)
 					taken.add(insert_at)
 					node.y = insert_at
-			for j in range(len(self.layers), 0, -1):
-				averages = [sum((self.node_names[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
+			for j in range(len(self.layers)-1, -1, -1):
+				averages = [sum((self.node_ids[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
 				taken = set()
 				for k, node in enumerate(self.layers[j]):
 					insert_at = find_closest(averages[k], taken)
@@ -734,14 +776,14 @@ class LayeredGraph:
 		nd_list = []
 		ed_sign = {}
 		nd_idx = 0
-		for ln in range(1, self.n_layers + 1):
+		for ln in range(self.n_layers):
 			for nd1, nd2 in itertools.combinations(self.layers[ln], 2):
 				veg[nd_idx] = []
 				nd_list.append((nd1.id, nd2.id))
 				nd_set[nd1.id, nd2.id] = nd_idx
 				nd_idx += 1
 		ebl = self.get_edges_by_layer()
-		for ln in range(1, self.n_layers):
+		for ln in range(self.n_layers - 1):
 			for ed1, ed2 in itertools.combinations(ebl[ln], 2):
 				if len({ed1.n1.id, ed1.n2.id, ed2.n1.id, ed2.n2.id}) == 4:
 					if (ed1.n1.y > ed2.n1.y and ed1.n2.y > ed2.n2.y) or (ed1.n1.y < ed2.n1.y and ed1.n2.y < ed2.n2.y):
@@ -783,7 +825,7 @@ class LayeredGraph:
 
 
 class CollapsedGraph(LayeredGraph):
-	def __init__(self, g: LayeredGraph):
+	def __init__(self, g: LayeredGraph, subgraphs=None):
 		super().__init__()
 		self.old_g = g
 		self.subgraphs = None
@@ -792,6 +834,9 @@ class CollapsedGraph(LayeredGraph):
 		self.stack_node_to_nodelist = None
 		self.crossing_edges = None
 		self.contact_nodes = None
+		# if subgraphs is not None:
+		# 	self.subgraphs = subgraphs
+		# 	self.collapse_subgraphs()
 
 	def create_layered_graphs_from_subgraphs(self):
 		subgraph_lgs = []
@@ -799,7 +844,7 @@ class CollapsedGraph(LayeredGraph):
 			subg_obj = LayeredGraph()
 			seen_nds = set()
 			for nd in subg:
-				subg_obj.add_node(self.old_g.nodes[nd].layer, name=nd)
+				subg_obj.add_node(self.old_g.nodes[nd].layer, idx=nd)
 				seen_nds.add(nd)
 				for adj in self.old_g.get_adj_list()[nd]:
 					if adj in seen_nds:
@@ -814,12 +859,15 @@ class CollapsedGraph(LayeredGraph):
 			subg_obj = LayeredGraph()
 			seen_nds = set(subg)
 			for nd in subg:
-				subg_obj.add_node(self.old_g.nodes[nd].layer, name=nd)
+				subg_obj.add_node(self.old_g.nodes[nd].layer, idx=nd)
 				seen_nds.remove(nd)
 				for adj in self.old_g.get_adj_list()[nd]:
 					if adj not in seen_nds:
 						if adj not in subg_obj:
-							subg_obj.add_node(self.old_g.nodes[adj].layer, name=adj)
+							subg_obj.add_node(self.old_g.nodes[adj].layer, idx=adj)
 						subg_obj.add_edge(subg_obj[nd], subg_obj[adj])
 			subgraph_lgs.append(subg_obj)
 		return subgraph_lgs
+
+	# def collapse_subgraphs(self):
+

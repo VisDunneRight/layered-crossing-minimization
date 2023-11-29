@@ -11,12 +11,12 @@ def normal_c_vars(g: graph.LayeredGraph, edges_by_layer, mirror_vars):
             for pr in itertools.permutations(edge_list, 2):
                 if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
                     c_vars.append(pr)
-                    constants.append(g.edge_names[pr[0]].weight * g.edge_names[pr[1]].weight)
+                    constants.append(g.edge_ids[pr[0]].weight * g.edge_ids[pr[1]].weight)
         else:
             for pr in itertools.combinations(edge_list, 2):
                 if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
                     c_vars.append(pr)
-                    constants.append(g.edge_names[pr[0]].weight * g.edge_names[pr[1]].weight)
+                    constants.append(g.edge_ids[pr[0]].weight * g.edge_ids[pr[1]].weight)
     return c_vars, constants
 
 
@@ -81,7 +81,7 @@ def kargers_algo_cut_finder(g: graph.LayeredGraph, n_iter):
 
 def is_large_subgraph(g: graph.LayeredGraph, subg_nodes):
     if len(subg_nodes) >= 5:
-        if len([g.node_names[n].layer for n in subg_nodes]) != len(set((g.node_names[n].layer for n in subg_nodes))):
+        if len([g.node_ids[n].layer for n in subg_nodes]) != len(set((g.node_ids[n].layer for n in subg_nodes))):
             return True
     return False
 

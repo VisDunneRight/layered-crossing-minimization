@@ -36,13 +36,13 @@ def true_random_layered_graph(k, n, d):
 			while n_added < n_edges_per_layer:
 				n1 = random.randint(0, n-1) + ((i - 1) * n)
 				n2 = random.randint(0, n-1) + (i * n)
-				if (n1, n2) not in g.edge_names:
+				if (n1, n2) not in g.edge_ids:
 					g.add_edge(n1, n2)
 					n_added += 1
 		if flip_edges:
-			edges = set(g.edge_names.keys())
+			edges = set(g.edge_ids.keys())
 			g.edges = []
-			g.edge_names = {}
+			g.edge_ids = {}
 			for i in range(1, k):
 				for n1 in range((i - 1) * n, n + ((i - 1) * n)):
 					for n2 in range(i * n, n + (i * n)):
@@ -91,7 +91,7 @@ def random_layered_graph_connect_help(k, n, d):
 				if i == k - 1:
 					while len(not_seen_l2) == n_edges_per_layer - n_added and n2 not in not_seen_l2:
 						n2 = random.randint(0, n-1) + (i * n)
-				if (n1, n2) not in g.edge_names:
+				if (n1, n2) not in g.edge_ids:
 					g.add_edge(n1, n2)
 					n_added += 1
 					if n1 in not_seen:
@@ -102,9 +102,9 @@ def random_layered_graph_connect_help(k, n, d):
 						if i == k - 1:
 							not_seen_l2.remove(n2)
 		if flip_edges:
-			edges = set(g.edge_names.keys())
+			edges = set(g.edge_ids.keys())
 			g.edges = []
-			g.edge_names = {}
+			g.edge_ids = {}
 			for i in range(1, k):
 				for n1 in range((i - 1) * n, n + ((i - 1) * n)):
 					for n2 in range(i * n, n + (i * n)):
@@ -143,7 +143,7 @@ def random_layered_graph_connect_help_edgecount(k, n, n_edges):
 			n1 = random.randint(0, g.n_nodes - 1)
 			if len(not_seen) == n_edges - n_added:
 				n1 = random.choice(sorted(not_seen))
-			adj_layers = [g[n1].layer + 1] if g[n1].layer == 1 else ([g[n1].layer - 1] if g[n1].layer == g.n_layers else [g[n1].layer - 1, g[n1].layer + 1])
+			adj_layers = [g[n1].layer + 1] if g[n1].layer == 0 else ([g[n1].layer - 1] if g[n1].layer == g.n_layers - 1 else [g[n1].layer - 1, g[n1].layer + 1])
 			n2_layer = random.choice(adj_layers)
 			n2 = random.randint(0, n-1) + ((n2_layer - 1) * n)
 			g.add_edge(n1, n2)

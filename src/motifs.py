@@ -4,7 +4,7 @@ from src import graph
 def count_butterflies(g: graph.LayeredGraph):
     adjacency = g.get_double_adj_list()
     butterfly_count = 0
-    for i in range(1, g.n_layers):
+    for i in range(g.n_layers - 1):
         wedges = []
         for node_1 in g.layers[i]:
             for adj in adjacency[node_1.id][1]:
@@ -21,7 +21,7 @@ def count_butterflies(g: graph.LayeredGraph):
 def get_butterflies(g: graph.LayeredGraph):
     adjacency = g.get_double_adj_list()
     butterflies = []
-    for i in range(1, g.n_layers):
+    for i in range(g.n_layers - 1):
         wedges = []
         for node_1 in g.layers[i]:
             for adj in adjacency[node_1.id][1]:
@@ -38,7 +38,7 @@ def get_butterflies(g: graph.LayeredGraph):
 def get_3claws(g: graph.LayeredGraph):
     bearclaws = []
     dbl_adj_list = g.get_double_adj_list()
-    for i in range(1, g.n_layers):
+    for i in range(g.n_layers - 1):
         for node_1 in g.layers[i]:
             wedges = []
             for adj in dbl_adj_list[node_1.id][1]:
@@ -66,7 +66,7 @@ def get_3claws(g: graph.LayeredGraph):
 def get_domepaths(g: graph.LayeredGraph):
     domes = []
     dbl_adj_list = g.get_double_adj_list()
-    for i in range(1, g.n_layers):
+    for i in range(g.n_layers - 1):
         for node_1 in g.layers[i]:
             wedges = []
             for adj in dbl_adj_list[node_1.id][1]:

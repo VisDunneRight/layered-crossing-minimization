@@ -13,10 +13,10 @@ def __layer_sweep(g: graph.LayeredGraph, n_iter, fn):
 	best = copy.deepcopy(order)
 	for i in range(n_iter):
 		if i % 2 == 0:
-			for j in range(2, g.n_layers + 1):
+			for j in range(1, g.n_layers):
 				fn(g, g.layers[j], order, True)
 		else:
-			for j in range(g.n_layers - 1, 0, -1):
+			for j in range(g.n_layers - 2, -1, -1):
 				fn(g, g.layers[j], order, False)
 		cr_order = g.num_edge_crossings()
 		# print(cr_order)
@@ -31,7 +31,7 @@ def __layer_sweep(g: graph.LayeredGraph, n_iter, fn):
 
 
 def weighted_median(g: graph.LayeredGraph, n_iter=24):  # Gansner et al. suggest using n_iter=24
-	""" The ordering() function defined by Gansner et al., also called the "Weighted Median Heuristic" """
+	""" The ordering() function defined by Gansner et al., aka 'Weighted Median Heuristic' """
 
 	order = __gansner_init_ordering(g)
 	cr_best = g.num_edge_crossings()
@@ -62,12 +62,12 @@ def weighted_median(g: graph.LayeredGraph, n_iter=24):  # Gansner et al. suggest
 def __gansner_init_ordering(gr: graph.LayeredGraph):
 	""" Uses BFS to assign initial orderings based on order discovered """
 	adj = gr.get_adj_list()
-	bfsq = [random.choice(gr.layers[1]).id]
+	bfsq = [random.choice(gr.layers[0]).id]
 	seen = [False] * (len(gr.nodes) + 1)
 	seen[bfsq[0]] = True
-	layer_seencts = [0] * (len(gr.layers) + 1)
+	layer_seencts = [0] * (len(gr.layers))
 	layer_seencts[1] += 1
-	ordering = [[] for _ in range(len(gr.layers) + 1)]
+	ordering = [[] for _ in range(len(gr.layers))]
 	ordering[1].append(bfsq[0])
 	while bfsq:
 		next_layer = []
@@ -211,14 +211,14 @@ def global_sifting(g: graph.LayeredGraph, maxfails=0):
 	fails = 0
 	while fails <= maxfails:
 		for nd in sift_order:
-			n_cr = __sift(nd, g.layers[g.node_names[nd].layer], flat_order, d_adj, n_cr)
+			n_cr = __sift(nd, g.layers[g.node_ids[nd].layer], flat_order, d_adj, n_cr)
 		if n_cr < best_cr:
 			best_cr = n_cr
 		else:
 			fails += 1
 			sift_order = sift_order[::-1]
 		for nd in sift_order:
-			n_cr = __sift(nd, g.layers[g.node_names[nd].layer], flat_order, d_adj, n_cr)
+			n_cr = __sift(nd, g.layers[g.node_ids[nd].layer], flat_order, d_adj, n_cr)
 		if n_cr < best_cr:
 			best_cr = n_cr
 		else:
@@ -379,7 +379,7 @@ def degree_weighted_barycenter(g: graph.LayeredGraph, threshold=0.05):
 	best_yvals = [node.y for node in g.nodes]
 	while not converged:
 		converged = True
-		for i in range(2, g.n_layers):
+		for i in range(1, g.n_layers-1):
 			for nd in g.layers[i]:
 				old_y = nd.y
 				if len(adj[nd.id][1]) > 0 and len(adj[nd.id][0]) > 0:
@@ -430,6 +430,38 @@ def barycenter_split(g: graph.LayeredGraph, n_iter=12):
 	""" Best-performing combination heuristic of Marti and Laguna, 2003 """
 	barycenter(g, n_iter=n_iter)
 	return split(g, n_iter=n_iter)
+
+
+def neighborhood_sift(g: graph.LayeredGraph, sift_vertices, n_ops):
+	""" Neighborhood sifting, C. Wilson """
+
+	adj = g.get_adj_list()
+	for v in sift_vertices:
+		# Step 1: use BFS to calculate siftable neighborhood
+		# new idea: siftable neighborhood is all adjacent nodes, then greedily take the lowest degree nodes until n_ops exceeded
+		# OR other idea: fan out in bfs fashion, sifting and fixing. only recurse on locations with equal cr (or cr within some bound e.g. 2)
+		seen = [False] * g.n_nodes
+		seen[v] = True
+		sift_ops = [0] * g.n_nodes
+		sift_ops[v] = len(g.layers[g[v].layer])
+		neighborhood = [v]
+		bfsq = [v]
+		ops = 0
+		while bfsq:
+			next_layer = []
+			for u in bfsq:
+				for u_adj in adj[u]:
+					if not seen[u_adj]:
+						seen[u_adj] = True
+						u_adj_ops = sift_ops[u] * len(g.layers[g[u_adj].layer])
+						if u_adj_ops + ops < n_ops / len(sift_vertices):
+							ops += u_adj_ops
+							sift_ops[u_adj] = u_adj_ops
+							neighborhood.append(u_adj)
+							next_layer.append(u_adj)
+			bfsq = next_layer.copy()
+
+		# Step 2: sift recursively out to sift depth
 
 
 # if __name__ == '__main__':
