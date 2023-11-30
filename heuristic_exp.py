@@ -134,6 +134,6 @@ if __name__ == '__main__':
     else:
         data_choice = 0
     run_heuristic_exp_checkpoint(data_choice)
-    # gr = read_data.read("random graphs/matuszewski/5_by_n/n10/graph17.lgbin")
+    # gr = read_data.read("random graphs/matuszewski/10_by_10_density/d20/graph17.lgbin")
     # print(sorted([(v.n1.id, v.n2.id) for v in gr.edges], key=lambda x: x[0]))
     # print(weighted_median(gr))

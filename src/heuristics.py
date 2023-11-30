@@ -93,7 +93,7 @@ def __gansner_wmedian(gr: graph.LayeredGraph, order, c_iter):
 		w = 0
 		for i in range(1, len(lay)):
 			if (gr[lay[i]].y - gr[lay[w]].y) <= 0.0001:
-				print(gr[lay[i]].y, gr[lay[w]].y, i, w)
+				# print(gr[lay[i]].y, gr[lay[w]].y, i, w)
 				gr[lay[i]].y = gr[lay[w]].y + 0.0001 * (i - w)
 			elif abs(gr[lay[i]].y - gr[lay[i - 1]].y) <= 0.0001:
 				gr[lay[i]].y = gr[lay[i - 1]].y + 0.0001
