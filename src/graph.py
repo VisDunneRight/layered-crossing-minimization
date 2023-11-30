@@ -1,6 +1,7 @@
 import itertools
 import pickle
 import random
+from typing import Tuple
 from src.helpers import *
 
 
@@ -741,7 +742,7 @@ class LayeredGraph:
 		new_g.subgraph_types = [0] * (subg_identifier - 1)
 		return new_g
 
-	def check_if_collapsible_subgraph(self, subgraph, joint_idx, leaves_only=False) -> tuple[bool, int]:
+	def check_if_collapsible_subgraph(self, subgraph, joint_idx, leaves_only=False) -> Tuple[bool, int]:
 		subgraph_layers = [self.nodes[nd].layer for nd in subgraph] + [self.nodes[joint_idx].layer]
 		if len(set(subgraph_layers)) != len(subgraph_layers):
 			subgraph_layers.remove(self.nodes[joint_idx].layer)
