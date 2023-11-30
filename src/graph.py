@@ -202,8 +202,9 @@ class LayeredGraph:
 
 	def add_edge(self, n1_id, n2_id, stacked=False, weight=1, data=None):
 		if n1_id not in self.node_ids or n2_id not in self.node_ids:
-			print(f"failed to add edge ({n1_id}, {n2_id}): node DNE")
-			return
+			raise Exception(f"failed to add edge ({n1_id}, {n2_id}): node DNE")
+		if (n1_id, n2_id) in self.edge_ids:
+			raise Exception(f"attempted to create duplicate edge ({n1_id}, {n2_id})")
 		if self.node_ids[n1_id].layer > self.node_ids[n2_id].layer:
 			e = LayeredEdge(self.node_ids[n2_id], self.node_ids[n1_id], stacked=stacked, weight=weight)
 			self.edges.append(e)
@@ -471,7 +472,7 @@ class LayeredGraph:
 
 	# Clean up graph by removing empty layers and making sure the first layer has label 1.
 	def relayer(self, remove_sl=True):
-		n_removals = min((n.layer for n in self.nodes)) - 1
+		n_removals = min((n.layer for n in self.nodes))
 		levels = sorted(list(self.layers.keys()))
 		if n_removals > 0:
 			for level in levels:

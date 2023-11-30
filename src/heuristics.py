@@ -38,7 +38,7 @@ def weighted_median(g: graph.LayeredGraph, n_iter=24):  # Gansner et al. suggest
 	best = copy.deepcopy(order)
 	for i in range(n_iter):  # Even i is a forward pass, odd i is a reverse pass
 		__gansner_wmedian(g, order, i)
-		flat_order = [0] * (len(g.nodes) + 1)
+		flat_order = [0] * len(g.nodes)
 		for lay in order:
 			for j, v in enumerate(lay):
 				flat_order[v] = j
@@ -63,12 +63,12 @@ def __gansner_init_ordering(gr: graph.LayeredGraph):
 	""" Uses BFS to assign initial orderings based on order discovered """
 	adj = gr.get_adj_list()
 	bfsq = [random.choice(gr.layers[0]).id]
-	seen = [False] * (len(gr.nodes) + 1)
+	seen = [False] * len(gr.nodes)
 	seen[bfsq[0]] = True
 	layer_seencts = [0] * (len(gr.layers))
-	layer_seencts[1] += 1
+	layer_seencts[0] += 1
 	ordering = [[] for _ in range(len(gr.layers))]
-	ordering[1].append(bfsq[0])
+	ordering[0].append(bfsq[0])
 	while bfsq:
 		next_layer = []
 		for cur in bfsq:
@@ -90,6 +90,16 @@ def __gansner_wmedian(gr: graph.LayeredGraph, order, c_iter):
 			mval = __gansner_median_value(gr, nd, gr[nd].layer + 2 * (c_iter % 2) - 1)  # y = 2x-1 maps 0 to -1 and 1 to 1
 			gr[nd].y = mval if mval != -1 else gr[nd].y
 		lay.sort(key=lambda x: gr[x].y)
+		w = 0
+		for i in range(1, len(lay)):
+			if (gr[lay[i]].y - gr[lay[w]].y) <= 0.0001:
+				print(gr[lay[i]].y, gr[lay[w]].y, i, w)
+				gr[lay[i]].y = gr[lay[w]].y + 0.0001 * (i - w)
+			elif abs(gr[lay[i]].y - gr[lay[i - 1]].y) <= 0.0001:
+				gr[lay[i]].y = gr[lay[i - 1]].y + 0.0001
+			else:
+				w = i
+		# print([gr[x].y for x in lay])
 
 
 def __gansner_median_value(gr: graph.LayeredGraph, v, adj_rank):
@@ -110,6 +120,8 @@ def __gansner_median_value(gr: graph.LayeredGraph, v, adj_rank):
 	else:
 		left = p[len(p)//2 - 1] - p[0]
 		right = p[len(p) - 1] - p[len(p)//2]
+		# print(p, left, right)
+		# print([nd for nd in gr.get_double_adj_list()[v][1]])
 		return (p[len(p)//2 - 1] * right + p[len(p)//2] * left) / (left + right)
 
 

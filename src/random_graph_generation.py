@@ -7,7 +7,7 @@ import random
 import os
 
 
-def true_random_layered_graph(k, n, d):
+def true_random_connected_layered_graph(k, n, d):
 	"""
 	:param k: number of layers
 	:param n: number of nodes per layer
@@ -29,13 +29,13 @@ def true_random_layered_graph(k, n, d):
 
 		for i in range(k):  # add nodes
 			for j in range(n):
-				g.add_node(i + 1)
+				g.add_node(i)
 
-		for i in range(1, k):  # randomly, uniformly select edges
+		for i in range(k - 1):  # randomly, uniformly select edges
 			n_added = 0
 			while n_added < n_edges_per_layer:
-				n1 = random.randint(0, n-1) + ((i - 1) * n)
-				n2 = random.randint(0, n-1) + (i * n)
+				n1 = random.randint(0, n-1) + (i * n)
+				n2 = random.randint(0, n-1) + ((i + 1) * n)
 				if (n1, n2) not in g.edge_ids:
 					g.add_edge(n1, n2)
 					n_added += 1
@@ -44,8 +44,8 @@ def true_random_layered_graph(k, n, d):
 			g.edges = []
 			g.edge_ids = {}
 			for i in range(1, k):
-				for n1 in range((i - 1) * n, n + ((i - 1) * n)):
-					for n2 in range(i * n, n + (i * n)):
+				for n1 in range(i * n, n + (i * n)):
+					for n2 in range((i + 1) * n, (i + 2) * n):
 						if (n1, n2) not in edges:
 							g.add_edge(n1, n2)
 
@@ -75,22 +75,22 @@ def random_layered_graph_connect_help(k, n, d):
 
 		for i in range(k):  # add nodes
 			for j in range(n):
-				g.add_node(i + 1)
+				g.add_node(i)
 
 		not_seen = set(range(n * k))
-		for i in range(1, k):  # randomly, uniformly select edges
+		for i in range(k - 1):  # randomly, uniformly select edges
 			n_added = 0
-			not_seen_l1 = set((x for x in not_seen if ((i - 1) * n) <= x < n + ((i - 1) * n)))
+			not_seen_l1 = set((x for x in not_seen if i * n <= x < n + (i * n)))
 			if i == k - 1:
-				not_seen_l2 = set((x for x in not_seen if (i * n) <= x < n + (i * n)))
+				not_seen_l2 = set((x for x in not_seen if (i + 1) * n <= x < (i + 2) * n))
 			while n_added < n_edges_per_layer:
-				n1 = random.randint(0, n-1) + ((i - 1) * n)
+				n1 = random.randint(0, n-1) + (i * n)
 				while len(not_seen_l1) == n_edges_per_layer - n_added and n1 not in not_seen_l1:
-					n1 = random.randint(0, n - 1) + ((i - 1) * n)
-				n2 = random.randint(0, n-1) + (i * n)
+					n1 = random.randint(0, n - 1) + (i * n)
+				n2 = random.randint(0, n-1) + ((i + 1) * n)
 				if i == k - 1:
 					while len(not_seen_l2) == n_edges_per_layer - n_added and n2 not in not_seen_l2:
-						n2 = random.randint(0, n-1) + (i * n)
+						n2 = random.randint(0, n-1) + ((i + 1) * n)
 				if (n1, n2) not in g.edge_ids:
 					g.add_edge(n1, n2)
 					n_added += 1
@@ -130,28 +130,43 @@ def random_layered_graph_connect_help_edgecount(k, n, n_edges):
 
 	assert n_edges >= n * k, "graph will not be connected"
 
+	max_edges = (k - 1) * (n * n)
+	flip_edges = True if n_edges > max_edges // 2 else False
+
 	while True:
 		g = graph.LayeredGraph()
 
 		for i in range(k):  # add nodes
 			for j in range(n):
-				g.add_node(i + 1)
+				g.add_node(i)
 
 		not_seen = set(range(n * k))
+		seen_edges = set()
 		n_added = 0
-		for i in range(n_edges):
+		while n_added < n_edges:
 			n1 = random.randint(0, g.n_nodes - 1)
 			if len(not_seen) == n_edges - n_added:
 				n1 = random.choice(sorted(not_seen))
 			adj_layers = [g[n1].layer + 1] if g[n1].layer == 0 else ([g[n1].layer - 1] if g[n1].layer == g.n_layers - 1 else [g[n1].layer - 1, g[n1].layer + 1])
 			n2_layer = random.choice(adj_layers)
-			n2 = random.randint(0, n-1) + ((n2_layer - 1) * n)
-			g.add_edge(n1, n2)
-			if n1 in not_seen:
-				not_seen.remove(n1)
-			if n2 in not_seen:
-				not_seen.remove(n2)
-			n_added += 1
+			n2 = random.randint(0, n - 1) + (n2_layer * n)
+			if (n1, n2) not in seen_edges and (n2, n1) not in seen_edges:
+				g.add_edge(n1, n2)
+				if n1 in not_seen:
+					not_seen.remove(n1)
+				if n2 in not_seen:
+					not_seen.remove(n2)
+				seen_edges.add((n1, n2))
+				n_added += 1
+		if flip_edges:
+			pre_flip = set(g.edge_ids.keys())
+			g.edges = []
+			g.edge_ids = {}
+			for i in range(k):
+				for n1 in range(i * n, n + (i * n)):
+					for n2 in range((i + 1) * n, ((i + 2) * n)):
+						if (n1, n2) not in pre_flip:
+							g.add_edge(n1, n2)
 
 		if g.is_connected():
 			return g
@@ -173,7 +188,7 @@ def generate_gange_dataset(seed=None):
 			if f"g{k}_{n}" not in os.listdir("../random graphs/gange"):
 				os.mkdir(f"../random graphs/gange/g{k}_{n}")
 			for i in range(10):
-				ng = true_random_layered_graph(k, n, 0.2)
+				ng = true_random_connected_layered_graph(k, n, 0.2)
 				ng.write_out(f"../random graphs/gange/g{k}_{n}/graph{i}.lgbin")
 
 
@@ -190,7 +205,7 @@ def generate_random_density_set(seed=None):
 		if f"d{d}" not in os.listdir("../random graphs/density_exp"):
 			os.mkdir(f"../random graphs/density_exp/d{d}")
 		for i in range(10):
-			ng = true_random_layered_graph(5, 10, d / 100)
+			ng = true_random_connected_layered_graph(5, 10, d / 100)
 			print(f"d={d} graph {i}")
 			ng.write_out(f"../random graphs/density_exp/d{d}/graph{i}.lgbin")
 
@@ -241,7 +256,7 @@ def generate_extended_matuszewski_datsets(seed=None):
 				ng.write_out(f"../random graphs/matuszewski/k_by_10/k{k}/graph{i}.lgbin")
 
 	for d in range(15, 96, 5):
-		if f"" not in os.listdir("../random graphs/matuszewski/10_by_10_density"):
+		if f"d{d}" not in os.listdir("../random graphs/matuszewski/10_by_10_density"):
 			os.mkdir(f"../random graphs/matuszewski/10_by_10_density/d{d}")
 			for i in range(100):
 				ng = random_layered_graph_connect_help(10, 10, d / 100)
@@ -255,6 +270,6 @@ if __name__ == '__main__':
 	# generate_random_fixed_density_set(seed=71)
 	generate_extended_matuszewski_datsets()
 
-	# gr = src.read_data.read("../random graphs/matuszewski/k_by_10/k20/graph2.lgbin")
+	# gr = src.read_data.read("../random graphs/matuszewski/10_by_10_density/d15/graph0.lgbin")
 	# gr = random_layered_graph_connect_help_edgecount(3, 10, 35)
 	# src.vis.draw_graph(gr, "rand", gravity=True, nested=True)
