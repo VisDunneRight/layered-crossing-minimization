@@ -122,7 +122,7 @@ def run_heuristic_exp_checkpoint(dataset):
         elif dataset == 3:
             if idx == 0:
                 insert_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", ["Index", "File", "Crossings", "Runtime"])
-            for fileid in range(3983):
+            for fileid in range(idx, 3983):
                 print(hname, "file", fileid)
                 run_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", rome_names[fileid], heuristic_fns[i], fileid)
             idx = 0
