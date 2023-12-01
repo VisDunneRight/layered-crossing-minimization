@@ -90,15 +90,10 @@ def __gansner_wmedian(gr: graph.LayeredGraph, order, c_iter):
 			mval = __gansner_median_value(gr, nd, gr[nd].layer + 2 * (c_iter % 2) - 1)  # y = 2x-1 maps 0 to -1 and 1 to 1
 			gr[nd].y = mval if mval != -1 else gr[nd].y
 		lay.sort(key=lambda x: gr[x].y)
-		w = 0
+		# print([gr[x].y for x in lay])
 		for i in range(1, len(lay)):
-			if (gr[lay[i]].y - gr[lay[w]].y) <= 0.0001:
-				# print(gr[lay[i]].y, gr[lay[w]].y, i, w)
-				gr[lay[i]].y = gr[lay[w]].y + 0.0001 * (i - w)
-			elif abs(gr[lay[i]].y - gr[lay[i - 1]].y) <= 0.0001:
+			if gr[lay[i]].y <= gr[lay[i - 1]].y + 0.0001:
 				gr[lay[i]].y = gr[lay[i - 1]].y + 0.0001
-			else:
-				w = i
 		# print([gr[x].y for x in lay])
 
 

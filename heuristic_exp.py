@@ -90,8 +90,8 @@ def run_heuristic_exp_checkpoint(dataset):
     for i in range(hidx, len(heuristic_names)):
         hname = heuristic_names[i]
         print(hname)
-        if (fold == 0 and idx == 0) or (dataset == 3 and idx == 0):
-            insert_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", ["Index", "File", "Crossings", "Runtime"])
+        # if (fold == 0 and idx == 0) or (dataset == 3 and idx == 0):
+        #     insert_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", ["Index", "File", "Crossings", "Runtime"])
         if dataset == 0:
             if fold == 10 and idx == 0:
                 insert_one(f"data storage/heuristic/{hname}/{data_names[dataset]}.csv", ["Index", "File", "Crossings", "Runtime"])
