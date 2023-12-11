@@ -132,6 +132,8 @@ def random_layered_graph_connect_help_edgecount(k, n, n_edges):
 
 	max_edges = (k - 1) * (n * n)
 	flip_edges = True if n_edges > max_edges // 2 else False
+	if flip_edges:
+		n_edges = max_edges - n_edges
 
 	while True:
 		g = graph.LayeredGraph()
@@ -145,7 +147,7 @@ def random_layered_graph_connect_help_edgecount(k, n, n_edges):
 		n_added = 0
 		while n_added < n_edges:
 			n1 = random.randint(0, g.n_nodes - 1)
-			if len(not_seen) == n_edges - n_added:
+			if len(not_seen) == n_edges - n_added and not flip_edges:
 				n1 = random.choice(sorted(not_seen))
 			adj_layers = [g[n1].layer + 1] if g[n1].layer == 0 else ([g[n1].layer - 1] if g[n1].layer == g.n_layers - 1 else [g[n1].layer - 1, g[n1].layer + 1])
 			n2_layer = random.choice(adj_layers)
@@ -160,12 +162,14 @@ def random_layered_graph_connect_help_edgecount(k, n, n_edges):
 				n_added += 1
 		if flip_edges:
 			pre_flip = set(g.edge_ids.keys())
+			print(pre_flip)
 			g.edges = []
 			g.edge_ids = {}
-			for i in range(k):
+			for i in range(k - 1):
 				for n1 in range(i * n, n + (i * n)):
 					for n2 in range((i + 1) * n, ((i + 2) * n)):
 						if (n1, n2) not in pre_flip:
+							print(n1, n2)
 							g.add_edge(n1, n2)
 
 		if g.is_connected():

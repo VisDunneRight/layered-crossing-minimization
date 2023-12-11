@@ -6,7 +6,7 @@ import os
 # from altair_saver import save
 
 
-def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, gravity=False, edge_thickness=False):
+def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, gravity=False, edge_thickness=False, label_nodes=True):
     if nested:
         if "Images" not in os.listdir(".."):
             os.mkdir("../Images")
@@ -90,7 +90,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
                 ctx.move_to((node.layer - 1 - min_l) * node_x_distance + offset - 11, node.y * node_y_distance + offset + 4)
             else:
                 ctx.move_to((node.layer - 1 - min_l) * node_x_distance + offset - 11, node.y * node_y_distance + offset + 4 + (2 * (node.layer % 2) - 1) * 25)
-            if not node.is_anchor_node:
+            if not node.is_anchor_node and label_nodes:
                 ctx.show_text(str(node.name))
         else:
             ctx.set_source_rgb(0.2, 0.2, 0.2)
@@ -135,15 +135,26 @@ def draw_altair_line_chart(data_points, x_axis, y_axis, color_field, x_title, y_
     chart.save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})
 
 
-def draw_altair_simple_line_chart(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name):
+def draw_altair_simple_line_chart(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name, xdom=None, ydom=None, coldom=None, rng2=False):
     data = alt.Data(values=data_points)
-    dom = list(set(dp[f"{color_field}"] for dp in data_points))
-    rng = ["#000000", "#e15759", "#b07aa1", "#9c755f", "#f28e2b", "#ff9da7", "#4e79a7", "#59a14f", "#edc948", "#76b7b2"]
-    chart = alt.Chart(data).mark_line().encode(
-        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
-        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title)),
-        color=alt.Color(f'{color_field}:N', scale=alt.Scale(domain=dom, range=rng))
+    dom = coldom if coldom is not None else list(set(dp[f"{color_field}"] for dp in data_points))
+    rng = ["#000000", "#e15759", "#4e79a7", "#b07aa1", "#f28e2b", "#9c755f", "#ff9da7", "#59a14f", "#4e79a7", "#ff9da7", "#59a14f"]  # "#edc948", "#76b7b2"]
+    if rng2:
+        rng = ["#000000", "#e15759", "#4e79a7", "#9c755f", "#ff9da7", "#59a14f"]
+    chart = alt.Chart(data).mark_line(clip=True).encode(
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title), scale=alt.Scale(domain=xdom) if xdom else alt.Scale()),
+        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title, format='%'), scale=alt.Scale(domain=ydom) if ydom else alt.Scale()),
+        color=alt.Color(f'{color_field}:N', scale=alt.Scale(domain=dom, range=rng)),
+        strokeDash=alt.StrokeDash("Dash:N", sort=["normal", "combined", "optimal"])
     )
+    # .properties(
+    #     width=800,
+    #     height=600,
+    #     autosize=alt.AutoSizeParams(
+    #         type='fit',
+    #         contains='padding'
+    #     )
+    # )
     chart.save(f"charts/{chart_name}.html", embed_options={'renderer': 'svg'})
 
 
