@@ -14,8 +14,8 @@ def create_bfs_layered_graph(s_g):  # DEPRECATED
     bfs_q.add(first)
     visited[first] = True
     g = graph.LayeredGraph()
-    g.add_node(1, name=first)
-    layer = 1
+    g.add_node(0, idx=first)
+    layer = 0
     while bfs_q:
         to_explore = bfs_q.copy()
         bfs_q.clear()
@@ -24,7 +24,7 @@ def create_bfs_layered_graph(s_g):  # DEPRECATED
             for adj in s_g[n]:
                 if not visited[adj]:
                     visited[adj] = True
-                    g.add_node(layer, name=adj)
+                    g.add_node(layer, idx=adj)
                     bfs_q.add(adj)
                     g.add_edge(n, adj)
                 elif adj in bfs_q:
@@ -121,10 +121,10 @@ def create_edge_list_layered_graph_given_layering(filepath, layer_assign):
             e = re.split('[ ,\n]', line)
             e = [entry for entry in e if entry.isnumeric()]
             assert len(e) == 2, "file format incorrect. Each line should be integers of the form: u, v"
-            if int(e[0]) not in g.node_names:
-                g.add_node(layer_assign[int(e[0])], name=int(e[0]))
-            if int(e[1]) not in g.node_names:
-                g.add_node(layer_assign[int(e[1])], name=int(e[1]))
+            if int(e[0]) not in g.node_ids:
+                g.add_node(layer_assign[int(e[0])], idx=int(e[0]))
+            if int(e[1]) not in g.node_ids:
+                g.add_node(layer_assign[int(e[1])], idx=int(e[1]))
             g.add_edge(int(e[0]), int(e[1]))
     g.add_anchors()
     g.y_val_setup()
@@ -239,14 +239,14 @@ def min_width(s_g, w, c):
     for adj_list in s_g.values():
         for j in adj_list:
             in_deg[j] += 1
-    cur_layer, width_cur, width_up = 1, 0, 0
+    cur_layer, width_cur, width_up = 0, 0, 0
     while len(v_minus_u) > 0:
         chosen = False
         for node in v_minus_u:
             if all(z_list[v] is True for v in s_g[node]):
                 chosen = True
                 selected = node
-                g.add_node(cur_layer, name=node)
+                g.add_node(cur_layer, idx=node)
                 v_minus_u.remove(node)
                 u_list.append(node)
                 width_cur -= len(s_g[node]) - 1
@@ -282,13 +282,13 @@ def promote_vertex(layering, g_dl, v):
 
 def vertex_promotion(g: graph.LayeredGraph):
     double_adj = g.get_double_adj_list()
-    layering = [g.node_names[i].layer for i in range(g.n_nodes)]
+    layering = [g.node_ids[i].layer for i in range(g.n_nodes)]
     layer_backup = layering.copy()
     for i in range(100):
         promotions = 0
         for v in g.nodes:
-            if len(double_adj[v.name][1]) > 0:
-                if promote_vertex(layering, double_adj, v.name) < 0:
+            if len(double_adj[v.id][1]) > 0:
+                if promote_vertex(layering, double_adj, v.id) < 0:
                     promotions += 1
                     layer_backup = layering.copy()
                 else:
@@ -296,6 +296,4 @@ def vertex_promotion(g: graph.LayeredGraph):
         if promotions == 0:
             break
     for i, l in enumerate(layering):
-        # if i == 0:
-        #     continue
-        g.node_names[i].layer = l
+        g.node_ids[i].layer = l

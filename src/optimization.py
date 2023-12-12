@@ -6,7 +6,7 @@ import gurobipy as gp
 from gurobipy import GRB
 from sklearn.cluster import SpectralClustering
 from src import vis, reductions, motifs, type_conversions, read_data
-from src.graph import LayeredGraph
+from src.graph import LayeredGraph, CollapsedGraph
 from src.helpers import *
 
 
@@ -14,12 +14,12 @@ class LayeredOptimizer:
 	def __init__(self, layered_graph, parameters=None):
 		if parameters is None:
 			parameters = {}
-		assert (type(layered_graph) == str and os.path.isfile(layered_graph)) or type(layered_graph) == LayeredGraph, "input needs to be a path to graph file or a LayeredGraph object"
-		if type(layered_graph) == LayeredGraph:
+		assert (type(layered_graph) == str and os.path.isfile(layered_graph)) or type(layered_graph) == LayeredGraph or type(layered_graph) == CollapsedGraph, "input needs to be a path to graph file or a LayeredGraph object"
+		if type(layered_graph) == LayeredGraph or type(layered_graph) == CollapsedGraph:
 			self.g = layered_graph
 		else:
 			self.g = read_data.read(layered_graph)
-		self.x_var_assign = {x_v: 2 for n_l in self.g.get_names_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
+		self.x_var_assign = {x_v: 2 for n_l in self.g.get_ids_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
 		self.bendiness_reduction = parameters["bendiness_reduction"] if "bendiness_reduction" in parameters else False
 		self.gamma_1 = parameters["gamma_1"] if "gamma_1" in parameters else 1
 		self.gamma_2 = parameters["gamma_2"] if "gamma_2" in parameters else 1
@@ -66,12 +66,12 @@ class LayeredOptimizer:
 		""" Collapse valid subgraphs """
 		if self.collapse_leaves:
 			g = g.collapse_leaves()
-			self.x_var_assign = {x_v: 2 for n_l in g.get_names_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
+			self.x_var_assign = {x_v: 2 for n_l in g.get_ids_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
 			# vis.draw_graph(g, "after collapse", groups={nd.name: 1 if nd.stacked else 0 for nd in g.nodes})
 
 		""" Create model and graph data """
-		nodes_by_layer = g.get_names_by_layer()
-		edges_by_layer = g.get_edge_names_by_layer()
+		nodes_by_layer = g.get_ids_by_layer()
+		edges_by_layer = g.get_edge_ids_by_layer()
 		n_constraints_generated = [0] * 6  # simple edge, hybrid edge, same layer edge, vertical pos, bendiness, total
 		pre_sym = '\t' if is_subgraph else ''
 		if self.verbose:
@@ -99,7 +99,7 @@ class LayeredOptimizer:
 			c_vars_orig, nc_consts = reductions.normal_c_vars(g, edges_by_layer, False)
 		c = m.addVars(c_vars, vtype=relax_type, name="c")
 		if self.vertical_transitivity or self.stratisfimal_y_vars:
-			y_vars = [n.name for n in g]
+			y_vars = [n.id for n in g]
 			y = m.addVars(y_vars, vtype=relax_type, lb=0, ub=self.m_val, name="y")
 		else:
 			y = None
@@ -136,7 +136,7 @@ class LayeredOptimizer:
 		""" Set model objective function """
 		if not self.sequential_bendiness:
 			if self.bendiness_reduction:
-				b_vars = list(g.edge_names.keys())
+				b_vars = list(g.edge_ids.keys())
 				b = m.addVars(b_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="b")
 				m.setObjective(self.gamma_1 * c.sum() + self.gamma_2 * b.sum(), GRB.MINIMIZE)
 			else:
@@ -236,7 +236,7 @@ class LayeredOptimizer:
 					g.assign_y_vals_given_x_vars(self.x_var_assign)
 				else:
 					for v in m.getVars():
-						if v.varName[:1] == "y" and int(v.varName[2:v.varName.index(']')]) in g.node_names:
+						if v.varName[:1] == "y" and int(v.varName[2:v.varName.index(']')]) in g.node_ids:
 							g[int(v.varName[2:v.varName.index(']')])].y = float(v.x)
 			vis.draw_graph(g, self.name)
 
@@ -260,7 +260,7 @@ class LayeredOptimizer:
 	def __sequential_br(self, graph_arg=None, substitute_x_vars=None, subgraph_seq=False):
 		g = self.g if graph_arg is None else graph_arg
 		x_var_opt = self.x_var_assign if substitute_x_vars is None else substitute_x_vars
-		y_vars = list(g.node_names)
+		y_vars = list(g.node_ids)
 		n_constr = 0
 		m2 = gp.Model()
 		y = m2.addVars(y_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="y")
@@ -268,13 +268,13 @@ class LayeredOptimizer:
 		m2.update()
 		for v in m2.getVars():
 			v.start = g[int(v.varName[2:v.varName.index(']')])].y
-		b_vars = list(g.edge_names.keys())
+		b_vars = list(g.edge_ids.keys())
 		b = m2.addVars(b_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="b")
 		# b = m2.addVars(b_vars, vtype=GRB.INTEGER, lb=0, ub=mv, name="b")
 		m2.setObjective(b.sum(), GRB.MINIMIZE)
 		n_orig = sum((1 for node in g.nodes if not node.is_anchor_node))
 		if subgraph_seq:
-			n_orig = max((n.name for n in g.nodes))
+			n_orig = max((n.id for n in g.nodes))
 		for var, val in x_var_opt.items():
 			if val == 0:
 				if g[int(var[0])].is_anchor_node and int(var[1]) > n_orig:
@@ -348,7 +348,7 @@ class LayeredOptimizer:
 			for c_var_pair in butterflies:
 				model.addConstr(c[c_var_pair[0]] + c[c_var_pair[1]] == 1)
 		for c_var in c_vars:
-			if self.mirror_vars and not g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
+			if self.mirror_vars and not g.edge_ids[c_var[0]].same_layer_edge and not g.edge_ids[c_var[1]].same_layer_edge:
 				model.addConstr(x[c_var[1][0], c_var[0][0]] + x[c_var[0][1], c_var[1][1]] + c[c_var] >= 1, f"1se{c_var}")
 				model.addConstr(x[c_var[0][0], c_var[1][0]] + x[c_var[1][1], c_var[0][1]] + c[c_var] >= 1, f"2se{c_var}")
 				if track_x_var_usage:
@@ -368,7 +368,7 @@ class LayeredOptimizer:
 				x1_rev, x2_rev, x3_rev = 1, 1, 1
 
 				# simple edge crossing
-				if not g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
+				if not g.edge_ids[c_var[0]].same_layer_edge and not g.edge_ids[c_var[1]].same_layer_edge:
 					if (c_var[0][0], c_var[1][0]) in x:
 						x1 = (c_var[0][0], c_var[1][0])
 					else:
@@ -392,7 +392,7 @@ class LayeredOptimizer:
 					n_constr_0 += 2
 
 				# same-layer/2-layer edge crossing
-				elif g.edge_names[c_var[0]].same_layer_edge and not g.edge_names[c_var[1]].same_layer_edge:
+				elif g.edge_ids[c_var[0]].same_layer_edge and not g.edge_ids[c_var[1]].same_layer_edge:
 					if (c_var[0][0], c_var[1][0]) in x:
 						x1 = (c_var[0][0], c_var[1][0])
 					else:
@@ -414,7 +414,7 @@ class LayeredOptimizer:
 					model.addConstr(x1_rev * x[x1] - x2_rev * x[x2] + c[c_var] + (1 - x1_rev) / 2 - (1 - x2_rev) / 2 >= 0, f"2hy{c_var}")
 					n_constr_1 += 2
 
-				elif g.edge_names[c_var[1]].same_layer_edge and not g.edge_names[c_var[0]].same_layer_edge:
+				elif g.edge_ids[c_var[1]].same_layer_edge and not g.edge_ids[c_var[0]].same_layer_edge:
 					if (c_var[1][0], c_var[0][0]) in x:
 						x1 = (c_var[1][0], c_var[0][0])
 					else:
@@ -671,17 +671,17 @@ class LayeredOptimizer:
 					csum = gp.LinExpr()
 					for edg in fcycle:
 						u, v = node_list[edg[0]], node_list[edg[1]]
-						if g.node_names[u[0]].layer > g.node_names[v[0]].layer:
+						if g.node_ids[u[0]].layer > g.node_ids[v[0]].layer:
 							u, v = v, u
 						if ((u[0], v[0]), (u[1], v[1])) in cvars_set or ((u[1], v[1]), (u[0], v[0])) in cvars_set:
-							if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y < g.node_names[v[1]].y):
+							if (g.node_ids[u[0]].y < g.node_ids[u[1]].y) == (g.node_ids[v[0]].y < g.node_ids[v[1]].y):
 								e1 = (u[0], v[0]) if edg[2] == 0 else (u[0], v[1])  # if sign doesn't match ypos comparison then we know this is a butterfly, and we got the wrong two edges in cvars
 								e2 = (u[1], v[1]) if edg[2] == 0 else (u[1], v[0])
 							else:
 								e1 = (u[0], v[0]) if edg[2] == 1 else (u[0], v[1])
 								e2 = (u[1], v[1]) if edg[2] == 1 else (u[1], v[0])
 						elif ((u[0], v[1]), (u[1], v[0])) in cvars_set or ((u[1], v[0]), (u[0], v[1])) in cvars_set:
-							if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):  # XAND
+							if (g.node_ids[u[0]].y < g.node_ids[u[1]].y) == (g.node_ids[v[0]].y > g.node_ids[v[1]].y):  # XAND
 								e1 = (u[0], v[1]) if edg[2] == 0 else (u[0], v[0])
 								e2 = (u[1], v[0]) if edg[2] == 0 else (u[1], v[1])
 							else:
@@ -725,11 +725,11 @@ class LayeredOptimizer:
 							connect_nd = graph.node_to_stack_node[connect_nd]
 						for nd_other in subgraph.nodes:
 							if nd_other.layer == graph[connect_nd].layer:
-								relative_xval = get_x_var(self.x_var_assign, graph.node_to_stack_node[nd_other.name], connect_nd)
+								relative_xval = get_x_var(self.x_var_assign, graph.node_to_stack_node[nd_other.id], connect_nd)
 						if relative_xval != -1:
 							for other_nd in subgraph.layers[subgraph[var_to_fix].layer]:
-								if other_nd.name != var_to_fix:
-									xvars_to_fix[var_to_fix, other_nd.name] = 1 - relative_xval
+								if other_nd.id != var_to_fix:
+									xvars_to_fix[var_to_fix, other_nd.id] = 1 - relative_xval
 					optim = LayeredOptimizer(subgraph)
 					# print(xvars_to_fix)
 					if xvars_to_fix != {}:
@@ -742,10 +742,10 @@ class LayeredOptimizer:
 					for j, nd in enumerate(subgraph.nodes):
 						for nd2 in subgraph.nodes[j+1:]:
 							if nd.layer == nd2.layer:
-								if (nd.name, nd2.name) in self.x_var_assign:
-									self.x_var_assign[nd.name, nd2.name] = 0
+								if (nd.id, nd2.id) in self.x_var_assign:
+									self.x_var_assign[nd.id, nd2.id] = 0
 								else:
-									self.x_var_assign[nd2.name, nd.name] = 1
+									self.x_var_assign[nd2.id, nd.id] = 1
 			to_remove = []
 			for x_var in x_vars:
 				if graph[x_var[0]].stacked and graph[x_var[1]].stacked:
@@ -807,8 +807,8 @@ class LayeredOptimizer:
 		# TODO (later): remove all the parameters to standard_opt, replace non-top-level calls with creation of new optimizer object
 		self.print_info.append("")
 
-		subgraphs = [set(node.name for node in self.g.nodes if cluster[node.name] == i) for i in range(n_partitions)]
-		top_level_subgraphs = {v: cluster[next(iter(stack_to_nodeset[v]))] for v in top_level_g.node_names.keys()}
+		subgraphs = [set(node.id for node in self.g.nodes if cluster[node.id] == i) for i in range(n_partitions)]
+		top_level_subgraphs = {v: cluster[next(iter(stack_to_nodeset[v]))] for v in top_level_g.node_ids.keys()}
 		# 2-subgraph optimization version
 		# top_x_vars = {}
 		# for node_list in top_level_g.layers.values():
@@ -839,7 +839,7 @@ class LayeredOptimizer:
 		t = time.time()
 		vis.draw_graph(top_level_g, "interim", gravity=True, groups=top_level_subgraphs)
 		vis.draw_graph(self.g, "overall", groups=cluster)
-		f_subg_l = {node.layer: node.name for node in top_level_g.nodes if top_level_subgraphs[node.name] == fix_subg}
+		f_subg_l = {node.layer: node.id for node in top_level_g.nodes if top_level_subgraphs[node.id] == fix_subg}
 		fix_x_vars_for_merge = {}
 		for x_var in top_x_vars:
 			for low_n1 in stack_to_nodeset[x_var[0]]:
@@ -876,27 +876,27 @@ class LayeredOptimizer:
 					vars_to_fix[x_var] = fix_x_vars_for_merge[x_var]
 
 			for subg_node in subg:
-				g_prime.add_node(self.g[subg_node].layer, name=self.g[subg_node].name, is_anchor=self.g[subg_node].is_anchor_node)
+				g_prime.add_node(self.g[subg_node].layer, idx=self.g[subg_node].id, is_anchor=self.g[subg_node].is_anchor_node)
 			for subg_node in subg:
 				if subg_node in sides:
 					for cnode, clist in crosses.items():
 						if cnode == subg_node:
 							for cadj in clist:
 								if cadj not in g_prime:
-									g_prime.add_node(g_prime[subg_node].layer + 1, name=cadj, stacked=True)
+									g_prime.add_node(g_prime[subg_node].layer + 1, idx=cadj, stacked=True)
 									extra_node_closest_subg[cadj] = cluster[subg_node]
 								g_prime.add_edge(subg_node, cadj)
 								sides_prime[cadj] = sides[subg_node]
 						elif subg_node in clist:
 							if cnode not in g_prime:
-								g_prime.add_node(g_prime[subg_node].layer - 1, name=cnode, stacked=True)
+								g_prime.add_node(g_prime[subg_node].layer - 1, idx=cnode, stacked=True)
 								extra_node_closest_subg[cnode] = cluster[subg_node]
 							g_prime.add_edge(cnode, subg_node)
 							sides_prime[cnode] = sides[subg_node]
 				for adj_node in self.g.get_double_adj_list()[subg_node]:
 					if adj_node in subg:
 						g_prime.add_edge(subg_node, adj_node)
-			gp_layers = g_prime.get_names_by_layer()
+			gp_layers = g_prime.get_ids_by_layer()
 
 			for nd, clr in extra_node_closest_subg.items():  # line the extra crossing nodes up with vars_to_fix
 				for other in gp_layers[g_prime[nd].layer]:
@@ -1026,6 +1026,13 @@ class LayeredOptimizer:
 				return "non-transitive x-values"
 		return y_assign
 
+	def __assign_x_given_y(self):
+		for k in self.x_var_assign:
+			if self.g[k[0]].y < self.g[k[1]].y:
+				self.x_var_assign[k] = 0
+			else:
+				self.x_var_assign[k] = 1
+
 	def optimize_layout(self, fix_xvars=None):
 		if self.do_subg_reduction:
 			out = self.__optimize_full_subgraph_algorithm()
@@ -1038,3 +1045,8 @@ class LayeredOptimizer:
 				print(string)
 			self.print_info.clear()
 		return out
+
+	def just_bendiness_reduction(self):
+		self.__assign_x_given_y()
+		self.__sequential_br()
+		vis.draw_graph(self.g, self.name)

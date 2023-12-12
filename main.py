@@ -9,6 +9,7 @@ if __name__ == '__main__':
 	optimizer.symmetry_breaking = True
 	optimizer.mip_relax = True
 	optimizer.bendiness_reduction = True
+	optimizer.collapse_leaves = True
 	optimizer.draw_graph = True
 	optimizer.cutoff_time = 60
 	optimizer.name = "grafo3216.40"

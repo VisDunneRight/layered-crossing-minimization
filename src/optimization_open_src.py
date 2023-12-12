@@ -50,7 +50,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		""" Collapse valid subgraphs """
 		if self.collapse_leaves:
 			g = g.collapse_leaves()
-			self.x_var_assign = {x_v: 2 for n_l in g.get_names_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
+			self.x_var_assign = {x_v: 2 for n_l in g.get_ids_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
 
 		vis.draw_graph(g, "interim")
 
@@ -66,7 +66,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		c_var_constants = {}
 		counter = 0
 		xs = 0
-		for name_list in g.get_names_by_layer().values():
+		for name_list in g.get_ids_by_layer().values():
 			combinatorics = itertools.permutations(name_list, 2) if self.mirror_vars else itertools.combinations(name_list, 2)
 			for x_pair in combinatorics:
 				x_vars[x_pair] = counter
@@ -75,18 +75,18 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 				# counter_eq += 1
 		xf, zs = counter, counter
 		if self.vertical_transitivity:
-			for name_list in g.get_names_by_layer().values():
+			for name_list in g.get_ids_by_layer().values():
 				for z_pair in itertools.permutations(name_list, 2):
 					z_vars[z_pair] = counter
 					counter += 1
 		zf, cs = counter, counter
-		for i, edge_list in g.get_edge_names_by_layer().items():
+		for i, edge_list in g.get_edge_ids_by_layer().items():
 			if self.mirror_vars:
 				for pr in itertools.permutations(edge_list, 2):
 					if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
 						c_vars[pr] = counter
 						if pr[0][0] < pr[1][0]:
-							c_var_constants[pr] = g.edge_names[pr[0]].weight * g.edge_names[pr[1]].weight
+							c_var_constants[pr] = g.edge_ids[pr[0]].weight * g.edge_ids[pr[1]].weight
 						else:
 							c_var_constants[pr] = 0
 						# c_vars_eq[pr] = counter_eq
@@ -96,14 +96,14 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 				for pr in itertools.combinations(edge_list, 2):
 					if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
 						c_vars[pr] = counter
-						c_var_constants[pr] = g.edge_names[pr[0]].weight * g.edge_names[pr[1]].weight
+						c_var_constants[pr] = g.edge_ids[pr[0]].weight * g.edge_ids[pr[1]].weight
 						# c_vars_eq[pr] = counter_eq
 						counter += 1
 						# counter_eq += 1
 		cf, ys = counter, counter
 		if self.vertical_transitivity:
 			for nd in g.nodes:
-				y_vars[nd.name] = counter
+				y_vars[nd.id] = counter
 				counter += 1
 		yf = counter
 		self.nvars = counter
@@ -299,7 +299,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 
 	def __transitivity_matrix(self, x, y, z, g):
 		if self.direct_transitivity:
-			for x_vars_list in g.get_names_by_layer().values():
+			for x_vars_list in g.get_ids_by_layer().values():
 				for x_1, x_2, x_3 in itertools.combinations(x_vars_list, 3):
 					if self.mirror_vars:
 						self.__add_matrix_constraint([x[x_1, x_2], x[x_2, x_3], x[x_1, x_3]], [-1, -1, 1], 0)
@@ -415,17 +415,17 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 					c_idxs = []
 					for edg in fcycle:
 						u, v = node_list[edg[0]], node_list[edg[1]]
-						if g.node_names[u[0]].layer > g.node_names[v[0]].layer:
+						if g.node_ids[u[0]].layer > g.node_ids[v[0]].layer:
 							u, v = v, u
 						if ((u[0], v[0]), (u[1], v[1])) in cvars_set or ((u[1], v[1]), (u[0], v[0])) in cvars_set:
-							if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y < g.node_names[v[1]].y):
+							if (g.node_ids[u[0]].y < g.node_ids[u[1]].y) == (g.node_ids[v[0]].y < g.node_ids[v[1]].y):
 								e1 = (u[0], v[0]) if edg[2] == 0 else (u[0], v[1])  # if sign doesn't match ypos comparison then we know this is a butterfly, and we got the wrong two edges in cvars
 								e2 = (u[1], v[1]) if edg[2] == 0 else (u[1], v[0])
 							else:
 								e1 = (u[0], v[0]) if edg[2] == 1 else (u[0], v[1])
 								e2 = (u[1], v[1]) if edg[2] == 1 else (u[1], v[0])
 						elif ((u[0], v[1]), (u[1], v[0])) in cvars_set or ((u[1], v[0]), (u[0], v[1])) in cvars_set:
-							if (g.node_names[u[0]].y < g.node_names[u[1]].y) == (g.node_names[v[0]].y > g.node_names[v[1]].y):  # XAND
+							if (g.node_ids[u[0]].y < g.node_ids[u[1]].y) == (g.node_ids[v[0]].y > g.node_ids[v[1]].y):  # XAND
 								e1 = (u[0], v[1]) if edg[2] == 0 else (u[0], v[0])
 								e2 = (u[1], v[0]) if edg[2] == 0 else (u[1], v[1])
 							else:
@@ -472,11 +472,11 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 							connect_nd = graph.node_to_stack_node[connect_nd]
 						for nd_other in subgraph.nodes:
 							if nd_other.layer == graph[connect_nd].layer:
-								relative_xval = get_x_var(self.x_var_assign, graph.node_to_stack_node[nd_other.name], connect_nd)
+								relative_xval = get_x_var(self.x_var_assign, graph.node_to_stack_node[nd_other.id], connect_nd)
 						if relative_xval != -1:
 							for other_nd in subgraph.layers[subgraph[var_to_fix].layer]:
-								if other_nd.name != var_to_fix:
-									xvars_to_fix[var_to_fix, other_nd.name] = 1 - relative_xval
+								if other_nd.id != var_to_fix:
+									xvars_to_fix[var_to_fix, other_nd.id] = 1 - relative_xval
 					optim = HiGHSLayeredOptimizer(subgraph)
 					# print(xvars_to_fix)
 					if xvars_to_fix != {}:
@@ -489,10 +489,10 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 					for j, nd in enumerate(subgraph.nodes):
 						for nd2 in subgraph.nodes[j+1:]:
 							if nd.layer == nd2.layer:
-								if (nd.name, nd2.name) in self.x_var_assign:
-									self.x_var_assign[nd.name, nd2.name] = 0
+								if (nd.id, nd2.id) in self.x_var_assign:
+									self.x_var_assign[nd.id, nd2.id] = 0
 								else:
-									self.x_var_assign[nd2.name, nd.name] = 1
+									self.x_var_assign[nd2.id, nd.id] = 1
 			to_remove = []
 			for x_var in x:
 				if graph[x_var[0]].stacked and graph[x_var[1]].stacked:
@@ -558,9 +558,9 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 			y_vars_br = {}
 			b_vars_br = {}
 			for nd in g.nodes:
-				y_vars_br[nd.name] = ct
+				y_vars_br[nd.id] = ct
 				ct += 1
-			for ed in g.edge_names:
+			for ed in g.edge_ids:
 				b_vars_br[ed] = ct
 				ct += 1
 			a_ub = []
@@ -606,4 +606,4 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 
 			seq_res = linprog(c_t, method="highs", A_ub=a_ub, b_ub=b_ub)
 			for nd in g.nodes:
-				nd.y = seq_res.x[y_vars_br[nd.name]]
+				nd.y = seq_res.x[y_vars_br[nd.id]]
