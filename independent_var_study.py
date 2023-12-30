@@ -44,12 +44,12 @@ def calc_transform_3(dpt):
 
 
 if __name__ == '__main__':
-	with open(f"data storage/vertical_transitivity/fix1var_60.csv", 'r') as fd:
+	with open(f"data storage previous/individual switch/direct_transitivity/symmetry_breaking_5m.csv", 'r') as fd:
 		rdr = csv.reader(fd)
 		next(rdr)
 		basevals = []
 		for row in rdr:
-			if 0.001 < float(row[10]) < 60:
+			if 0.001 < float(row[10]) < 300:
 				basevals.append((row[1], float(row[10]), row[1][:row[1].index('/')]))
 	# datapoints = []
 	# for bval in basevals:
@@ -143,6 +143,7 @@ if __name__ == '__main__':
 	for bval in basevals:
 		datax.append(calc_transform_3(bval))
 		datay.append(math.log(1000*bval[1]))
+		# datay.append(bval[1])
 		colors.append(bval[2])
 	datax = np.array(datax)
 	datay = np.array(datay)
@@ -162,7 +163,8 @@ if __name__ == '__main__':
 	line_xv = np.linspace(min_v, max_v, 500)
 	line_dicts = [{'x': line_xv[i], 'y': np.e**(p(line_xv[i]))} for i in range(500)]
 	scatter_dicts = [{'x': datax[i], 'y': datay[i], 'c': colors[i]} for i in range(len(datax))]
-	vis.draw_altair_scatter_with_custom_line(scatter_dicts, line_dicts, 'x', 'y', 'c', 'ln(|C|)', 'ln(t)', f'Cscore_fix1vert')
+	vis.draw_altair_scatter_with_custom_line(scatter_dicts, line_dicts, 'x', 'y', 'c', 'ln|C|', 'ln(t)', f'Cscore_symbreak')
 
 	print(p)
+	print(f"f(t) = e^({p}), where x=ln|C|")
 	print(f"results:", results)

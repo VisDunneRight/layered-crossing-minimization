@@ -3,11 +3,13 @@ import random
 import time
 import itertools
 import gurobipy as gp
+import multiprocessing as mp
 from gurobipy import GRB
 from sklearn.cluster import SpectralClustering
 from src import vis, reductions, motifs, type_conversions, read_data
 from src.graph import LayeredGraph, CollapsedGraph
 from src.helpers import *
+from src.heuristics import global_sifting
 
 
 class LayeredOptimizer:
@@ -25,6 +27,7 @@ class LayeredOptimizer:
 		self.gamma_2 = parameters["gamma_2"] if "gamma_2" in parameters else 1
 		self.m_val = parameters["m_val"] if "m_val" in parameters else max(len(layer) for layer in self.g.layers.values())
 		self.sequential_bendiness = parameters["sequential_bendiness"] if "sequential_bendiness" in parameters else True
+		self.locally_optimal_heuristic = parameters["locally_optimal_heuristic"] if "locally_optimal_heuristic" in parameters else False
 		self.return_full_data = parameters["return_full_data"] if "return_full_data" in parameters else False
 		self.cutoff_time = parameters["cutoff_time"] if "cutoff_time" in parameters else 0
 		self.do_subg_reduction = parameters["do_subg_reduction"] if "do_subg_reduction" in parameters else False
@@ -41,7 +44,7 @@ class LayeredOptimizer:
 		self.direct_transitivity = parameters["direct_transitivity"] if "direct_transitivity" in parameters else False
 		self.vertical_transitivity = parameters["vertical_transitivity"] if "vertical_transitivity" in parameters else False
 		self.mirror_vars = parameters["mirror_vars"] if "mirror_vars" in parameters else False
-		self.stratisfimal_y_vars = parameters["stratisfimal_yvars"] if "stratisfimal_yvars" in parameters else False
+		self.stratisfimal_y_vars = parameters["stratisfimal_y_vars"] if "stratisfimal_y_vars" in parameters else False
 		self.symmetry_constraints = parameters["symmetry_constraints"] if "symmetry_constraints" in parameters else True
 		self.cycle_constraints = parameters["cycle_constraints"] if "cycle_constraints" in parameters else False
 		self.collapse_subgraphs = parameters["collapse_subgraphs"] if "collapse_subgraphs" in parameters else False
@@ -56,213 +59,226 @@ class LayeredOptimizer:
 			self.claw_constraints, self.dome_path_constraints = True, True
 
 	def __optimize_layout_standard(self, graph_arg=None, assignment=None, name="graph1", fix_x_vars=None, start_x_vars=None, is_subgraph=False, use_top_level_params=False):
-		g = self.g if graph_arg is None else graph_arg
-		if self.polyhedral_constraints:
-			self.claw_constraints, self.dome_path_constraints = True, True
-		if not self.direct_transitivity and not self.vertical_transitivity:
-			self.direct_transitivity = True
-		t1 = time.time()
+		with gp.Env() as env, gp.Model(env=env) as m:
+			g = self.g if graph_arg is None else graph_arg
+			print(sorted(list(g.node_ids.keys())))
+			if self.polyhedral_constraints:
+				self.claw_constraints, self.dome_path_constraints = True, True
+			if not self.direct_transitivity and not self.vertical_transitivity:
+				self.direct_transitivity = True
+			t1 = time.time()
 
-		""" Collapse valid subgraphs """
-		if self.collapse_leaves:
-			g = g.collapse_leaves()
-			self.x_var_assign = {x_v: 2 for n_l in g.get_ids_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
-			# vis.draw_graph(g, "after collapse", groups={nd.name: 1 if nd.stacked else 0 for nd in g.nodes})
+			""" Collapse valid subgraphs """
+			if self.collapse_leaves:
+				g = g.collapse_leaves()
+				self.x_var_assign = {x_v: 2 for n_l in g.get_ids_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
+				# vis.draw_graph(g, "after collapse", groups={nd.name: 1 if nd.stacked else 0 for nd in g.nodes})
 
-		""" Create model and graph data """
-		nodes_by_layer = g.get_ids_by_layer()
-		edges_by_layer = g.get_edge_ids_by_layer()
-		n_constraints_generated = [0] * 6  # simple edge, hybrid edge, same layer edge, vertical pos, bendiness, total
-		pre_sym = '\t' if is_subgraph else ''
-		if self.verbose:
-			self.print_info.extend(('-' * 70, f"{self.name if use_top_level_params else name}:", '-' * 70))
-		m = gp.Model()
+			print(sorted(list(g.node_ids.keys())))
 
-		""" Add all variables """
-		x_vars = []
-		z_vars = []
-		relax_type = GRB.INTEGER if not self.mip_relax else GRB.CONTINUOUS
-		for i, name_list in nodes_by_layer.items():
-			if self.mirror_vars:
-				x_vars += list(itertools.permutations(name_list, 2))
-			else:
-				x_vars += list(itertools.combinations(name_list, 2))
+			""" Create model and graph data """
+			nodes_by_layer = g.get_ids_by_layer()
+			edges_by_layer = g.get_edge_ids_by_layer()
+			n_constraints_generated = [0] * 6  # simple edge, hybrid edge, same layer edge, vertical pos, bendiness, total
+			pre_sym = '\t' if is_subgraph else ''
+			if self.verbose:
+				self.print_info.extend(('-' * 70, f"{self.name if use_top_level_params else name}:", '-' * 70))
+			# m = gp.Model()
+
+			""" Add all variables """
+			x_vars = []
+			z_vars = []
+			relax_type = GRB.INTEGER if not self.mip_relax else GRB.CONTINUOUS
+			for i, name_list in nodes_by_layer.items():
+				if self.mirror_vars:
+					x_vars += list(itertools.permutations(name_list, 2))
+				else:
+					x_vars += list(itertools.combinations(name_list, 2))
+				if self.stratisfimal_y_vars:
+					z_vars += list(itertools.permutations(name_list, 2))
+			x = m.addVars(x_vars, vtype=GRB.BINARY, name="x")
 			if self.stratisfimal_y_vars:
-				z_vars += list(itertools.permutations(name_list, 2))
-		x = m.addVars(x_vars, vtype=GRB.BINARY, name="x")
-		if self.stratisfimal_y_vars:
-			z = m.addVars(z_vars, vtype=relax_type, lb=0, ub=self.m_val, name="z")
-		else:
-			z = None
-		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars)
-		if self.mirror_vars:
-			c_vars_orig, nc_consts = reductions.normal_c_vars(g, edges_by_layer, False)
-		c = m.addVars(c_vars, vtype=relax_type, name="c")
-		if self.vertical_transitivity or self.stratisfimal_y_vars:
-			y_vars = [n.id for n in g]
-			y = m.addVars(y_vars, vtype=relax_type, lb=0, ub=self.m_val, name="y")
-		else:
-			y = None
-		m.update()
+				z = m.addVars(z_vars, vtype=relax_type, lb=0, ub=self.m_val, name="z")
+			else:
+				z = None
+			c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars)
+			if self.mirror_vars:
+				c_vars_orig, nc_consts = reductions.normal_c_vars(g, edges_by_layer, False)
+			c = m.addVars(c_vars, vtype=relax_type, name="c")
+			if self.vertical_transitivity or self.stratisfimal_y_vars:
+				y_vars = [n.id for n in g]
+				y = m.addVars(y_vars, vtype=relax_type, lb=0, ub=self.m_val, name="y")
+			else:
+				y = None
+			m.update()
 
-		""" Fix variables/set starting assignments, used in some old experiments """
-		if assignment:  # TODO (later): can be removed, not used in full subg algo (remove in place of fix_x_vars)
-			for k, v in assignment.items():
-				m.getVarByName(k).ub, m.getVarByName(k).lb = v, v
-		if fix_x_vars:
-			for k, v in fix_x_vars.items():
-				if k in x:
-					m.getVarByName(f"x[{k[0]},{k[1]}]").lb, m.getVarByName(f"x[{k[0]},{k[1]}]").ub = v, v
+			""" Fix variables/set starting assignments, used in some old experiments """
+			if assignment:  # TODO (later): can be removed, not used in full subg algo (remove in place of fix_x_vars)
+				for k, v in assignment.items():
+					m.getVarByName(k).ub, m.getVarByName(k).lb = v, v
+			if fix_x_vars:
+				for k, v in fix_x_vars.items():
+					if k in x:
+						m.getVarByName(f"x[{k[0]},{k[1]}]").lb, m.getVarByName(f"x[{k[0]},{k[1]}]").ub = v, v
+					else:
+						m.getVarByName(f"x[{k[1]},{k[0]}]").lb, m.getVarByName(f"x[{k[1]},{k[0]}]").ub = 1 - v, 1 - v
+			if start_x_vars:
+				for v in m.getVars():
+					v.Start = start_x_vars[v.varName]
+			if not all((nd.fix == 0 for nd in g)):
+				self.symmetry_breaking = False
+				for nd in g:
+					if nd.fix != 0:  # TODO: make multiple fixed nodes in same layer not fix each other
+						for nd2 in g.layers[nd.layer]:
+							if (nd, nd2) in x:
+								m.getVarByName(f"x[{nd},{nd2}]").lb, m.getVarByName(f"x[{nd},{nd2}]").ub = (nd.fix + 1)//2, (nd.fix + 1)//2
+							elif (nd2, nd) in x:
+								m.getVarByName(f"x[{nd2},{nd}]").lb, m.getVarByName(f"x[{nd2},{nd}]").ub = 1 - (nd.fix + 1)//2, 1 - (nd.fix + 1)//2
+
+			""" Heuristic starting assignments """
+			self.__heuristic_start(m, g)
+
+			""" Set higher priority for branching on x-vars """
+			if self.xvar_branch_priority:
+				for v in m.getVars():
+					if v.varName[:1] == "x":
+						v.BranchPriority = 1
+					else:
+						v.BranchPriority = 0
+
+			""" Butterfly reduction """
+			butterfly_c_pairs = self.get_butterfly_cvars(g, c_vars)
+
+			""" Set model objective function """
+			if not self.sequential_bendiness:
+				if self.bendiness_reduction:
+					b_vars = list(g.edge_ids.keys())
+					b = m.addVars(b_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="b")
+					m.setObjective(self.gamma_1 * c.sum() + self.gamma_2 * b.sum(), GRB.MINIMIZE)
 				else:
-					m.getVarByName(f"x[{k[1]},{k[0]}]").lb, m.getVarByName(f"x[{k[1]},{k[0]}]").ub = 1 - v, 1 - v
-		if start_x_vars:
-			for v in m.getVars():
-				v.Start = start_x_vars[v.varName]
-
-		""" Heuristic starting assignments """
-		self.__heuristic_start(m, g)
-
-		""" Set higher priority for branching on x-vars """
-		if self.xvar_branch_priority:
-			for v in m.getVars():
-				if v.varName[:1] == "x":
-					v.BranchPriority = 1
-				else:
-					v.BranchPriority = 0
-
-		""" Butterfly reduction """
-		butterfly_c_pairs = self.get_butterfly_cvars(g, c_vars)
-
-		""" Set model objective function """
-		if not self.sequential_bendiness:
-			if self.bendiness_reduction:
-				b_vars = list(g.edge_ids.keys())
-				b = m.addVars(b_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="b")
-				m.setObjective(self.gamma_1 * c.sum() + self.gamma_2 * b.sum(), GRB.MINIMIZE)
+					opt = gp.LinExpr()
+					for i, c_var in enumerate(c_vars):
+						opt += c_consts[i] * c[c_var]
+					m.setObjective(opt, GRB.MINIMIZE)
 			else:
 				opt = gp.LinExpr()
-				for i, c_var in enumerate(c_vars):
-					opt += c_consts[i] * c[c_var]
+				if self.mirror_vars and self.symmetry_constraints:
+					for i, c_var in enumerate(c_vars_orig):
+						opt += nc_consts[i] * c[c_var]
+				else:
+					for i, c_var in enumerate(c_vars):
+						opt += c_consts[i] * c[c_var]
 				m.setObjective(opt, GRB.MINIMIZE)
-		else:
-			opt = gp.LinExpr()
-			if self.mirror_vars and self.symmetry_constraints:
-				for i, c_var in enumerate(c_vars_orig):
-					opt += nc_consts[i] * c[c_var]
+
+			""" Transitivity constraints """
+			self.__transitivity(m, nodes_by_layer, x_vars, x, y, z)
+
+			""" Edge crossing constraints """
+			n_cs = self.__edge_crossings(m, c_vars, x, c, graph_arg=g, track_x_var_usage=self.symmetry_breaking, butterflies=butterfly_c_pairs)
+			for i, val in enumerate(n_cs[:-1]):
+				n_constraints_generated[i] += val
+
+			""" 3-claw constraints """
+			self.__add_3claw_constraints(m, g, c_vars, c)
+
+			""" Dome path constraints """
+			self.__add_dome_path_constraints(m, g, c_vars, c, x_vars, x)
+
+			""" Symmetry constraints """
+			self.__add_symmetry_constraints(m, x_vars, c_vars, x, c)
+
+			""" Cycle constraints """
+			self.__add_cycle_constraints(m, g, c_vars, c)
+
+			""" Break symmetry by fixing key x-var """
+			self.__symmetry_breaking(m, n_cs[-1], x_vars)
+
+			""" Non-sequential bendiness reduction, original Stratisfimal version"""
+			if not self.sequential_bendiness and self.bendiness_reduction:
+				for b_var in b_vars:
+					m.addConstr(y[b_var[0]] - y[b_var[1]] <= b[b_var], f"1bend{b_var}")
+					m.addConstr(y[b_var[1]] - y[b_var[0]] <= b[b_var], f"2bend{b_var}")
+					n_constraints_generated[4] += 2
+
+			""" Optimize model """
+			if self.cutoff_time > 0:
+				m.setParam("TimeLimit", self.cutoff_time)
+			m.setParam("OutputFlag", 0)
+			if self.aggro_presolve:
+				m.setParam("Presolve", 2)
+			n_constraints_generated[5] = sum(n_constraints_generated[:5])
+			t1 = time.time() - t1
+			if self.verbose:
+				self.print_info.append(f"{pre_sym}Time to input constraints: {t1}")
+				self.print_info.append(f"{pre_sym}Constraint counts: {n_constraints_generated}")
+			t2 = time.time()
+			m.optimize()
+			t2 = time.time() - t2
+			if self.verbose:
+				self.print_info.append(f"{pre_sym}Objective: {m.objVal}")
+				self.print_info.append(f"{pre_sym}Time to optimize: {t2}")
+			if (m.status != 2 and m.status != 9) or m.SolCount == 0:
+				print("model returned status code:", m.status)
+				print("4: model probably never found a feasible solution")
+				print("11: solve interrupted")
+				print("otherwise check https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html")
+				print("or, was cutoff without finding a solution. #solutions found:", m.SolCount)
+				return 0, 0, 0, 0, 0, float('inf'), m.status, 0, 0, "INCORRECT STATUS"
+			for v in m.getVars():
+				if v.varName[:1] == "x":
+					self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
+			num_crossings = round(m.objVal)
+
+			""" Optimize and merge collapsed subgraphs """
+			g, t1, num_crossings = self.__optimize_subgraphs(g, x_vars, t1, num_crossings)
+
+			""" Draw pre-bendiness graph """
+			# vis.draw_graph(g, "interim")
+			print(g.num_edge_crossings())
+
+			""" Sequential bendiness reduction """
+			if self.bendiness_reduction:
+				t3 = time.time()
+				n_constraints_generated[4] += self.__sequential_br(graph_arg=g, subgraph_seq=is_subgraph, env=env)
+				t3 = time.time() - t3
+				if not is_subgraph and self.verbose:
+					self.print_info.append(f"{pre_sym}Time to perform bendiness reduction: {t3}")
 			else:
-				for i, c_var in enumerate(c_vars):
-					opt += c_consts[i] * c[c_var]
-			m.setObjective(opt, GRB.MINIMIZE)
-
-		""" Transitivity constraints """
-		self.__transitivity(m, nodes_by_layer, x_vars, x, y, z)
-
-		""" Edge crossing constraints """
-		n_cs = self.__edge_crossings(m, c_vars, x, c, graph_arg=g, track_x_var_usage=self.symmetry_breaking, butterflies=butterfly_c_pairs)
-		for i, val in enumerate(n_cs[:-1]):
-			n_constraints_generated[i] += val
-
-		""" 3-claw constraints """
-		self.__add_3claw_constraints(m, g, c_vars, c)
-
-		""" Dome path constraints """
-		self.__add_dome_path_constraints(m, g, c_vars, c, x_vars, x)
-
-		""" Symmetry constraints """
-		self.__add_symmetry_constraints(m, x_vars, c_vars, x, c)
-
-		""" Cycle constraints """
-		self.__add_cycle_constraints(m, g, c_vars, c)
-
-		""" Break symmetry by fixing key x-var """
-		self.__symmetry_breaking(m, n_cs[-1], x_vars)
-
-		""" Non-sequential bendiness reduction, original Stratisfimal version"""
-		if not self.sequential_bendiness and self.bendiness_reduction:
-			for b_var in b_vars:
-				m.addConstr(y[b_var[0]] - y[b_var[1]] <= b[b_var], f"1bend{b_var}")
-				m.addConstr(y[b_var[1]] - y[b_var[0]] <= b[b_var], f"2bend{b_var}")
-				n_constraints_generated[4] += 2
-
-		""" Optimize model """
-		if self.cutoff_time > 0:
-			m.setParam("TimeLimit", self.cutoff_time)
-		m.setParam("OutputFlag", 0)
-		if self.aggro_presolve:
-			m.setParam("Presolve", 2)
-		n_constraints_generated[5] = sum(n_constraints_generated[:5])
-		t1 = time.time() - t1
-		if self.verbose:
-			self.print_info.append(f"{pre_sym}Time to input constraints: {t1}")
-			self.print_info.append(f"{pre_sym}Constraint counts: {n_constraints_generated}")
-		t2 = time.time()
-		m.optimize()
-		t2 = time.time() - t2
-		if self.verbose:
-			self.print_info.append(f"{pre_sym}Objective: {m.objVal}")
-			self.print_info.append(f"{pre_sym}Time to optimize: {t2}")
-		if (m.status != 2 and m.status != 9) or m.SolCount == 0:
-			print("model returned status code:", m.status)
-			print("4: model probably never found a feasible solution")
-			print("11: solve interrupted")
-			print("otherwise check https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html")
-			print("or, was cutoff without finding a solution. #solutions found:", m.SolCount)
-			return 0, 0, 0, 0, 0, float('inf'), m.status, 0, 0, "INCORRECT STATUS"
-		for v in m.getVars():
-			if v.varName[:1] == "x":
-				self.x_var_assign[int(v.varName[2:v.varName.index(',')]), int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])] = round(v.x)
-		num_crossings = round(m.objVal)
-
-		""" Optimize and merge collapsed subgraphs """
-		g, t1, num_crossings = self.__optimize_subgraphs(g, x_vars, t1, num_crossings)
-
-		""" Draw pre-bendiness graph """
-		# vis.draw_graph(g, "interim")
-
-		""" Sequential bendiness reduction """
-		if self.bendiness_reduction:
-			t3 = time.time()
-			n_constraints_generated[4] += self.__sequential_br(graph_arg=g, subgraph_seq=is_subgraph)
-			t3 = time.time() - t3
-			if not is_subgraph and self.verbose:
-				self.print_info.append(f"{pre_sym}Time to perform bendiness reduction: {t3}")
-		else:
-			t3 = 0
-
-		""" Draw the resulting graph """
-		if self.draw_graph:
-			if not self.bendiness_reduction:
+				t3 = 0
 				if self.direct_transitivity:
 					g.assign_y_vals_given_x_vars(self.x_var_assign)
 				else:
 					for v in m.getVars():
 						if v.varName[:1] == "y" and int(v.varName[2:v.varName.index(']')]) in g.node_ids:
 							g[int(v.varName[2:v.varName.index(']')])].y = float(v.x)
-			vis.draw_graph(g, self.name)
 
-		if self.verbose:
-			self.print_info.append(f"{pre_sym}Final edge crossing count: {g.num_edge_crossings()}")
-			self.print_info.append(f"{pre_sym}Number of constraints: {n_constraints_generated}")
-			self.print_info.append(f"{pre_sym}{round(t1, 3)}, {round(t2, 3)}, {round(t3, 3)}, {round(t1 + t2 + t3, 3)}")
+			""" Draw the resulting graph """
+			if self.draw_graph:
+				vis.draw_graph(g, self.name)
 
-		""" Return data """
-		print(f"Number of crossings: {num_crossings}", f"\tOptimization time: {round(m.runtime, 3)}")
-		# print(f"g calc: {g.num_edge_crossings()}")
+			if self.verbose:
+				self.print_info.append(f"{pre_sym}Final edge crossing count: {g.num_edge_crossings()}")
+				self.print_info.append(f"{pre_sym}Number of constraints: {n_constraints_generated}")
+				self.print_info.append(f"{pre_sym}{round(t1, 3)}, {round(t2, 3)}, {round(t3, 3)}, {round(t1 + t2 + t3, 3)}")
 
-		if self.return_x_vars:
-			return num_crossings, self.x_var_assign
+			""" Return data """
+			print(f"Number of crossings: {num_crossings}", f"\tOptimization time: {round(m.runtime, 3)}")
+			print(f"g calc: {g.num_edge_crossings()}")
 
-		if self.return_experiment_data:
-			return len(x_vars), len(c_vars), m.numVars, m.numConstrs, num_crossings, m.runtime, m.status, int(m.nodeCount), round(t1, 3)
+			if self.return_x_vars:
+				return num_crossings, self.x_var_assign
 
-		return round(t1 + t2 + t3, 3), num_crossings
+			if self.return_experiment_data:
+				return len(x_vars), len(c_vars), m.numVars, m.numConstrs, num_crossings, m.runtime, m.status, int(m.nodeCount), round(t1, 3)
 
-	def __sequential_br(self, graph_arg=None, substitute_x_vars=None, subgraph_seq=False):
+			return round(t1 + t2 + t3, 3), num_crossings
+
+	def __sequential_br(self, graph_arg=None, substitute_x_vars=None, subgraph_seq=False, env=None):
 		g = self.g if graph_arg is None else graph_arg
 		x_var_opt = self.x_var_assign if substitute_x_vars is None else substitute_x_vars
 		y_vars = list(g.node_ids)
 		n_constr = 0
-		m2 = gp.Model()
+		m2 = gp.Model(env=env) if env is not None else gp.Model()
 		y = m2.addVars(y_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="y")
 		# y = m2.addVars(y_vars, vtype=GRB.INTEGER, lb=0, ub=mv, name="y")
 		m2.update()
@@ -702,6 +718,7 @@ class LayeredOptimizer:
 
 	def __optimize_subgraphs(self, graph, x_vars, t1, num_crossings):
 		if self.collapse_leaves or self.collapse_subgraphs:
+			print(x_vars)
 			t4 = time.time()
 			# new_g, stack_node_to_nodelist, node_to_stack_node, subgraphs_collapsed, subg_types
 			subgraphs = graph.create_layered_graphs_from_subgraphs()
@@ -755,17 +772,21 @@ class LayeredOptimizer:
 					to_remove.append(x_var)
 				elif graph[x_var[0]].stacked:
 					for otv in graph.stack_node_to_nodelist[x_var[0]]:
-						set_x_var(self.x_var_assign, otv, x_var[1], get_x_var(self.x_var_assign, x_var[0], x_var[1]))
+						if x_var[1] != otv:
+							set_x_var(self.x_var_assign, otv, x_var[1], get_x_var(self.x_var_assign, x_var[0], x_var[1]))
 					to_remove.append(x_var)
 				elif graph[x_var[1]].stacked:
 					for otv in graph.stack_node_to_nodelist[x_var[1]]:
-						set_x_var(self.x_var_assign, x_var[0], otv, get_x_var(self.x_var_assign, x_var[0], x_var[1]))
+						if x_var[0] != otv:
+							set_x_var(self.x_var_assign, x_var[0], otv, get_x_var(self.x_var_assign, x_var[0], x_var[1]))
 					to_remove.append(x_var)
 			for xv in to_remove:
 				if xv in self.x_var_assign:
 					del self.x_var_assign[xv]
 				else:
 					del self.x_var_assign[xv[1], xv[0]]
+			print(to_remove)
+			print(self.x_var_assign)
 			return graph.old_g, t1 + time.time() - t4, num_crossings
 		else:
 			return graph, t1, num_crossings
@@ -945,9 +966,9 @@ class LayeredOptimizer:
 		return n_ec, opt_vals, unconstrained_opt_vals, top_level_optval
 
 	""" Return min possible num crossings, given by my formula """
-	def __bound_on_optimality(self, subg_assign, top_lv_g, cr_num, cr_num_tuple, opt_cr_num_tuple, top_ov):
-		# LOOKAT search reduced graph for butterflies which are inexcusable, to improve bound
-		return sum(opt_cr_num_tuple)
+	# def __bound_on_optimality(self, subg_assign, top_lv_g, cr_num, cr_num_tuple, opt_cr_num_tuple, top_ov):
+	# 	# LOOKAT search reduced graph for butterflies which are inexcusable, to improve bound
+	# 	return sum(opt_cr_num_tuple)
 
 	def __optimize_full_subgraph_algorithm(self):
 		t_allotted = self.cutoff_time if self.cutoff_time > 0 else 60
@@ -984,6 +1005,75 @@ class LayeredOptimizer:
 		else:
 			print("ran out of time ;(")
 		return 0
+
+	def __optimize_locally_optimal(self):
+		# step 1: calculate num partitions by increasing until size falls within predicted bound (self.cutoff_time)
+		# step 2: split up partitions into layeredgraph objects (add hanger nodes)
+		# do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
+		# do_draw_graph, self.draw_graph = self.draw_graph, False
+		cutoff_partitions, n_partitions = 100, 1
+		cg = CollapsedGraph(self.g)
+		while n_partitions <= cutoff_partitions:
+			cluster = list(SpectralClustering(n_clusters=n_partitions, assign_labels="discretize", affinity="precomputed").fit(self.g.adjacency_matrix()).labels_)
+			cg.subgraphs = cluster
+			lgs = cg.create_layered_graphs_from_subgraphs_dangling_nodes()
+			if sum((lg.optimization_time_estimate() for lg in lgs)) < self.cutoff_time:
+				print(f"Optimizing with {n_partitions} partition{'s' if n_partitions > 1 else ''}")
+				print("Runtime estimates:", [lg.optimization_time_estimate() for lg in lgs])
+				break
+		cg.create_collapsed_graph_skeleton()
+
+		if cg.optimization_time_estimate() < self.cutoff_time / 2:
+			# note: need separate opt to preserve x_var_assign
+			skele_opt = LayeredOptimizer(cg)
+			skele_opt.set_reasonable_params()
+			skele_opt.optimize_layout()
+			y_vs = skele_opt.__find_y_assignment_given_x(skele_opt.x_var_assign)
+			for nd, y_v in y_vs.items():
+				cg[nd].y = y_v
+		else:
+			# call bary-sift
+			global_sifting(cg)
+
+		for cr_edge in cg.crossing_edges:  # fix nodes
+			#  cn11----cn12
+			#     `----.
+			#  cn21----cn22
+			cn11y = cg[cg.node_to_stack_node[cr_edge[0]]].y
+			cn12 = cg.get_collapsed_node(cg[cr_edge[1]].layer, cg.subgraphs[cr_edge[0]])
+			cn22y = cg[cg.node_to_stack_node[cr_edge[1]]].y
+			cn21 = cg.get_collapsed_node(cg[cr_edge[0]].layer, cg.subgraphs[cr_edge[1]])
+			if cn12 != -1 and cr_edge[1] in lgs[cg.subgraphs[cr_edge[0]]]:
+				# fix node corresponding to cn22 in subg1
+				# issue: cr_edge[0] may not be a node in lg2
+				# solution: since iteration is over all cr_edges, can just skip if not there
+				lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix = 1 if cn22y > cn12.y else -1
+			if cn21 != -1 and cr_edge[0] in lgs[cg.subgraphs[cr_edge[1]]]:
+				# fix node corresponding to cn11 in subg2
+				lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix = 1 if cn11y > cn21.y else -1
+
+		# step 3: multiprocessing pool, optimize normally all layeredgraphs
+		with mp.Pool() as pool:
+			pool.map(self.optimize_target, lgs)
+
+		# step 4: extract node positions from optimized subgraphs
+		max_height = max((max((len(lay) for lay in lg.layers.values())) for lg in lgs))
+		for c_nd in cg.nodes:
+			for nd in cg.stack_node_to_nodelist[c_nd.id]:
+				self.g[nd].y = c_nd.y * max_height + lgs[cg.subgraphs[nd]][nd].y
+		self.__assign_x_given_y()
+
+		# step 5: apply neighborhood_sift
+
+		# if do_bendiness_reduction:
+		# 	self.__sequential_br()
+		# if do_draw_graph:
+		# 	vis.draw_graph(self.g, self.name)
+
+		return self.g.num_edge_crossings()
+
+	def optimize_target(self, graph: LayeredGraph):
+		return self.__optimize_layout_standard(graph_arg=graph)
 
 	def optimize_with_starting_assignments(self, assigments):
 		out = self.__optimize_layout_standard(use_top_level_params=True, fix_x_vars=assigments)
@@ -1034,8 +1124,10 @@ class LayeredOptimizer:
 				self.x_var_assign[k] = 1
 
 	def optimize_layout(self, fix_xvars=None):
-		if self.do_subg_reduction:
-			out = self.__optimize_full_subgraph_algorithm()
+		# if self.do_subg_reduction:
+		if self.locally_optimal_heuristic:
+			# out = self.__optimize_full_subgraph_algorithm()
+			out = self.__optimize_locally_optimal()
 		elif fix_xvars is not None:
 			out = self.__optimize_layout_standard(use_top_level_params=True, fix_x_vars=fix_xvars)
 		else:
@@ -1050,3 +1142,8 @@ class LayeredOptimizer:
 		self.__assign_x_given_y()
 		self.__sequential_br()
 		vis.draw_graph(self.g, self.name)
+
+	def set_reasonable_params(self):
+		self.symmetry_breaking = True
+		self.xvar_branch_priority = True
+		self.direct_transitivity = True

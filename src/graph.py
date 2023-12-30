@@ -1,4 +1,5 @@
 import itertools
+import math
 import pickle
 import random
 from typing import Tuple
@@ -6,13 +7,14 @@ from src.helpers import *
 
 
 class LayeredNode:
-	def __init__(self, node_id, node_layer, is_anchor=False, stacked=False, name=None):
+	def __init__(self, node_id, node_layer, is_anchor=False, stacked=False, name=None, fix=0):
 		self.id = node_id
 		self.layer = node_layer
 		self.y = node_id
 		self.is_anchor_node = is_anchor
 		self.stacked = stacked
 		self.name = node_id if name is None else name
+		self.fix = fix
 
 	def __str__(self):
 		return f"ID={self.id}/L={self.layer}"
@@ -98,10 +100,10 @@ class LayeredGraph:
 		else:
 			return item in self.node_names
 
-	def get_node(self, node_id):
-		if 0 <= node_id < len(self.nodes):
-			return self.nodes[node_id]
-		return None
+	# def get_node(self, node_id):
+	# 	if 0 <= node_id < len(self.nodes):
+	# 		return self.nodes[node_id]
+	# 	return None
 
 	def get_edge(self, node1_name, node2_name):
 		if (node1_name, node2_name) in self.edge_ids:
@@ -344,9 +346,9 @@ class LayeredGraph:
 		if only_subgraphs:
 			for i, nd_val in enumerate(subgraph_assignments):
 				if nd_val == 0 and keep_indices_same:
-					old_node_to_new_node[i] = new_g.add_node(self.nodes[i].layer, name=self.nodes[i].name)
+					old_node_to_new_node[i] = new_g.add_node(self.node_ids[i].layer, name=self.node_ids[i].name)
 				elif nd_val == 0:
-					new_g.add_node(self.nodes[i].layer, idx=i)
+					new_g.add_node(self.node_ids[i].layer, idx=i)
 
 		if not keep_indices_same:
 			new_g.n_nodes = self.n_nodes
@@ -720,7 +722,7 @@ class LayeredGraph:
 			if len(adj_list[nd.id]) == 1:
 				if adj_list[nd.id][0] not in leaf_subgs:
 					leaf_subgs[adj_list[nd.id][0]] = [[], []]
-				leaf_subgs[adj_list[nd.id][0]][0 if nd.layer < self.nodes[adj_list[nd.id][0]].layer else 1].append(nd.id)
+				leaf_subgs[adj_list[nd.id][0]][0 if nd.layer < self.node_ids[adj_list[nd.id][0]].layer else 1].append(nd.id)
 
 		subgraphs_marked = [0] * self.n_nodes
 		subg_identifier = 1
@@ -743,30 +745,30 @@ class LayeredGraph:
 		return new_g
 
 	def check_if_collapsible_subgraph(self, subgraph, joint_idx, leaves_only=False) -> Tuple[bool, int]:
-		subgraph_layers = [self.nodes[nd].layer for nd in subgraph] + [self.nodes[joint_idx].layer]
+		subgraph_layers = [self.node_ids[nd].layer for nd in subgraph] + [self.node_ids[joint_idx].layer]
 		if len(set(subgraph_layers)) != len(subgraph_layers):
-			subgraph_layers.remove(self.nodes[joint_idx].layer)
+			subgraph_layers.remove(self.node_ids[joint_idx].layer)
 			if joint_idx in subgraph:
 				subgraph.remove(joint_idx)
 			if all((self.adj_list[x] == [joint_idx] for x in subgraph)):
 				# articulation point with leaves
 				return True, 0
 			if not leaves_only:
-				joint_layer = self.nodes[joint_idx].layer
+				joint_layer = self.node_ids[joint_idx].layer
 				subg_set = set(subgraph)
 				outsiders = [nd for nd in self.adj_list[joint_idx] if nd not in subg_set]
-				if (all((self.nodes[x].layer < joint_layer for x in outsiders)) and all((x >= joint_layer for x in subgraph_layers))) or (all((self.nodes[x].layer > joint_layer for x in outsiders)) and all((x <= joint_layer for x in subgraph_layers))):
+				if (all((self.node_ids[x].layer < joint_layer for x in outsiders)) and all((x >= joint_layer for x in subgraph_layers))) or (all((self.node_ids[x].layer > joint_layer for x in outsiders)) and all((x <= joint_layer for x in subgraph_layers))):
 					# extreme layer subgraph
 					return True, 1
 				if len(outsiders) <= 1:
-					if len([x for x in subgraph if self.nodes[x].layer == joint_layer]) <= 1:
+					if len([x for x in subgraph if self.node_ids[x].layer == joint_layer]) <= 1:
 						# <2 node per layer subgraph
 						return True, 2
-					n_left_parents = [len([x for x in self.adj_list[y] if self.nodes[x].layer == self.nodes[y].layer - 1]) for y in subgraph]
+					n_left_parents = [len([x for x in self.adj_list[y] if self.node_ids[x].layer == self.node_ids[y].layer - 1]) for y in subgraph]
 					if all((x <= 1 for x in n_left_parents)):
 						# left l-tree
 						return True, 3
-					n_right_parents = [len([x for x in self.adj_list[y] if self.nodes[x].layer == self.nodes[y].layer + 1]) for y in subgraph]
+					n_right_parents = [len([x for x in self.adj_list[y] if self.node_ids[x].layer == self.node_ids[y].layer + 1]) for y in subgraph]
 					if all((x <= 1 for x in n_right_parents)):
 						# right l-tree
 						return True, 4
@@ -821,6 +823,13 @@ class LayeredGraph:
 			if n_other.id != node:
 				relevant_x_vars[node, n_other.id] = get_x_var(x_vars, node, n_other.id)
 
+	def optimization_time_estimate(self):
+		c_count = 0
+		e_b_l = self.get_edges_by_layer()
+		for elist in e_b_l.values():
+			c_count += len(elist) ** 2
+		return math.e ** (0.4615 * math.log(c_count) - 1.542) if c_count > 0 else 0
+
 	def write_out(self, path):
 		with open(path, 'wb') as bfd:
 			pickle.dump(self, bfd)
@@ -836,40 +845,81 @@ class CollapsedGraph(LayeredGraph):
 		self.stack_node_to_nodelist = None
 		self.crossing_edges = None
 		self.contact_nodes = None
-		# if subgraphs is not None:
-		# 	self.subgraphs = subgraphs
-		# 	self.collapse_subgraphs()
+		# self.skeleton = None
+		if subgraphs is not None:
+			self.subgraphs = subgraphs
+
+	def get_collapsed_node(self, layer, subg_id):
+		for nd in self.layers[layer]:
+			if self.subgraphs[nd.id] == subg_id:
+				return nd
+		return -1
 
 	def create_layered_graphs_from_subgraphs(self):
 		subgraph_lgs = []
+		old_adj = self.old_g.get_adj_list()
 		for subg in self.subgraphs:
 			subg_obj = LayeredGraph()
 			seen_nds = set()
 			for nd in subg:
 				subg_obj.add_node(self.old_g.nodes[nd].layer, idx=nd)
 				seen_nds.add(nd)
-				for adj in self.old_g.get_adj_list()[nd]:
+				for adj in old_adj[nd]:
 					if adj in seen_nds:
 						subg_obj.add_edge(nd, adj)
 			subgraph_lgs.append(subg_obj)
 		return subgraph_lgs
 
 	def create_layered_graphs_from_subgraphs_dangling_nodes(self):
-		# TODO (later): combine dangling nodes from same node into single node with higher edge weight, mark as node to fix
 		subgraph_lgs = []
-		for subg in self.subgraphs:
+		old_adj = self.old_g.get_adj_list()
+		subgs = [[idx for idx, v in enumerate(self.subgraphs) if v == i] for i in range(max(self.subgraphs)+1)]
+		already_connected = {}
+		for subg in subgs:
 			subg_obj = LayeredGraph()
 			seen_nds = set(subg)
 			for nd in subg:
-				subg_obj.add_node(self.old_g.nodes[nd].layer, idx=nd)
+				subg_obj.add_node(self.old_g[nd].layer, idx=nd)
 				seen_nds.remove(nd)
-				for adj in self.old_g.get_adj_list()[nd]:
+				for adj in old_adj[nd]:
 					if adj not in seen_nds:
-						if adj not in subg_obj:
+						# the line below corrects for when a node has >1 adjacent contact nodes, but in diff layers
+						nd_adj_val = nd + 0.5 if self.old_g[adj].layer > self.old_g[nd].layer else nd
+						if adj not in subg_obj.node_ids and nd_adj_val not in already_connected:  # adj in diff subg
 							subg_obj.add_node(self.old_g.nodes[adj].layer, idx=adj)
-						subg_obj.add_edge(subg_obj[nd], subg_obj[adj])
+							already_connected[nd_adj_val] = adj
+							subg_obj.add_edge(nd, adj)
+						elif adj not in subg_obj.node_ids and nd_adj_val in already_connected:
+							subg_obj.edge_ids[nd, already_connected[nd_adj_val]].weight += 1
+						else:
+							subg_obj.add_edge(nd, adj)
 			subgraph_lgs.append(subg_obj)
 		return subgraph_lgs
 
-	# def collapse_subgraphs(self):
+	def create_collapsed_graph_skeleton(self):
+		self.node_to_stack_node = {}
+		self.stack_node_to_nodelist = {}
+		self.crossing_edges = []
+		self.contact_nodes = []
+		subg_layer_combos = {}
 
+		for nd in self.old_g.nodes:
+			if (nd.layer, self.subgraphs[nd.id]) not in subg_layer_combos:
+				xnd = self.add_node(nd.layer)
+				subg_layer_combos[nd.layer, self.subgraphs[nd.id]] = xnd.id
+				self.stack_node_to_nodelist[xnd.id] = []
+			else:
+				xnd = self.node_ids[subg_layer_combos[nd.layer, self.subgraphs[nd.id]]]
+			self.node_to_stack_node[nd.id] = xnd.id
+			self.stack_node_to_nodelist[xnd.id].append(nd.id)
+
+		for ed in self.edges:  # find crossing edges and nodes
+			if self.subgraphs[ed.n1.id] != self.subgraphs[ed.n2.id]:
+				self.crossing_edges.append((ed.n1.id, ed.n2.id))
+				if ed.n1.id not in self.contact_nodes:
+					self.contact_nodes.append(ed.n1.id)
+				if ed.n2.id not in self.contact_nodes:
+					self.contact_nodes.append(ed.n2.id)
+			if (self.node_to_stack_node[ed.n1.id], self.node_to_stack_node[ed.n2.id]) not in self.edge_ids:
+				self.add_edge(self.node_to_stack_node[ed.n1.id], self.node_to_stack_node[ed.n2.id], weight=0)
+			self.edge_ids[self.node_to_stack_node[ed.n1.id], self.node_to_stack_node[ed.n2.id]].weight += 1
