@@ -175,7 +175,7 @@ class LayeredGraph:
 	def add_node(self, layer, idx=None, name=None, is_anchor=False, stacked=False, data=None):
 		if idx is None:
 			idx = self.n_nodes
-		elif id in self.node_ids:
+		elif idx in self.node_ids:
 			raise Exception(f"node {idx} already exists in graph")
 		elif name is not None and name in self.node_names:
 			raise Exception(f"node with name {name} already exists in graph")
@@ -346,7 +346,7 @@ class LayeredGraph:
 		if only_subgraphs:
 			for i, nd_val in enumerate(subgraph_assignments):
 				if nd_val == 0 and keep_indices_same:
-					old_node_to_new_node[i] = new_g.add_node(self.node_ids[i].layer, name=self.node_ids[i].name)
+					old_node_to_new_node[i] = new_g.add_node(self.node_ids[i].layer, idx=self.node_ids[i].name)
 				elif nd_val == 0:
 					new_g.add_node(self.node_ids[i].layer, idx=i)
 
@@ -356,16 +356,22 @@ class LayeredGraph:
 			starting_node = new_g.n_nodes
 			min_l = min((self.node_ids[node].layer for node in subgraph))
 			max_l = max((self.node_ids[node].layer for node in subgraph))
-			sn1 = new_g.add_node(min_l, stacked=True)
+			l_ids = {}
+			for node in subgraph:
+				if self.node_ids[node].layer not in l_ids:
+					l_ids[self.node_ids[node].layer] = node
+			sn1 = new_g.add_node(min_l, stacked=True, idx=l_ids[min_l])
 			new_g.stack_node_to_nodelist[sn1.id] = set()
 			for level in range(min_l, max_l):
-				sn2 = new_g.add_node(level + 1, stacked=True)
+				sn2 = new_g.add_node(level + 1, stacked=True, idx=l_ids[level + 1])
 				new_g.stack_node_to_nodelist[sn2.id] = set()
 				new_g.add_edge(sn1.id, sn2.id, stacked=True, weight=0)
 				sn1 = sn2
 			for node in subgraph:
-				new_g.node_to_stack_node[node] = starting_node + (self.node_ids[node].layer - min_l)
-				new_g.stack_node_to_nodelist[starting_node + (self.node_ids[node].layer - min_l)].add(node)
+				# new_g.node_to_stack_node[node] = starting_node + (self.node_ids[node].layer - min_l)
+				new_g.node_to_stack_node[node] = l_ids[self.node_ids[node].layer]
+				# new_g.stack_node_to_nodelist[starting_node + (self.node_ids[node].layer - min_l)].add(node)
+				new_g.stack_node_to_nodelist[l_ids[self.node_ids[node].layer]].add(node)
 		for edge in self.edges:
 			if subgraph_assignments[edge.n1.id] != subgraph_assignments[edge.n2.id]:
 				if only_subgraphs:
@@ -582,6 +588,7 @@ class LayeredGraph:
 		return n_ec
 
 	def assign_y_vals_given_x_vars(self, x_vars):
+		# x_vars: dictionary of x-var to assignment, e.g. {(3, 4): 1} if node 3 is below node 4
 		for nd in self.nodes:
 			nd.y = 0
 		for x_var, val in x_vars.items():
@@ -890,7 +897,10 @@ class CollapsedGraph(LayeredGraph):
 							already_connected[nd_adj_val] = adj
 							subg_obj.add_edge(nd, adj)
 						elif adj not in subg_obj.node_ids and nd_adj_val in already_connected:
-							subg_obj.edge_ids[nd, already_connected[nd_adj_val]].weight += 1
+							if (nd, already_connected[nd_adj_val]) in subg_obj.edge_ids:
+								subg_obj.edge_ids[nd, already_connected[nd_adj_val]].weight += 1
+							else:
+								subg_obj.edge_ids[already_connected[nd_adj_val], nd].weight += 1
 						else:
 							subg_obj.add_edge(nd, adj)
 			subgraph_lgs.append(subg_obj)
