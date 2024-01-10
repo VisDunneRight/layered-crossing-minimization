@@ -2,6 +2,7 @@ from sys import maxsize
 from src import graph
 import random
 import copy
+from queue import PriorityQueue
 
 
 def __layer_sweep(g: graph.LayeredGraph, n_iter, fn):
@@ -443,30 +444,46 @@ def neighborhood_sift(g: graph.LayeredGraph, sift_vertices, n_ops):
 	""" Neighborhood sifting, C. Wilson """
 
 	adj = g.get_adj_list()
-	for v in sift_vertices:
+	set_sift_nodes = set(sift_vertices)
+	sift_vertex_seen = [False] * len(sift_vertices)
+	n_ops_per = n_ops / len(sift_vertices)
+	for i, v in enumerate(sift_vertices):
 		# Step 1: use BFS to calculate siftable neighborhood
-		# new idea: siftable neighborhood is all adjacent nodes, then greedily take the lowest degree nodes until n_ops exceeded
+		# new idea: siftable neighborhood is all adjacent nodes, then greedily take the lowest degree nodes until n_ops exceeded (Dijkstra-esque)
 		# OR other idea: fan out in bfs fashion, sifting and fixing. only recurse on locations with equal cr (or cr within some bound e.g. 2)
+		if sift_vertex_seen[i]:
+			continue
+		sift_vertex_seen[i] = True
 		seen = [False] * g.n_nodes
 		seen[v] = True
 		sift_ops = [0] * g.n_nodes
 		sift_ops[v] = len(g.layers[g[v].layer])
 		neighborhood = [v]
-		bfsq = [v]
+		pq = PriorityQueue()
+		for n_adj in adj[v]:
+			pq.put((len(adj[n_adj]), n_adj))
+			seen[n_adj] = True
 		ops = 0
-		while bfsq:
-			next_layer = []
-			for u in bfsq:
-				for u_adj in adj[u]:
-					if not seen[u_adj]:
-						seen[u_adj] = True
-						u_adj_ops = sift_ops[u] * len(g.layers[g[u_adj].layer])
-						if u_adj_ops + ops < n_ops / len(sift_vertices):
-							ops += u_adj_ops
-							sift_ops[u_adj] = u_adj_ops
-							neighborhood.append(u_adj)
-							next_layer.append(u_adj)
-			bfsq = next_layer.copy()
+		# while ops < n_ops_per:
+		# 	next_node = pq.get()
+		# 	neighborhood.append(next_node[1])
+		# 	if next_node in set_sift_nodes:
+		# 		# MARK
+		# 	for adj_node in adj[next_node[1]]:
+		# 		if not seen[adj_node]:
+		# 			seen[adj_node] = True
+		# 			pq.put((len(adj[adj_node]), adj_node))
+		#
+		# 		for u_adj in adj[u]:
+		# 			if not seen[u_adj]:
+		# 				seen[u_adj] = True
+		# 				u_adj_ops = sift_ops[u] * len(g.layers[g[u_adj].layer])
+		# 				if u_adj_ops + ops < n_ops / len(sift_vertices):
+		# 					ops += u_adj_ops
+		# 					sift_ops[u_adj] = u_adj_ops
+		# 					neighborhood.append(u_adj)
+		# 					next_layer.append(u_adj)
+		# 	bfsq = next_layer.copy()
 
 		# Step 2: sift recursively out to sift depth
 

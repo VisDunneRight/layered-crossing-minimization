@@ -61,12 +61,12 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
 
     ctx.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
     ctx.set_font_size(font_size)
-    for node in g.nodes:  # ctx.arc(2, 1, 0.5, 0, 2 * math.pi), pos (2,1) radius 0.5
+    for i, node in enumerate(g.nodes):  # ctx.arc(2, 1, 0.5, 0, 2 * math.pi), pos (2,1) radius 0.5
         if not node.is_anchor_node or groups is not None:
-            if node.stacked:
+            if node.stacked or node.fix != 0:
                 ctx.set_source_rgb(222/256, 23/256, 56/256)
             elif groups is not None:
-                ctx.set_source_rgb(palette[groups[node.id]][0], palette[groups[node.id]][1], palette[groups[node.id]][2])
+                ctx.set_source_rgb(palette[groups[i]][0], palette[groups[i]][1], palette[groups[i]][2])
             else:
                 ctx.set_source_rgb(163/256, 185/256, 182/256)  # light gray-cyan
             if node.is_anchor_node:

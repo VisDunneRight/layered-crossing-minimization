@@ -592,7 +592,19 @@ class LayeredGraph:
 		for nd in self.nodes:
 			nd.y = 0
 		for x_var, val in x_vars.items():
-			self[x_var[val]].y += 1
+			if x_var[0] in self.node_ids and x_var[1] in self.node_ids and val != 2:
+				self[x_var[val]].y += 1
+
+	def check_position_validity(self):
+		checks_out = True
+		for lay in self.layers.values():
+			xl = sorted([(nd.id, nd.y) for nd in lay], key=lambda x: x[1])
+			for i in range(len(xl)-1):
+				if xl[i][1] == xl[i+1][1]:
+					print(f"Invalid position: node {xl[i][0]} and {xl[i+1][0]} both have position {xl[i][1]}")
+					checks_out = False
+		if checks_out:
+			print("Nodes have valid positions.")
 
 	def calculate_connectedness(self):
 		max_connectedness = 0
@@ -858,14 +870,15 @@ class CollapsedGraph(LayeredGraph):
 
 	def get_collapsed_node(self, layer, subg_id):
 		for nd in self.layers[layer]:
-			if self.subgraphs[nd.id] == subg_id:
+			if self.subgraphs[self.stack_node_to_nodelist[nd.id][0]] == subg_id:
 				return nd
 		return -1
 
 	def create_layered_graphs_from_subgraphs(self):
 		subgraph_lgs = []
 		old_adj = self.old_g.get_adj_list()
-		for subg in self.subgraphs:
+		subgs = [[idx for idx, v in enumerate(self.subgraphs) if v == i] for i in range(max(self.subgraphs) + 1)]
+		for sid, subg in enumerate(subgs):
 			subg_obj = LayeredGraph()
 			seen_nds = set()
 			for nd in subg:
@@ -875,6 +888,7 @@ class CollapsedGraph(LayeredGraph):
 					if adj in seen_nds:
 						subg_obj.add_edge(nd, adj)
 			subgraph_lgs.append(subg_obj)
+			subg_obj.subg_id = sid
 		return subgraph_lgs
 
 	def create_layered_graphs_from_subgraphs_dangling_nodes(self):
@@ -882,7 +896,7 @@ class CollapsedGraph(LayeredGraph):
 		old_adj = self.old_g.get_adj_list()
 		subgs = [[idx for idx, v in enumerate(self.subgraphs) if v == i] for i in range(max(self.subgraphs)+1)]
 		already_connected = {}
-		for subg in subgs:
+		for sid, subg in enumerate(subgs):
 			subg_obj = LayeredGraph()
 			seen_nds = set(subg)
 			for nd in subg:
@@ -904,6 +918,7 @@ class CollapsedGraph(LayeredGraph):
 						else:
 							subg_obj.add_edge(nd, adj)
 			subgraph_lgs.append(subg_obj)
+			subg_obj.subg_id = sid
 		return subgraph_lgs
 
 	def create_collapsed_graph_skeleton(self):
@@ -923,7 +938,7 @@ class CollapsedGraph(LayeredGraph):
 			self.node_to_stack_node[nd.id] = xnd.id
 			self.stack_node_to_nodelist[xnd.id].append(nd.id)
 
-		for ed in self.edges:  # find crossing edges and nodes
+		for ed in self.old_g.edges:  # find crossing edges and nodes
 			if self.subgraphs[ed.n1.id] != self.subgraphs[ed.n2.id]:
 				self.crossing_edges.append((ed.n1.id, ed.n2.id))
 				if ed.n1.id not in self.contact_nodes:

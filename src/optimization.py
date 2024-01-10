@@ -27,7 +27,8 @@ class LayeredOptimizer:
 		self.gamma_2 = parameters["gamma_2"] if "gamma_2" in parameters else 1
 		self.m_val = parameters["m_val"] if "m_val" in parameters else max(len(layer) for layer in self.g.layers.values())
 		self.sequential_bendiness = parameters["sequential_bendiness"] if "sequential_bendiness" in parameters else True
-		self.locally_optimal_heuristic = parameters["locally_optimal_heuristic"] if "locally_optimal_heuristic" in parameters else False
+		self.local_opt = parameters["local_opt"] if "local_opt" in parameters else False
+		self.local_opt_heuristic = parameters["local_opt_heuristic"] if "local_opt_heuristic" in parameters else "incremental"
 		self.n_partitions = parameters["n_partitions"] if "n_partitions" in parameters else -1
 		self.return_full_data = parameters["return_full_data"] if "return_full_data" in parameters else False
 		self.cutoff_time = parameters["cutoff_time"] if "cutoff_time" in parameters else 0
@@ -59,7 +60,7 @@ class LayeredOptimizer:
 		if self.polyhedral_constraints:
 			self.claw_constraints, self.dome_path_constraints = True, True
 
-	def __optimize_layout_standard(self, graph_arg=None, name="graph1", fix_x_vars=None, start_x_vars=None, is_subgraph=False, use_top_level_params=False):
+	def __optimize_layout_standard(self, graph_arg=None, name="graph1", fix_x_vars=None, start_x_vars=None, is_subgraph=False):
 		with gp.Env() as env, gp.Model(env=env) as m:
 			g = self.g if graph_arg is None else graph_arg
 			if self.polyhedral_constraints:
@@ -82,7 +83,7 @@ class LayeredOptimizer:
 			n_constraints_generated = [0] * 6  # simple edge, hybrid edge, same layer edge, vertical pos, bendiness, total
 			pre_sym = '\t' if is_subgraph else ''
 			if self.verbose:
-				self.print_info.extend(('-' * 70, f"{self.name if use_top_level_params else name}:", '-' * 70))
+				self.print_info.extend(('-' * 70, f"{self.name}:", '-' * 70))
 			# m = gp.Model()
 
 			""" Add all variables """
@@ -127,10 +128,16 @@ class LayeredOptimizer:
 				for nd in g:
 					if nd.fix != 0:  # TODO: make multiple fixed nodes in same layer not fix each other
 						for nd2 in g.layers[nd.layer]:
-							if (nd, nd2) in x:
-								m.getVarByName(f"x[{nd},{nd2}]").lb, m.getVarByName(f"x[{nd},{nd2}]").ub = (nd.fix + 1)//2, (nd.fix + 1)//2
-							elif (nd2, nd) in x:
-								m.getVarByName(f"x[{nd2},{nd}]").lb, m.getVarByName(f"x[{nd2},{nd}]").ub = 1 - (nd.fix + 1)//2, 1 - (nd.fix + 1)//2
+							if (nd.id, nd2.id) in x:
+								if nd.fix > nd2.fix:
+									m.getVarByName(f"x[{nd.id},{nd2.id}]").lb, m.getVarByName(f"x[{nd.id},{nd2.id}]").ub = 0, 0
+								elif nd.fix < nd2.fix:
+									m.getVarByName(f"x[{nd.id},{nd2.id}]").lb, m.getVarByName(f"x[{nd.id},{nd2.id}]").ub = 1, 1
+							elif (nd2.id, nd.id) in x:
+								if nd.fix > nd2.fix:
+									m.getVarByName(f"x[{nd2.id},{nd.id}]").lb, m.getVarByName(f"x[{nd2.id},{nd.id}]").ub = 1, 1
+								elif nd.fix < nd2.fix:
+									m.getVarByName(f"x[{nd2.id},{nd.id}]").lb, m.getVarByName(f"x[{nd2.id},{nd.id}]").ub = 0, 0
 
 			""" Heuristic starting assignments """
 			self.__heuristic_start(m, g)
@@ -216,7 +223,7 @@ class LayeredOptimizer:
 				self.print_info.append(f"{pre_sym}Time to optimize: {t2}")
 			if (m.status != 2 and m.status != 9) or m.SolCount == 0:
 				print("model returned status code:", m.status)
-				print("4: model probably never found a feasible solution")
+				print("3/4: model probably never found a feasible solution")
 				print("11: solve interrupted")
 				print("otherwise check https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html")
 				print("or, was cutoff without finding a solution. #solutions found:", m.SolCount)
@@ -250,7 +257,10 @@ class LayeredOptimizer:
 
 			""" Draw the resulting graph """
 			if self.draw_graph:
-				vis.draw_graph(g, self.name)
+				if self.name == "collapsed_graph":
+					vis.draw_graph(g, self.name, groups=[g.subgraphs[g.stack_node_to_nodelist[nod.id][0]] for nod in g.nodes])
+				else:
+					vis.draw_graph(g, self.name)
 
 			if self.verbose:
 				self.print_info.append(f"{pre_sym}Final edge crossing count: {g.num_edge_crossings()}")
@@ -288,7 +298,7 @@ class LayeredOptimizer:
 		if subgraph_seq:
 			n_orig = max((n.id for n in g.nodes))
 		for var, val in x_var_opt.items():
-			if val == 0:
+			if val == 1:
 				if g[int(var[0])].is_anchor_node and int(var[1]) > n_orig:
 					m2.addConstr(y[var[0]] >= 0.15 + y[var[1]], f"vert{var}")
 				elif int(var[0]) > n_orig or int(var[1]) > n_orig:
@@ -819,7 +829,7 @@ class LayeredOptimizer:
 					m.addConstr(klc * x[kl1, kl2] - 2 * kmc * x[km1, km2] + lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] + (1 - klc)//2 - (1 - kmc) + (1 - lmc)//2 <= 0)
 					m.addConstr(-klc * x[kl1, kl2] + 2 * kmc * x[km1, km2] - lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] - (1 - klc)//2 + (1 - kmc) - (1 - lmc)//2 <= 0)
 
-	def __optimize_with_subgraph_reduction(self, n_partitions, cluster, top_level_g, crosses, contacts, stack_to_nodeset, node_to_stack):
+	def __optimize_with_subgraph_reduction(self, n_partitions, cluster, top_level_g, crosses, contacts, stack_to_nodeset, node_to_stack):  # DEPRECATED
 		# TODO (later): remove all the parameters to standard_opt, replace non-top-level calls with creation of new optimizer object
 		self.print_info.append("")
 
@@ -960,12 +970,7 @@ class LayeredOptimizer:
 		# LOOKAT return x_vars (or use self.x_var_assign?), n_crossings, subgraph LayeredGraph objects
 		return n_ec, opt_vals, unconstrained_opt_vals, top_level_optval
 
-	""" Return min possible num crossings, given by my formula """
-	# def __bound_on_optimality(self, subg_assign, top_lv_g, cr_num, cr_num_tuple, opt_cr_num_tuple, top_ov):
-	# 	# LOOKAT search reduced graph for butterflies which are inexcusable, to improve bound
-	# 	return sum(opt_cr_num_tuple)
-
-	def __optimize_full_subgraph_algorithm(self):
+	def __optimize_full_subgraph_algorithm(self):  # DEPRECATED
 		t_allotted = self.cutoff_time if self.cutoff_time > 0 else 60
 		t_start = time.time()
 		n_partitions = 2
@@ -1013,7 +1018,7 @@ class LayeredOptimizer:
 				cluster = list(SpectralClustering(n_clusters=n_partitions, assign_labels="discretize", affinity="precomputed").fit(self.g.adjacency_matrix()).labels_)
 				cg.subgraphs = cluster
 				lgs = cg.create_layered_graphs_from_subgraphs_dangling_nodes()
-				if sum((lg.optimization_time_estimate() for lg in lgs)) < self.cutoff_time:
+				if max((lg.optimization_time_estimate() for lg in lgs)) < self.cutoff_time:
 					print(f"Optimizing with {n_partitions} partition{'s' if n_partitions > 1 else ''}")
 					print("Runtime estimates:", [lg.optimization_time_estimate() for lg in lgs])
 					break
@@ -1022,11 +1027,14 @@ class LayeredOptimizer:
 			cg.subgraphs = cluster
 			lgs = cg.create_layered_graphs_from_subgraphs_dangling_nodes()
 		cg.create_collapsed_graph_skeleton()
+		# print([[idx for idx, v in enumerate(cg.subgraphs) if v == i] for i in range(max(cg.subgraphs)+1)])
 
 		if cg.optimization_time_estimate() < self.cutoff_time / 2:
 			# note: need separate opt to preserve x_var_assign
 			skele_opt = LayeredOptimizer(cg)
 			skele_opt.set_reasonable_params()
+			skele_opt.draw_graph = True
+			skele_opt.name = "collapsed_graph"
 			skele_opt.optimize_layout()
 			y_vs = skele_opt.__find_y_assignment_given_x(skele_opt.x_var_assign)
 			for nd, y_v in y_vs.items():
@@ -1036,21 +1044,30 @@ class LayeredOptimizer:
 			improved_sifting(cg)
 
 		for cr_edge in cg.crossing_edges:  # fix nodes
-			#  cn11----cn12
-			#     `----.
-			#  cn21----cn22
+			#  cn11----cn12    <- subgraph 1
+			#     `----.       <- crossing edge (cn11, cn22)
+			#  cn21----cn22    <- subgraph 2
 			cn11y = cg[cg.node_to_stack_node[cr_edge[0]]].y
-			cn12 = cg.get_collapsed_node(cg[cr_edge[1]].layer, cg.subgraphs[cr_edge[0]])
+			cn12 = cg.get_collapsed_node(self.g[cr_edge[1]].layer, cg.subgraphs[cr_edge[0]])
 			cn22y = cg[cg.node_to_stack_node[cr_edge[1]]].y
-			cn21 = cg.get_collapsed_node(cg[cr_edge[0]].layer, cg.subgraphs[cr_edge[1]])
+			cn21 = cg.get_collapsed_node(self.g[cr_edge[0]].layer, cg.subgraphs[cr_edge[1]])
+			# print(cr_edge, cn12, cn21)
 			if cn12 != -1 and cr_edge[1] in lgs[cg.subgraphs[cr_edge[0]]]:
 				# fix node corresponding to cn22 in subg1
 				# issue: cr_edge[0] may not be a node in lg2
 				# solution: since iteration is over all cr_edges, can just skip if not there
-				lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix = 1 if cn22y > cn12.y else -1
+				lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix = cn22y - cn12.y
+				# print(lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]], lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix)
+			elif cn12 == -1 and cr_edge[1] in lgs[cg.subgraphs[cr_edge[0]]]:
+				lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix = cn22y
+				# print(lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]], lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix)
 			if cn21 != -1 and cr_edge[0] in lgs[cg.subgraphs[cr_edge[1]]]:
 				# fix node corresponding to cn11 in subg2
-				lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix = 1 if cn11y > cn21.y else -1
+				lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix = cn11y - cn21.y
+				# print(lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]], lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix)
+			elif cn21 == -1 and cr_edge[0] in lgs[cg.subgraphs[cr_edge[1]]]:
+				lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix = cn11y
+				# print(lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]], lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix)
 
 		# step 3: multiprocessing pool, optimize normally all layeredgraphs
 		manager = mp.Manager()
@@ -1066,25 +1083,77 @@ class LayeredOptimizer:
 		# step 4: extract node positions from optimized subgraphs
 		print("before", self.g.num_edge_crossings())
 		max_height = max((v.y for lg in lgs_out for v in lg.nodes))
-		print("max", max_height)
 		for lg in lgs_out:
 			for nd in lg.nodes:
-				if nd.fix == 0:
+				if cg.subgraphs[nd.id] == lg.subg_id:
 					self.g[nd.id].y = cg[cg.node_to_stack_node[nd.id]].y * max_height + nd.y
-		# for c_nd in cg.nodes:
-		# 	# print("cnode", c_nd, c_nd.y)
-		# 	for nd in cg.stack_node_to_nodelist[c_nd.id]:
-		# 		# print(lgs[cg.subgraphs[nd]][nd], lgs[cg.subgraphs[nd]][nd].y)
-		# 		self.g[nd].y = c_nd.y * max_height + lgs_out[cg.subgraphs[nd]][nd].y
+		# self.g.check_position_validity()
 		self.__assign_x_given_y()
 		print("after", self.g.num_edge_crossings())
+
+		for i in range(len(lgs_out)):
+			vis.draw_graph(lgs_out[i], f"example{i + 1}", groups=[0 if nd.fix == 0 else 1 for nd in lgs_out[i].nodes])
 
 		# step 5: apply neighborhood_sift
 
 		if do_bendiness_reduction:
 			self.__sequential_br()
-		# if do_draw_graph:
-		vis.draw_graph(self.g, self.name)
+		if do_draw_graph:
+			vis.draw_graph(self.g, self.name, groups=cg.subgraphs)
+
+		return self.g.num_edge_crossings()
+
+	def __optimize_incremental_local(self):
+		do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
+		do_draw_graph, self.draw_graph = self.draw_graph, False
+		cutoff_partitions, n_partitions = 100, 1
+		cg = CollapsedGraph(self.g)
+		if self.n_partitions == -1:
+			while n_partitions <= cutoff_partitions:
+				cluster = list(SpectralClustering(n_clusters=n_partitions, assign_labels="discretize", affinity="precomputed").fit(self.g.adjacency_matrix()).labels_)
+				cg.subgraphs = cluster
+				lgs = cg.create_layered_graphs_from_subgraphs()
+				rt_ests = [lg.optimization_time_estimate() for lg in lgs]
+				if max(rt_ests) < self.cutoff_time:
+					print(f"Optimizing with {n_partitions} incremental partition{'s' if n_partitions > 1 else ''}")
+					print("Runtime estimates:", [lg.optimization_time_estimate() for lg in lgs])
+					break
+		else:
+			cluster = list(SpectralClustering(n_clusters=self.n_partitions, assign_labels="discretize", affinity="precomputed").fit(self.g.adjacency_matrix()).labels_)
+			cg.subgraphs = cluster
+			lgs = cg.create_layered_graphs_from_subgraphs()
+			rt_ests = [lg.optimization_time_estimate() for lg in lgs]
+		cg.create_collapsed_graph_skeleton()
+
+		lg_kv = [(lgs[i], i) for i in range(len(lgs))]
+		lg_kv.sort(key=lambda x: -rt_ests[x[1]])
+		lgs_st, pm = zip(*lg_kv)
+
+		base_g = lgs_st[0]
+		seen_subgs = {pm[0]}
+		self.__optimize_layout_standard(graph_arg=base_g)
+		self.symmetry_breaking = False
+		for i in range(1, len(lgs)):
+			vis.draw_graph(base_g, f"example{i}", groups=[cg.subgraphs[nd.id] for nd in base_g])
+			x_v_save = {k: v for k, v in self.x_var_assign.items() if v != 2}
+			for nd in lgs_st[i].nodes:
+				base_g.add_node(nd.layer, idx=nd.id, is_anchor=nd.is_anchor_node)
+			for ed in lgs_st[i].edges:
+				base_g.add_edge(ed.n1.id, ed.n2.id)
+			for cr_ed in cg.crossing_edges:
+				if (cg.subgraphs[cr_ed[0]] == pm[i] and cg.subgraphs[cr_ed[1]] in seen_subgs) or (cg.subgraphs[cr_ed[1]] == pm[i] and cg.subgraphs[cr_ed[0]] in seen_subgs):
+					base_g.add_edge(cr_ed[0], cr_ed[1])
+			seen_subgs.add(pm[i])
+			self.__optimize_layout_standard(graph_arg=base_g, fix_x_vars=x_v_save)
+		vis.draw_graph(base_g, "example4", groups=[cg.subgraphs[nd.id] for nd in base_g])
+
+		self.__assign_y_given_x()
+		print("after", self.g.num_edge_crossings())
+
+		if do_bendiness_reduction:
+			self.__sequential_br()
+		if do_draw_graph:
+			vis.draw_graph(self.g, self.name, groups=cg.subgraphs)
 
 		return self.g.num_edge_crossings()
 
@@ -1093,7 +1162,7 @@ class LayeredOptimizer:
 		return_list.append(graph)
 
 	def optimize_with_starting_assignments(self, assigments):
-		out = self.__optimize_layout_standard(use_top_level_params=True, fix_x_vars=assigments)
+		out = self.__optimize_layout_standard(fix_x_vars=assigments)
 		if self.verbose:
 			for string in self.print_info:
 				print(string)
@@ -1127,8 +1196,8 @@ class LayeredOptimizer:
 					counts[v[1]] += 1
 			in_order = sorted(list(counts.values()))
 			if all((in_order[i] < in_order[i+1] for i in range(len(in_order)-1))):
-				for x_v, ct in counts.items():
-					y_assign[x_v] = ct
+				for nd, ct in counts.items():
+					y_assign[nd] = ct
 			else:
 				return "non-transitive x-values"
 		return y_assign
@@ -1140,15 +1209,33 @@ class LayeredOptimizer:
 			else:
 				self.x_var_assign[k] = 1
 
-	def optimize_layout(self, fix_xvars=None):
-		# if self.do_subg_reduction:
-		if self.locally_optimal_heuristic:
-			# out = self.__optimize_full_subgraph_algorithm()
-			out = self.__optimize_locally_optimal()
+	def __assign_y_given_x(self):
+		print(self.x_var_assign)
+		print([nd.y for nd in self.g.nodes])
+		for nd in self.g:
+			nd.y = 0
+		for x_var, val in self.x_var_assign.items():
+			if x_var[0] in self.g.node_ids and x_var[1] in self.g.node_ids and val != 2:
+				self.g[x_var[val]].y += 1
+		print([nd.y for nd in self.g.nodes])
+
+	def optimize_layout(self, fix_xvars=None, local_opt=False, local_opt_heuristic="incremental", cutoff=0, force_optimal=False):
+		if cutoff != 0:
+			self.cutoff_time = cutoff
+		if force_optimal:
+			self.local_opt, local_opt = False, False
+
+		if self.local_opt or local_opt:
+			if local_opt_heuristic == "partition" or self.local_opt_heuristic == "partition":
+				out = self.__optimize_locally_optimal()
+			elif local_opt_heuristic == "incremental" and self.local_opt_heuristic == "incremental":
+				out = self.__optimize_incremental_local()
+			else:
+				raise Exception("no heuristic of that name")
 		elif fix_xvars is not None:
-			out = self.__optimize_layout_standard(use_top_level_params=True, fix_x_vars=fix_xvars)
+			out = self.__optimize_layout_standard(fix_x_vars=fix_xvars)
 		else:
-			out = self.__optimize_layout_standard(use_top_level_params=True)
+			out = self.__optimize_layout_standard()
 		if self.verbose:
 			for string in self.print_info:
 				print(string)
