@@ -32,10 +32,6 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 
 	def optimize_layout(self, fix_x_vars=None):
 		out = self.__optimize_layout_standard_highs(fix_x_vars=fix_x_vars)
-		if self.verbose:
-			for string in self.print_info:
-				print(string)
-			self.print_info.clear()
 		return out
 
 	# TODO: implement. https://docs.scipy.org/doc/scipy/reference/optimize.linprog-highs.html#optimize-linprog-highs

@@ -268,12 +268,44 @@ def generate_extended_matuszewski_datsets(seed=None):
 				ng.write_out(f"../random graphs/matuszewski/10_by_10_density/d{d}/graph{i}.lgbin")
 
 
+def generate_big_n_by_n_graphs(seed=220):
+	random.seed(seed)
+	if "n_by_n" not in os.listdir("../random graphs"):
+		os.mkdir("../random graphs/n_by_n")
+
+	for n in range(20, 51, 5):
+		if f"n{n}" not in os.listdir("../random graphs/n_by_n"):
+			os.mkdir(f"../random graphs/n_by_n/n{n}")
+			for i in range(10):
+				ng = random_layered_graph_connect_help_edgecount(n, n, 2 * n * (n - 1))
+				print(f"n={n} graph {i+1}")
+				ng.write_out(f"../random graphs/n_by_n/n{n}/graph{i}.lgbin")
+
+
+def generate_rectangle_graphs(seed=2200):
+	random.seed(seed)
+	if "rectangles" not in os.listdir("../random graphs"):
+		os.mkdir("../random graphs/rectangles")
+
+	for n in range(10, 31):
+		k = 100 - (3*n)
+		if f"k{k}n{n}" not in os.listdir("../random graphs/rectangles"):
+			os.mkdir(f"../random graphs/rectangles/k{k}n{n}")
+			for i in range(10):
+				ng = random_layered_graph_connect_help_edgecount(k, n, 2 * n * (k - 1))
+				print(f"k={k}/n={n} graph {i+1}")
+				ng.write_out(f"../random graphs/rectangles/k{k}n{n}/graph{i}.lgbin")
+
+
 if __name__ == '__main__':
 	# generate_gange_dataset(seed=22)
 	# generate_random_density_set(seed=49)
 	# generate_random_fixed_density_set(seed=71)
-	generate_extended_matuszewski_datsets()
+	# generate_extended_matuszewski_datsets()
+	# generate_big_n_by_n_graphs()
+	generate_rectangle_graphs()
 
 	# gr = src.read_data.read("../random graphs/matuszewski/10_by_10_density/d15/graph0.lgbin")
+	# gr = src.read_data.read("../random graphs/rectangles/k70n20/graph0.lgbin")
 	# gr = random_layered_graph_connect_help_edgecount(3, 10, 35)
 	# src.vis.draw_graph(gr, "rand", gravity=True, nested=True)

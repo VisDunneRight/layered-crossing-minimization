@@ -163,8 +163,9 @@ if __name__ == '__main__':
 	line_xv = np.linspace(min_v, max_v, 500)
 	line_dicts = [{'x': line_xv[i], 'y': np.e**(p(line_xv[i]))} for i in range(500)]
 	scatter_dicts = [{'x': datax[i], 'y': datay[i], 'c': colors[i]} for i in range(len(datax))]
+	# vis.draw_altair_scatter_with_custom_line(scatter_dicts, line_dicts, 'x', 'y', 'c', '|C|', 'ln(t)', f'Cscore')
 	vis.draw_altair_scatter_with_custom_line(scatter_dicts, line_dicts, 'x', 'y', 'c', 'ln|C|', 'ln(t)', f'Cscore_symbreak')
 
 	print(p)
-	print(f"f(t) = e^({p}), where x=ln|C|")
+	print(f"f(t) = e^({p}), where x=ln|C|, t in ms")
 	print(f"results:", results)

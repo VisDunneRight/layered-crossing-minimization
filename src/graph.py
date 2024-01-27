@@ -4,6 +4,7 @@ import pickle
 import random
 from typing import Tuple
 from src.helpers import *
+import networkx as nx
 
 
 class LayeredNode:
@@ -15,6 +16,7 @@ class LayeredNode:
 		self.stacked = stacked
 		self.name = node_id if name is None else name
 		self.fix = fix
+		self.energy = 0
 
 	def __str__(self):
 		return f"ID={self.id}/L={self.layer}"
@@ -84,6 +86,7 @@ class LayeredGraph:
 		self.double_adj_list = {}
 		self.node_data = {}
 		self.edge_data = {}
+		self.nx_graph = None
 
 	def __getitem__(self, item):
 		if type(item) == int:
@@ -833,21 +836,33 @@ class LayeredGraph:
 							ed_sign[nd_set[ed2.n1.id, ed1.n1.id], nd_set[ed2.n2.id, ed1.n2.id]] = sign
 		return veg, nd_list, ed_sign
 
-	def wiggle_node(self, x_vars, edge_b_l, node, pos_or_neg):
-		best_seen_n_cr = 0
-		start_x_vars = x_vars.copy()
-		x_vars_changed = x_vars
-		relevant_x_vars = {}
-		for n_other in self.layers[self[node].layer]:
-			if n_other.id != node:
-				relevant_x_vars[node, n_other.id] = get_x_var(x_vars, node, n_other.id)
+	# def wiggle_node(self, x_vars, edge_b_l, node, pos_or_neg):
+	# 	best_seen_n_cr = 0
+	# 	start_x_vars = x_vars.copy()
+	# 	x_vars_changed = x_vars
+	# 	relevant_x_vars = {}
+	# 	for n_other in self.layers[self[node].layer]:
+	# 		if n_other.id != node:
+	# 			relevant_x_vars[node, n_other.id] = get_x_var(x_vars, node, n_other.id)
 
-	def optimization_time_estimate(self):
+	def get_networkx_graph(self, update=False):
+		try:
+			if self.nx_graph is None or update:
+				self.nx_graph = nx.DiGraph()
+				self.nx_graph.add_nodes_from(self.node_ids.keys())
+				self.nx_graph.add_edges_from(self.edge_ids.keys())
+		except AttributeError:
+			self.nx_graph = nx.DiGraph()
+			self.nx_graph.add_nodes_from(self.node_ids.keys())
+			self.nx_graph.add_edges_from(self.edge_ids.keys())
+		return self.nx_graph
+
+	def c_vars_count(self):
 		c_count = 0
 		e_b_l = self.get_edges_by_layer()
 		for elist in e_b_l.values():
 			c_count += len(elist) ** 2
-		return math.e ** (0.4615 * math.log(c_count) - 1.542) if c_count > 0 else 0
+		return c_count
 
 	def write_out(self, path):
 		with open(path, 'wb') as bfd:
