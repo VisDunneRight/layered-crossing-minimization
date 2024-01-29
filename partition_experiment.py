@@ -59,7 +59,7 @@ def small_test():
         print(lb_n_cv)
         print(calc_time_taken_for_partition_size(n_p - 1, lb_n_cv, n_cv))
         print("individual partition", optimization_time_estimate(lb_n_cv))
-        opt.optimize_layout(bucket_size=10000, local_opt=True, pct=1)
+        opt.local_opt_increment(4000, 1, neighborhood_fn=degree_ratio_neighborhood)
     # heuristics.global_sifting(opt.g)
     print(opt.g.num_edge_crossings())
 
@@ -69,10 +69,10 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
         mkdir(path_to_dataset + "/results")
     # if neighborhood_fn.__name__ not in listdir(path_to_dataset + "/results"):
     #     (path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", ""))
-    fname = path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", "") + ".csv"
+    fname = path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", "") + "+" + str(n_cvs) + ".csv"
     fidx = get_start_position(fname)
     if fidx == -1:
-        insert_one(fname, ["Index", "File", "OptTime", "CrFinal", "CrInitial", "Cr1", "T1", "Cr2", "T2..."])
+        insert_one(fname, ["Index", "File", "OptTime", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
     cur_idx = 0
     for root, dirs, files in os.walk(path_to_dataset):
         dirs.sort()
@@ -81,7 +81,7 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
                 if cur_idx >= fidx:
                     optim = LayeredOptimizer(root + "/" + fl, {"cutoff_time": 300, "vertical_transitivity": True})
                     initial_layout_fn(optim.g)
-                    output = optim.optimize_layout(local_opt=True, bucket_size=n_cvs)
+                    output = optim.local_opt_increment(n_cvs, 1, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn)
                     reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
                     insert_one(fname, [cur_idx, root + "/" + fl, output[0], output[1]] + reordered)
                 cur_idx += 1
@@ -89,9 +89,9 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
 
 if __name__ == '__main__':
     # small_test()
-    cv_sizes = [2000, 4000, 6000, 8000]
+    cv_sizes = [2000, 5000, 8000]
     cand_fns = [degree_candidate, biconnected_candidate, betweenness_candidate, avg_adge_length_candidate, crossings_candidate]
-    nbhd_fns = [bfs_neighborhood, vertical_neighborhood]
+    nbhd_fns = [bfs_neighborhood, vertical_neighborhood, degree_ratio_neighborhood]
     if len(sys.argv) >= 2:
         nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(cv_sizes))
         cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) % len(cand_fns)

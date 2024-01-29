@@ -1112,7 +1112,7 @@ class LayeredOptimizer:
 		# return self.__optimize_layout_standard(graph_arg=graph, fix_x_vars=self.x_var_assign)
 		return self.__optimize_crossing_reduction_model(m, graph, env)
 
-	def __local_opt_increment(self, bucket_size, percentage, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate):
+	def local_opt_increment(self, bucket_size, percentage, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate):
 		# opt_g = LayeredGraph()
 		g = self.g
 		do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
@@ -1144,7 +1144,7 @@ class LayeredOptimizer:
 					next_partition = neighborhood_fn(g, candidate, bucket_size * percentage)
 					neighborhood = [nid for nid, v in enumerate(next_partition) if v]
 					y_save = [g[nd].y for nd in neighborhood]
-					# print(neighborhood)
+					print(neighborhood)
 					out = self.__incremetal_opt(g, next_partition, m, env)
 					self.cutoff_time -= time.time() - t_since_last
 					t_since_last = time.time()
