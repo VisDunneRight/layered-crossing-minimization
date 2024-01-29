@@ -3,7 +3,7 @@ import sys
 import csv
 from src.optimization import LayeredOptimizer
 from src.helpers import *
-from src import heuristics
+from src import heuristics, vis
 from src.neighborhood import *
 from os import mkdir, listdir
 
@@ -35,12 +35,13 @@ def get_start_position(filename):
 
 def small_test():
     opt = LayeredOptimizer("random graphs/n_by_n/n25/graph0.lgbin")
-    opt.cutoff_time = 300
-    opt.vertical_transitivity = True
+    opt.cutoff_time = 180
+    # opt.vertical_transitivity = True
     # opt = LayeredOptimizer("Rome-Lib/graficon96nodi/grafo3510.96")
     n_cv = opt.g.c_vars_count()
     n_p = 1
     heuristics.global_sifting(opt.g)
+    vis.draw_graph(opt.g, "solution_heuristic")
     print(n_cv)
     print(optimization_time_estimate(n_cv / n_p))
     while n_p * optimization_time_estimate(n_cv / n_p) > 60 and n_p < 100:
@@ -71,7 +72,7 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
     fname = path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", "") + ".csv"
     fidx = get_start_position(fname)
     if fidx == -1:
-        insert_one(fname, ["Index", "File", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
+        insert_one(fname, ["Index", "File", "OptTime", "CrFinal", "CrInitial", "Cr1", "T1", "Cr2", "T2..."])
     cur_idx = 0
     for root, dirs, files in os.walk(path_to_dataset):
         dirs.sort()
@@ -81,8 +82,8 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
                     optim = LayeredOptimizer(root + "/" + fl, {"cutoff_time": 300, "vertical_transitivity": True})
                     initial_layout_fn(optim.g)
                     output = optim.optimize_layout(local_opt=True, bucket_size=n_cvs)
-                    reordered = [(output[0][i], output[1][i]) for i in range(len(output[0]))]
-                    insert_one(fname, [cur_idx, root + "/" + fl] + reordered)
+                    reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
+                    insert_one(fname, [cur_idx, root + "/" + fl, output[0], output[1]] + reordered)
                 cur_idx += 1
 
 
@@ -96,7 +97,7 @@ if __name__ == '__main__':
         cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) % len(cand_fns)
         cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) // len(cand_fns)
     else:
-        nbhd_idx, cand_idx, cv_idx = 0, 0, 0
+        nbhd_idx, cand_idx, cv_idx = 1, 1, 2
     run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], cv_sizes[cv_idx], heuristics.global_sifting, "random graphs/rectangles")
     # opt = LayeredOptimizer("random graphs/n_by_n/n25/graph0.lgbin")
     # crossings_candidate(opt.g, init=True)

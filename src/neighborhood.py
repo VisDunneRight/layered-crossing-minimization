@@ -192,8 +192,10 @@ def penalty_fn(g: LayeredGraph, neighborhood, candidate, movement, iteration, no
     var_1, var_2 = 8, 4
     var_moved = 2  # factor for penalty on a neighborhood node that DID move (higher = less penalty)
     end_penalty_iter = 20  # subsequent iterations only penalize nodes that don't move
-    var_1 = (var_1 - 1) * (math.e ** (-1/end_penalty_iter * iteration)) + 1
-    var_2 = (var_2 - 1) * (math.e ** (-1/end_penalty_iter * iteration)) + 1
+    # var_1 = (var_1 - 1) * (math.e ** (-1/end_penalty_iter * iteration)) + 1
+    var_1 = (var_1 - 1) * (1 / (iteration // 10 + 1)) + 1
+    # var_2 = (var_2 - 1) * (math.e ** (-1/end_penalty_iter * iteration)) + 1
+    var_2 = (var_2 - 1) * (1 / (iteration // 10 + 1)) + 1
     if no_repeats:
         g[candidate].energy = 0
     for i, nd in enumerate(neighborhood):
