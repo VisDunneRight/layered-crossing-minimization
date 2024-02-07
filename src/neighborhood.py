@@ -1,3 +1,5 @@
+import random
+
 from src.graph import *
 from collections import defaultdict
 import heapq
@@ -60,7 +62,7 @@ def bfs_neighborhood(g: LayeredGraph, candidate_id: int, cutoff):
 
 
 def vertical_neighborhood(g: LayeredGraph, candidate_node: int, cutoff):
-    """ greedy criterion: largest (incoming edges / (outgoing edges + 1)) """
+    """ greedy criterion: largest (incoming edges / (outgoing edges + 0.5)) """
     d_adj = g.get_double_adj_list()
     selected = [False] * g.n_nodes
     for n in g.layers[g[candidate_node].layer]:
@@ -87,9 +89,12 @@ def vertical_neighborhood(g: LayeredGraph, candidate_node: int, cutoff):
         next_nd = heapq.heappop(pqueue)[1]
         next_layer = g[next_nd].layer
         nd_lr = 0 if next_layer == right_layer else 1
-        for nd_adj in d_adj[next_nd][nd_lr]:  # C-VAR CALCULATION
-            acc_cv += 2 * layer_edge_cts[g[nd_adj].layer - 1 + nd_lr]
-            # layer_edge_cts[g[nd_adj].layer - 1 + nd_lr] += 1
+        # print(d_adj[next_nd][nd_lr], nd_lr, next_layer, next_nd, right_layer, g[d_adj[next_nd][nd_lr][0]].layer - 1 + nd_lr)
+        # print(layer_edge_cts[g[d_adj[next_nd][nd_lr][0]].layer - 1 + nd_lr])
+        for i in range(2):  # C-VAR CALCULATION
+            for v in d_adj[next_nd][i]:
+                acc_cv += 2 * layer_edge_cts[next_layer - 1 + i]
+                # layer_edge_cts[g[nd_adj].layer - 1 + nd_lr] += 1
         if acc_cv > cutoff:
             break
         selected[next_nd] = True
@@ -106,20 +111,64 @@ def vertical_neighborhood(g: LayeredGraph, candidate_node: int, cutoff):
             exp_left += 1 if (nd_lr == 1) else 0
             if right_layer in g.layers and nd_lr == 0 and open_right:
                 for nd in g.layers[right_layer]:
-                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][0]) / (len(d_adj[nd.id][1]) + 1)), nd.id))
+                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][0]) / (len(d_adj[nd.id][1]) + 0.5)), nd.id))
             if left_layer in g.layers and nd_lr == 1 and open_left:
                 for nd in g.layers[left_layer]:
-                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][1]) / (len(d_adj[nd.id][0]) + 1)), nd.id))
+                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][1]) / (len(d_adj[nd.id][0]) + 0.5)), nd.id))
         if exp_right - exp_left < 2 and not open_right:
             open_right = True
             if right_layer in g.layers:
                 for nd in g.layers[right_layer]:
-                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][0]) / (len(d_adj[nd.id][1]) + 1)), nd.id))
+                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][0]) / (len(d_adj[nd.id][1]) + 0.5)), nd.id))
         elif exp_left - exp_right < 2 and not open_left:
             open_left = True
             if left_layer in g.layers:
                 for nd in g.layers[left_layer]:
-                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][1]) / (len(d_adj[nd.id][0]) + 1)), nd.id))
+                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][1]) / (len(d_adj[nd.id][0]) + 0.5)), nd.id))
+    return selected
+
+
+def vertical_re_neighborhood(g: LayeredGraph, candidate_node: int, cutoff):
+    """ greedy criterion: largest (incoming edges / (outgoing edges + 0.5))
+        this procedure randomly chooses an adjacent layer and adds from that layer until cutoff.
+    """
+    d_adj = g.get_double_adj_list()
+    selected = [False] * g.n_nodes
+    for n in g.layers[g[candidate_node].layer]:
+        selected[n.id] = True
+    layer_edge_cts = [len(g.get_edges_by_layer()[i]) for i in range(g.n_layers - 1)]
+    layer_node_cts = defaultdict(int)
+    layer_node_cts[g[candidate_node].layer] = len(g.layers[g[candidate_node].layer])
+    next_layers = [g[candidate_node].layer - 1] if g[candidate_node].layer > 0 else [] + \
+                  [g[candidate_node].layer + 1] if g[candidate_node].layer < g.n_layers - 1 else []
+    next_layer = random.choice(next_layers)
+    lr_minmax = sorted([g[candidate_node].layer, next_layer])
+    pqueue = []
+    acc_cv = 0
+    for nd in g.layers[next_layer]:
+        heapq.heappush(pqueue, (-(len(d_adj[nd.id][1]) / (len(d_adj[nd.id][0]) + 0.5)), nd.id))
+    while pqueue:
+        next_nd = heapq.heappop(pqueue)[1]
+        for i in range(2):  # C-VAR CALCULATION
+            for v in d_adj[next_nd][i]:
+                acc_cv += 2 * layer_edge_cts[g[next_nd].layer - 1 + i]
+        if acc_cv > cutoff:
+            break
+        selected[next_nd] = True
+        layer_node_cts[next_layer] += 1
+        if layer_node_cts[next_layer] == len(g.layers[next_layer]):
+            if lr_minmax[0] == 0:
+                next_layer = lr_minmax[1] + 1
+            elif lr_minmax[1] == g.n_layers - 1:
+                next_layer = lr_minmax[0] - 1
+            else:
+                next_layer = random.choice([lr_minmax[0] - 1, lr_minmax[1] + 1])
+            if next_layer > lr_minmax[1]:
+                for nd in g.layers[next_layer]:
+                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][0]) / (len(d_adj[nd.id][1]) + 0.5)), nd.id))
+            if next_layer < lr_minmax[0]:
+                for nd in g.layers[next_layer]:
+                    heapq.heappush(pqueue, (-(len(d_adj[nd.id][1]) / (len(d_adj[nd.id][0]) + 0.5)), nd.id))
     return selected
 
 
@@ -156,9 +205,18 @@ def degree_ratio_neighborhood(g: LayeredGraph, candidate_node: int, cutoff):
             selected[next_node] = True
             n_selected += 1
         else:
-            print(acc_cv)
+            # print(acc_cv)
             break
     return selected
+
+
+def random_candidate(g: LayeredGraph, init=False):
+    if init:
+        for nd in g:
+            nd.energy = 10
+    else:
+        max_e = max(x.energy for x in g)
+        return random.choice([nd.id for nd in g if nd.energy == max_e])
 
 
 def degree_candidate(g: LayeredGraph, init=False):
@@ -196,30 +254,36 @@ def biconnected_candidate(g: LayeredGraph, init=False):
         return max(g.node_ids.keys(), key=lambda x: g[x].energy)
 
 
-def avg_adge_length_candidate(g: LayeredGraph, init=False):
-    adj = g.get_adj_list()
-    max_seen, max_nd = 0, -1
-    for nd in g:
-        nd.energy = sum((abs(nd.y - g[a_nd].y) for a_nd in adj[nd.id])) / len(adj[nd.id])
-        if nd.energy > max_seen:
-            max_seen = nd.energy
-            max_nd = nd.id
-    return max_nd
+def avg_edge_length_candidate(g: LayeredGraph, init=False):
+    if init:
+        for nd in g:
+            nd.tabu = False
+    else:
+        adj = g.get_adj_list()
+        # max_seen, max_nd = 0, -1
+        for nd in g:
+            nd.energy = sum((abs(nd.y - g[a_nd].y) for a_nd in adj[nd.id])) / len(adj[nd.id])
+            # if nd.energy > max_seen:  # calculate candidate after penalty but before update?
+            #     max_seen = nd.energy
+            #     max_nd = nd.id
+        return max(g.node_ids.keys(), key=lambda x: g[x].energy if not g[x].tabu else 0)
 
 
 def crossings_candidate(g: LayeredGraph, init=False):
-    e_b_l = g.get_edges_by_layer()
-    for nd in g:
-        nd.energy = 0
-    for edge_list in e_b_l.values():
-        for e1, e2 in itertools.combinations(edge_list, 2):
-            if len({e1.n1, e1.n2, e2.n1, e2.n2}) == 4:
-                if (e1.n1.y > e2.n1.y and e1.n2.y < e2.n2.y) or (e1.n1.y < e2.n1.y and e1.n2.y > e2.n2.y):
-                    g[e1.n1.id].energy += 1
-                    g[e1.n2.id].energy += 1
-                    g[e2.n1.id].energy += 1
-                    g[e2.n2.id].energy += 1
-    return max(g.node_ids.keys(), key=lambda x: g[x].energy)
+    if init:
+        for nd in g:
+            nd.tabu = False
+    else:
+        e_b_l = g.get_edges_by_layer()
+        for edge_list in e_b_l.values():
+            for e1, e2 in itertools.combinations(edge_list, 2):
+                if len({e1.n1, e1.n2, e2.n1, e2.n2}) == 4:
+                    if (e1.n1.y > e2.n1.y and e1.n2.y < e2.n2.y) or (e1.n1.y < e2.n1.y and e1.n2.y > e2.n2.y):
+                        g[e1.n1.id].energy += 1
+                        g[e1.n2.id].energy += 1
+                        g[e2.n1.id].energy += 1
+                        g[e2.n2.id].energy += 1
+        return max(g.node_ids.keys(), key=lambda x: g[x].energy if not g[x].tabu else 0)
 
 
 def next_candidate(g: LayeredGraph):
@@ -234,6 +298,8 @@ def penalty_fn(g: LayeredGraph, neighborhood, candidate, movement, iteration, no
     var_1 = (var_1 - 1) * (1 / (iteration // 10 + 1)) + 1
     # var_2 = (var_2 - 1) * (math.e ** (-1/end_penalty_iter * iteration)) + 1
     var_2 = (var_2 - 1) * (1 / (iteration // 10 + 1)) + 1
+    adj = g.get_adj_list()
+    g[candidate].tabu = True
     if no_repeats:
         g[candidate].energy = 0
     for i, nd in enumerate(neighborhood):
@@ -247,3 +313,6 @@ def penalty_fn(g: LayeredGraph, neighborhood, candidate, movement, iteration, no
                 g[nd].energy /= max(var_1 / var_moved, 1)
             else:
                 g[nd].energy /= max(var_2 / var_moved, 1)
+            g[nd].tabu = False
+            for nd_adj in adj[nd]:
+                g[nd_adj].tabu = False

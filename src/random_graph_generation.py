@@ -131,6 +131,9 @@ def random_layered_graph_connect_help_edgecount(k, n, n_edges):
 	assert n_edges >= n * k, "graph will not be connected"
 
 	max_edges = (k - 1) * (n * n)
+
+	assert n_edges <= max_edges, f"Max edges for this graph size is {max_edges}"
+
 	flip_edges = True if n_edges > max_edges // 2 else False
 	if flip_edges:
 		n_edges = max_edges - n_edges
@@ -146,12 +149,78 @@ def random_layered_graph_connect_help_edgecount(k, n, n_edges):
 		seen_edges = set()
 		n_added = 0
 		while n_added < n_edges:
-			n1 = random.randint(0, g.n_nodes - 1)
-			if len(not_seen) == n_edges - n_added and not flip_edges:
-				n1 = random.choice(sorted(not_seen))
-			adj_layers = [g[n1].layer + 1] if g[n1].layer == 0 else ([g[n1].layer - 1] if g[n1].layer == g.n_layers - 1 else [g[n1].layer - 1, g[n1].layer + 1])
-			n2_layer = random.choice(adj_layers)
-			n2 = random.randint(0, n - 1) + (n2_layer * n)
+			n1_l = random.randint(0, g.n_layers - 2)
+			n1 = random.randint(0, n - 1) + (n1_l * n)
+			# if len(not_seen) == n_edges - n_added and not flip_edges:
+			# 	n1 = random.choice(sorted(not_seen))
+			# 	n1_l = g[n1].layer
+			n2_l = n1_l + 1 if n1_l != g.n_layers - 1 else n1_l - 1
+			n2 = random.randint(0, n - 1) + (n2_l * n)
+			if (n1, n2) not in seen_edges and (n2, n1) not in seen_edges:
+				g.add_edge(n1, n2)
+				if n1 in not_seen:
+					not_seen.remove(n1)
+				if n2 in not_seen:
+					not_seen.remove(n2)
+				seen_edges.add((n1, n2))
+				n_added += 1
+		adj = g.get_adj_list()
+		for unseen in not_seen:
+			unconnected = True
+			while unconnected:
+				ot_nd_in_layer = random.choice()
+		if flip_edges:
+			pre_flip = set(g.edge_ids.keys())
+			print(pre_flip)
+			g.edges = []
+			g.edge_ids = {}
+			g.invalidate_data()
+			for i in range(k - 1):
+				for n1 in range(i * n, n + (i * n)):
+					for n2 in range((i + 1) * n, ((i + 2) * n)):
+						if (n1, n2) not in pre_flip:
+							print(n1, n2)
+							g.add_edge(n1, n2)
+
+		if g.is_connected():
+			return g
+		else:
+			print("fail")
+
+
+def random_layered_graph_edgecount_drop_unconnected(k, n, n_edges):
+	"""
+	:param k: number of layers
+	:param n: number of nodes per layer
+	:param n_edges: number of edges in the resultant graph
+	:return: LayeredGraph object g
+
+	Randomly samples edges over the entire network. Any nodes left unconnected are removed
+	"""
+
+	max_edges = (k - 1) * (n * n)
+
+	assert n_edges <= max_edges, f"Max edges for this graph size is {max_edges}"
+
+	flip_edges = True if n_edges > max_edges // 2 else False
+	if flip_edges:
+		n_edges = max_edges - n_edges
+
+	while True:
+		g = graph.LayeredGraph()
+
+		for i in range(k):  # add nodes
+			for j in range(n):
+				g.add_node(i)
+
+		not_seen = set(range(n * k))
+		seen_edges = set()
+		n_added = 0
+		while n_added < n_edges:
+			n1_l = random.randint(0, g.n_layers - 2)
+			n1 = random.randint(0, n - 1) + (n1_l * n)
+			n2_l = n1_l + 1
+			n2 = random.randint(0, n - 1) + (n2_l * n)
 			if (n1, n2) not in seen_edges and (n2, n1) not in seen_edges:
 				g.add_edge(n1, n2)
 				if n1 in not_seen:
@@ -165,12 +234,24 @@ def random_layered_graph_connect_help_edgecount(k, n, n_edges):
 			print(pre_flip)
 			g.edges = []
 			g.edge_ids = {}
+			g.invalidate_data()
 			for i in range(k - 1):
 				for n1 in range(i * n, n + (i * n)):
 					for n2 in range((i + 1) * n, ((i + 2) * n)):
 						if (n1, n2) not in pre_flip:
-							print(n1, n2)
 							g.add_edge(n1, n2)
+		else:
+			gp = graph.LayeredGraph()
+			nd_map = []
+			for nd in g.nodes:
+				if nd.id not in not_seen:
+					x = gp.add_node(nd.layer)
+					nd_map.append(x.id)
+				else:
+					nd_map.append(0)
+			for ed in seen_edges:
+				gp.add_edge(nd_map[ed[0]], nd_map[ed[1]])
+			g = gp
 
 		if g.is_connected():
 			return g
@@ -292,9 +373,77 @@ def generate_rectangle_graphs(seed=2200):
 		if f"k{k}n{n}" not in os.listdir("../random graphs/rectangles"):
 			os.mkdir(f"../random graphs/rectangles/k{k}n{n}")
 			for i in range(10):
-				ng = random_layered_graph_connect_help_edgecount(k, n, 2 * n * (k - 1))
+				ng = random_layered_graph_edgecount_drop_unconnected(k, n, 2 * n * (k - 1))
 				print(f"k={k}/n={n} graph {i+1}")
 				ng.write_out(f"../random graphs/rectangles/k{k}n{n}/graph{i}.lgbin")
+
+
+def generate_ratio_graphs(seed=22200):
+	random.seed(seed)
+	if "ratio" not in os.listdir("../random graphs"):
+		os.mkdir(f"../random graphs/ratio")
+
+	for kn in [10, 15, 20, 25, 30, 35]:
+		if f"r1k{kn}n{kn}" not in os.listdir("../random graphs/ratio"):
+			os.mkdir(f"../random graphs/ratio/r1k{kn}n{kn}")
+			for i in range(10):
+				ng = random_layered_graph_edgecount_drop_unconnected(kn, kn, 2 * kn * (kn - 1))
+				print(f"k={kn}/n={kn} graph {i + 1}")
+				ng.write_out(f"../random graphs/ratio/r1k{kn}n{kn}/graph{i}.lgbin")
+	for n in [6, 10, 13, 17, 20, 24]:
+		k = n * 2
+		if f"r2k{k}n{n}" not in os.listdir("../random graphs/ratio"):
+			os.mkdir(f"../random graphs/ratio/r2k{k}n{n}")
+			for i in range(10):
+				ng = random_layered_graph_edgecount_drop_unconnected(k, n, 2 * n * (k - 1))
+				print(f"k={k}/n={n} graph {i + 1}")
+				ng.write_out(f"../random graphs/ratio/r2k{k}n{n}/graph{i}.lgbin")
+	for n in [5, 8, 11, 14, 17, 20]:
+		k = n * 3
+		if f"r3k{k}n{n}" not in os.listdir("../random graphs/ratio"):
+			os.mkdir(f"../random graphs/ratio/r3k{k}n{n}")
+			for i in range(10):
+				ng = random_layered_graph_edgecount_drop_unconnected(k, n, 2 * n * (k - 1))
+				print(f"k={k}/n={n} graph {i + 1}")
+				ng.write_out(f"../random graphs/ratio/r3k{k}n{n}/graph{i}.lgbin")
+
+
+def generate_ratio_graphs_degree_3(seed=22201):
+	random.seed(seed)
+	if "ratio_d3" not in os.listdir("../random graphs"):
+		os.mkdir(f"../random graphs/ratio_d3")
+
+	for kn in [10, 15, 20, 25, 30, 35]:
+		if f"r1k{kn}n{kn}" not in os.listdir("../random graphs/ratio_d3"):
+			os.mkdir(f"../random graphs/ratio_d3/r1k{kn}n{kn}")
+			for i in range(10):
+				ng = random_layered_graph_edgecount_drop_unconnected(kn, kn, round(1.5 * kn * (kn - 1)))
+				print(f"k={kn}/n={kn} graph {i + 1}")
+				ng.write_out(f"../random graphs/ratio_d3/r1k{kn}n{kn}/graph{i}.lgbin")
+	for n in [8, 12, 16, 20, 24, 28]:
+		k = int(n * 1.5)
+		if f"r1.5k{k}n{n}" not in os.listdir("../random graphs/ratio_d3"):
+			os.mkdir(f"../random graphs/ratio_d3/r1.5k{k}n{n}")
+			for i in range(10):
+				ng = random_layered_graph_edgecount_drop_unconnected(k, n, round(1.5 * n * (k - 1)))
+				print(f"k={k}/n={n} graph {i + 1}")
+				ng.write_out(f"../random graphs/ratio_d3/r1.5k{k}n{n}/graph{i}.lgbin")
+	for n in [6, 10, 13, 17, 20, 24]:
+		k = n * 2
+		if f"r2k{k}n{n}" not in os.listdir("../random graphs/ratio_d3"):
+			os.mkdir(f"../random graphs/ratio_d3/r2k{k}n{n}")
+			for i in range(10):
+				ng = random_layered_graph_edgecount_drop_unconnected(k, n, round(1.5 * n * (k - 1)))
+				print(f"k={k}/n={n} graph {i + 1}")
+				ng.write_out(f"../random graphs/ratio_d3/r2k{k}n{n}/graph{i}.lgbin")
+	for n in [5, 8, 11, 14, 17, 20]:
+		k = n * 3
+		if f"r3k{k}n{n}" not in os.listdir("../random graphs/ratio_d3"):
+			os.mkdir(f"../random graphs/ratio_d3/r3k{k}n{n}")
+			for i in range(10):
+				ng = random_layered_graph_edgecount_drop_unconnected(k, n, round(1.5 * n * (k - 1)))
+				print(f"k={k}/n={n} graph {i + 1}")
+				ng.write_out(f"../random graphs/ratio_d3/r3k{k}n{n}/graph{i}.lgbin")
 
 
 if __name__ == '__main__':
@@ -303,7 +452,17 @@ if __name__ == '__main__':
 	# generate_random_fixed_density_set(seed=71)
 	# generate_extended_matuszewski_datsets()
 	# generate_big_n_by_n_graphs()
-	generate_rectangle_graphs()
+	# generate_rectangle_graphs()
+	# generate_ratio_graphs()
+	generate_ratio_graphs_degree_3()
+
+	# gr = src.read_data.read("../random graphs/ratio/r3k51n17/graph0.lgbin")
+	# print(gr.layers)
+	# print(gr.nodes)
+	# print(gr.node_ids)
+	# print(gr.edge_ids)
+	# adj = gr.get_adj_list()
+	# print(sum((len(adj[v.id]) for v in gr))/gr.n_nodes)
 
 	# gr = src.read_data.read("../random graphs/matuszewski/10_by_10_density/d15/graph0.lgbin")
 	# gr = src.read_data.read("../random graphs/rectangles/k70n20/graph0.lgbin")

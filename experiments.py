@@ -75,7 +75,7 @@ def baseline_experiment(start_idx, filename):
         gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
     for to_opt in gfiles[start_idx:]:
         g = read_data.read(to_opt)
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "cutoff_time": 600, "return_experiment_data": True, "stratisfimal_yvars": True})
+        optimizer = optimization.LayeredOptimizer(g, name=to_opt, cutoff_time=600, return_experiment_data=True, stratisfimal_yvars=True)
         result = optimizer.optimize_layout()
         insert_data("strat_baseline.csv", [result])
         optimizer.junger_ec, optimizer.stratisfimal_y_vars = True, False
@@ -93,7 +93,7 @@ def independent_var_experiment(file_name, start_ind):
         result = [i+start_ind, file]
         g = read_data.read(file)
         result.extend((sum(1 for n in g.nodes if not n.is_anchor_node), len(g.nodes), len(g.edges)))
-        opt = optimization.LayeredOptimizer(g, {"return_full_data": True, "cutoff_time": 120})
+        opt = optimization.LayeredOptimizer(g, return_full_data=True, cutoff_time=120)
         result.extend(opt.optimize_layout())
         results.append(result)
         if i % 10 == 0:
@@ -107,7 +107,7 @@ def fix_1_var_experiment(start_idx, filename):
         gfiles = [gname.removesuffix('\n') for gname in f.readlines()]
     for to_opt in gfiles[start_idx:]:
         g = read_data.read(to_opt)
-        optimizer = optimization.LayeredOptimizer(g, {"name": to_opt, "cutoff_time": 600, "symmetry_breaking": True, "return_experiment_data": True, "stratisfimal_yvars": True})
+        optimizer = optimization.LayeredOptimizer(g, name=to_opt, cutoff_time=600, symmetry_breaking=True, return_experiment_data=True, stratisfimal_yvars=True)
         result = optimizer.optimize_layout()
         insert_data("strat_fix1.csv", [result])
         optimizer.junger_ec, optimizer.stratisfimal_y_vars = True, False
@@ -155,7 +155,7 @@ def run_experiment(start_idx, cutoff_time, exp_name, param_to_set, clear_files, 
             print(f"{i+start_idx[1] + 1} / {len(gfiles[j])}")
             g = read_data.read(to_opt)
             base_info = basic_info(g)
-            optimizer = optimization.LayeredOptimizer(g, {"cutoff_time": cutoff_time, "return_experiment_data": True, "direct_transitivity": True, param_to_set: True})
+            optimizer = optimization.LayeredOptimizer(g, cutoff_time=cutoff_time, return_experiment_data=True, direct_transitivity=True, **{param_to_set: True})
             result = optimizer.optimize_layout()
             insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", [i+start_idx[1], to_opt] + base_info + [j for j in result])
             if result[5] >= cutoff_time or junger_timedout >= max_timeout:
@@ -197,7 +197,7 @@ def run_multi_param_experiment(start_idx, graphs_file, cutoff_time, exp_name, pa
         base_info = basic_info(g)
         params = {param: True for param in params_to_set}
         params.update({"cutoff_time": cutoff_time, "return_experiment_data": True, "direct_transitivity": True})
-        optimizer = optimization.LayeredOptimizer(g, params)
+        optimizer = optimization.LayeredOptimizer(g, **params)
         result = optimizer.optimize_layout()
         insert_one(f"junger_basic/{exp_name}_{cutoff_time}.csv", [i + start_idx, to_opt] + base_info + [j for j in result])
         optimizer.direct_transitivity, optimizer.vertical_transitivity = False, True
@@ -252,7 +252,7 @@ def run_one_experiment(start_idx, graphs_file, exp_name, params_to_set, clear_fi
         g = read_data.read(to_opt)
         params = {param: True for param in params_to_set}
         params.update({"cutoff_time": 300, "return_experiment_data": True})
-        optimizer = optimization.LayeredOptimizer(g, params)
+        optimizer = optimization.LayeredOptimizer(g, **params)
         result = optimizer.optimize_layout()
         insert_one(f"{exp_name}.csv", [i+start_idx+1, to_opt] + [j for j in result])
 
@@ -263,9 +263,9 @@ def run_one_graph(gfile, exp_name, cutoff_time, params_to_set, idx, open_source=
     params = {param: True for param in params_to_set}
     params.update({"cutoff_time": cutoff_time, "return_experiment_data": True})
     if open_source:
-        optimizer = optimization_open_src.HiGHSLayeredOptimizer(g, params)
+        optimizer = optimization_open_src.HiGHSLayeredOptimizer(g, **params)
     else:
-        optimizer = optimization.LayeredOptimizer(g, params)
+        optimizer = optimization.LayeredOptimizer(g, **params)
     result = optimizer.optimize_layout()
     formatted = [idx, gfile] + base_info + [j for j in result]
     if int(formatted[11]) != 11:

@@ -17,6 +17,7 @@ class LayeredNode:
 		self.name = node_id if name is None else name
 		self.fix = fix
 		self.energy = 0
+		self.tabu = False
 
 	def __str__(self):
 		return f"ID={self.id}/L={self.layer}"

@@ -14,48 +14,47 @@ from src.heuristics import improved_sifting
 
 
 class LayeredOptimizer:
-	def __init__(self, layered_graph, parameters=None):
-		if parameters is None:
-			parameters = {}
-		assert (type(layered_graph) == str and os.path.isfile(layered_graph)) or type(layered_graph) == LayeredGraph or type(layered_graph) == CollapsedGraph, "input needs to be a path or LayeredGraph object"
+	def __init__(self, layered_graph, **kwargs):
+		assert (type(layered_graph) == str and os.path.isfile(layered_graph)) or type(layered_graph) == LayeredGraph or type(layered_graph) == CollapsedGraph, "input needs to be a Path or LayeredGraph object"
 		if type(layered_graph) == LayeredGraph or type(layered_graph) == CollapsedGraph:
 			self.g = layered_graph
 		else:
 			self.g = read_data.read(layered_graph)
 		self.x_var_assign = {x_v: 2 for n_l in self.g.get_ids_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
-		self.bendiness_reduction = parameters["bendiness_reduction"] if "bendiness_reduction" in parameters else False
-		self.gamma_1 = parameters["gamma_1"] if "gamma_1" in parameters else 1
-		self.gamma_2 = parameters["gamma_2"] if "gamma_2" in parameters else 1
-		self.m_val = parameters["m_val"] if "m_val" in parameters else max(len(lr) for lr in self.g.layers.values())
-		self.sequential_bendiness = parameters["sequential_bendiness"] if "sequential_bendiness" in parameters else True
-		self.local_opt = parameters["local_opt"] if "local_opt" in parameters else False
-		self.local_opt_heuristic = parameters["local_opt_heuristic"] if "local_opt_heuristic" in parameters else "incremental"
-		self.n_partitions = parameters["n_partitions"] if "n_partitions" in parameters else -1
-		self.return_full_data = parameters["return_full_data"] if "return_full_data" in parameters else False
-		self.cutoff_time = parameters["cutoff_time"] if "cutoff_time" in parameters else 0
-		self.do_subg_reduction = parameters["do_subg_reduction"] if "do_subg_reduction" in parameters else False
-		self.return_x_vars = parameters["return_x_vars"] if "return_x_vars" in parameters else False
-		self.butterfly_reduction = parameters["butterfly_reduction"] if "butterfly_reduction" in parameters else False
-		self.draw_graph = parameters["draw_graph"] if "draw_graph" in parameters else False
-		self.symmetry_breaking = parameters["symmetry_breaking"] if "symmetry_breaking" in parameters else False
-		self.heuristic_start = parameters["heuristic_start"] if "heuristic_start" in parameters else False
-		self.aggro_presolve = parameters["presolve"] if "presolve" in parameters else False
-		self.mip_relax = parameters["mip_relax"] if "mip_relax" in parameters else False
-		self.xvar_branch_priority = parameters["xvar_branch_priority"] if "xvar_branch_priority" in parameters else False
-		self.direct_transitivity = parameters["direct_transitivity"] if "direct_transitivity" in parameters else False
-		self.vertical_transitivity = parameters["vertical_transitivity"] if "vertical_transitivity" in parameters else False
-		self.mirror_vars = parameters["mirror_vars"] if "mirror_vars" in parameters else False
-		self.stratisfimal_y_vars = parameters["stratisfimal_y_vars"] if "stratisfimal_y_vars" in parameters else False
-		self.symmetry_constraints = parameters["symmetry_constraints"] if "symmetry_constraints" in parameters else True
-		self.cycle_constraints = parameters["cycle_constraints"] if "cycle_constraints" in parameters else False
-		self.collapse_subgraphs = parameters["collapse_subgraphs"] if "collapse_subgraphs" in parameters else False
-		self.collapse_leaves = parameters["collapse_leaves"] if "collapse_leaves" in parameters else False
-		self.claw_constraints = parameters["claw_constraints"] if "claw_constraints" in parameters else False
-		self.dome_path_constraints = parameters["dome_path_constraints"] if "dome_path_constraints" in parameters else False
-		self.polyhedral_constraints = parameters["polyhedral_constraints"] if "polyhedral_constraints" in parameters else False
-		self.return_experiment_data = parameters["return_experiment_data"] if "return_experiment_data" in parameters else False
-		self.constrain_straight_long_arcs = parameters["constrain_straight_long_arcs"] if "constrain_straight_long_arcs" in parameters else False
-		self.name = parameters["name"] if "name" in parameters else "graph1"
+		self.bendiness_reduction = kwargs["bendiness_reduction"] if "bendiness_reduction" in kwargs else False
+		self.gamma_1 = kwargs["gamma_1"] if "gamma_1" in kwargs else 1
+		self.gamma_2 = kwargs["gamma_2"] if "gamma_2" in kwargs else 1
+		self.m_val = kwargs["m_val"] if "m_val" in kwargs else max(len(lr) for lr in self.g.layers.values())
+		self.sequential_bendiness = kwargs["sequential_bendiness"] if "sequential_bendiness" in kwargs else True
+		self.local_opt = kwargs["local_opt"] if "local_opt" in kwargs else False
+		self.local_opt_heuristic = kwargs["local_opt_heuristic"] if "local_opt_heuristic" in kwargs else "incremental"
+		self.n_partitions = kwargs["n_partitions"] if "n_partitions" in kwargs else -1
+		self.return_full_data = kwargs["return_full_data"] if "return_full_data" in kwargs else False
+		self.cutoff_time = kwargs["cutoff_time"] if "cutoff_time" in kwargs else 0
+		self.do_subg_reduction = kwargs["do_subg_reduction"] if "do_subg_reduction" in kwargs else False
+		self.return_x_vars = kwargs["return_x_vars"] if "return_x_vars" in kwargs else False
+		self.butterfly_reduction = kwargs["butterfly_reduction"] if "butterfly_reduction" in kwargs else False
+		self.draw_graph = kwargs["draw_graph"] if "draw_graph" in kwargs else False
+		self.symmetry_breaking = kwargs["symmetry_breaking"] if "symmetry_breaking" in kwargs else False
+		self.heuristic_start = kwargs["heuristic_start"] if "heuristic_start" in kwargs else False
+		self.aggro_presolve = kwargs["presolve"] if "presolve" in kwargs else False
+		self.mip_relax = kwargs["mip_relax"] if "mip_relax" in kwargs else False
+		self.xvar_branch_priority = kwargs["xvar_branch_priority"] if "xvar_branch_priority" in kwargs else False
+		self.direct_transitivity = kwargs["direct_transitivity"] if "direct_transitivity" in kwargs else False
+		self.vertical_transitivity = kwargs["vertical_transitivity"] if "vertical_transitivity" in kwargs else False
+		self.mirror_vars = kwargs["mirror_vars"] if "mirror_vars" in kwargs else False
+		self.stratisfimal_y_vars = kwargs["stratisfimal_y_vars"] if "stratisfimal_y_vars" in kwargs else False
+		self.symmetry_constraints = kwargs["symmetry_constraints"] if "symmetry_constraints" in kwargs else True
+		self.cycle_constraints = kwargs["cycle_constraints"] if "cycle_constraints" in kwargs else False
+		self.collapse_subgraphs = kwargs["collapse_subgraphs"] if "collapse_subgraphs" in kwargs else False
+		self.collapse_leaves = kwargs["collapse_leaves"] if "collapse_leaves" in kwargs else False
+		self.claw_constraints = kwargs["claw_constraints"] if "claw_constraints" in kwargs else False
+		self.dome_path_constraints = kwargs["dome_path_constraints"] if "dome_path_constraints" in kwargs else False
+		self.polyhedral_constraints = kwargs["polyhedral_constraints"] if "polyhedral_constraints" in kwargs else False
+		self.return_experiment_data = kwargs["return_experiment_data"] if "return_experiment_data" in kwargs else False
+		self.create_video = kwargs["create_video"] if "create_video" in kwargs else False
+		self.constrain_straight_long_arcs = kwargs["constrain_straight_long_arcs"] if "constrain_straight_long_arcs" in kwargs else False
+		self.name = kwargs["name"] if "name" in kwargs else "graph1"
 		self.print_info = []
 		if self.polyhedral_constraints:
 			self.claw_constraints, self.dome_path_constraints = True, True
@@ -1112,12 +1111,14 @@ class LayeredOptimizer:
 		# return self.__optimize_layout_standard(graph_arg=graph, fix_x_vars=self.x_var_assign)
 		return self.__optimize_crossing_reduction_model(m, graph, env)
 
-	def local_opt_increment(self, bucket_size, percentage, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate):
+	def local_opt_increment(self, bucket_size, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate):
 		# opt_g = LayeredGraph()
 		g = self.g
 		do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
 		do_draw_graph, self.draw_graph = self.draw_graph, False
 		collapse_leaves, self.collapse_leaves, self.collapse_subgraphs = self.collapse_leaves, False, False
+		if self.create_video and not os.path.isdir(f"Images/{self.name}"):
+			os.mkdir(f"Images/{self.name}")
 		if collapse_leaves:
 			g = g.collapse_leaves()
 			self.x_var_assign = {x_v: 2 for n_l in g.get_ids_by_layer().values() for x_v in itertools.combinations(n_l, 2)}
@@ -1130,6 +1131,7 @@ class LayeredOptimizer:
 		# print("\n==========DONE==========\n")
 		cr_counts = [g.num_edge_crossings()]
 		times = [0]
+		times_moved = [0] * g.n_nodes
 		opt_time = 0
 		with gp.Env() as env, gp.Model(env=env) as m:
 			x_vs, _ = self.__crossing_reduction_model(m, g)
@@ -1139,97 +1141,128 @@ class LayeredOptimizer:
 				iter_ct = 0
 				t_since_last = time.time()
 				st_time = time.time()
+				iter_without_improvement = 0
 				while self.cutoff_time > 0:
+					if self.create_video:
+						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 3}", as_png=True, label_nodes=False, groups=[0] * g.n_nodes)
 					candidate = candidate_fn(g)
-					next_partition = neighborhood_fn(g, candidate, bucket_size * percentage)
+					next_partition = neighborhood_fn(g, candidate, bucket_size)
 					neighborhood = [nid for nid, v in enumerate(next_partition) if v]
 					y_save = [g[nd].y for nd in neighborhood]
-					print(neighborhood)
+					print(candidate, neighborhood)
+					if self.create_video:
+						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 3 + 1}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=next_partition, label_nodes=False)
 					out = self.__incremetal_opt(g, next_partition, m, env)
 					self.cutoff_time -= time.time() - t_since_last
 					t_since_last = time.time()
 					opt_time += out[1]
 					cr_counts.append(out[0])
 					movement = [g[neighborhood[i]].y - y_save[i] for i in range(len(neighborhood))]
+					for i, v in enumerate(movement):
+						if v != 0:
+							times_moved[neighborhood[i]] += 1
+					if cr_counts[-1] == cr_counts[-2]:
+						iter_without_improvement += 1
+					else:
+						iter_without_improvement = 0
+					if self.create_video:
+						edges_moved = {(v, vp) for i, v in enumerate(neighborhood) if movement[i] != 0 for vp in g.get_adj_list()[v]}
+						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 3 + 2}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=next_partition, emphasize_edges=edges_moved, label_nodes=False)
 					penalty_fn(g, neighborhood, candidate, movement, iter_ct, no_repeats=True)
 					iter_ct += 1
+					if iter_without_improvement == 5:
+						iter_without_improvement = 0
+						# TODO increase all blinds, refresh blinds
 					times.append(time.time() - st_time)
 					print("Iteration:", iter_ct, "\tTime left:", self.cutoff_time, "\tCrossings:", out[0])
 			if collapse_leaves:
 				self.collapse_leaves = True
 				self.__optimize_subgraphs(g, x_vs, 0)
+		if self.create_video:
+			import imageio.v3 as iio
+			from numpy import stack
+			from pygifsicle import optimize
+			frames = stack([iio.imread(f"Images/{self.name}/frame_{i}.png") for i in range(iter_ct * 3)], axis=0)
+			iio.imwrite(f'Images/{self.name}.gif', frames, format="gif", fps=2)
+			optimize(f'Images/{self.name}.gif')
+			# with imageio.get_writer(f'Images/{self.name}.gif', mode='I') as writer:
+			# 	for i in range(iter_ct * 3):
+			# 		print(i)
+			# 		image = imageio.v3.imread(f"Images/{self.name}/frame_{i}.png")
+			# 		writer.append_data(image)
 
-		# vis.draw_graph(g, "solution_neighborhood")
+		print(times_moved)
+		vis.draw_graph(g, "solution_neighborhood", color_scale=times_moved)
 		return opt_time, cr_counts[-1], cr_counts, times
 
-	def __optimize_incremental_local(self):  # TODO: split function into parts. the optimal part takes a subgraph as input. maintain "pos assigned?" array. Implement dummy subgraph generation algo (BFS on high dens nodes), dummy partition algo (spectral but randomly remove the extra bit)
-		do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
-		do_draw_graph, self.draw_graph = self.draw_graph, False
-		cutoff_partitions, n_partitions = 100, 1
-		cg = CollapsedGraph(self.g)
-		if self.n_partitions == -1:
-			n_cv = self.g.c_vars_count()
-			while n_partitions * optimization_time_estimate(n_cv / n_partitions) > self.cutoff_time and n_partitions < cutoff_partitions:
-				n_partitions += 1
-			if n_partitions > 1:
-				ub_n_cv = n_cv / (n_partitions - 1)
-				lb_n_cv = n_cv / n_partitions
-				while abs(ub_n_cv - lb_n_cv) > 1:
-					mid = (ub_n_cv + lb_n_cv) / 2
-					if calc_time_taken_for_partition_size(n_partitions - 1, mid, n_cv) < self.cutoff_time:
-						lb_n_cv = mid
-					else:
-						ub_n_cv = mid
-				cluster = simple_vertical_partition(self.g, lb_n_cv)
-			else:
-				pass
-			# while n_partitions <= cutoff_partitions:
-			# 	cluster = list(SpectralClustering(n_clusters=n_partitions, assign_labels="discretize", affinity="precomputed").fit_predict(self.g.adjacency_matrix()))
-			# 	cg.subgraphs = cluster
-			# 	lgs = cg.create_layered_graphs_from_subgraphs()
-			# 	rt_ests = [lg.optimization_time_estimate() for lg in lgs]
-			# 	if max(rt_ests) < self.cutoff_time:
-			# 		print(f"Optimizing with {n_partitions} incremental partition{'s' if n_partitions > 1 else ''}")
-			# 		print("Runtime estimates:", [lg.optimization_time_estimate() for lg in lgs])
-			# 		break
-		else:
-			cluster = list(SpectralClustering(n_clusters=self.n_partitions, assign_labels="discretize", affinity="precomputed").fit_predict(self.g.adjacency_matrix()))
-			cg.subgraphs = cluster
-			lgs = cg.create_layered_graphs_from_subgraphs()
-			rt_ests = [lg.optimization_time_estimate() for lg in lgs]
-		cg.create_collapsed_graph_skeleton()
-
-		lg_kv = [(lgs[i], i) for i in range(len(lgs))]
-		lg_kv.sort(key=lambda x: -rt_ests[x[1]])
-		lgs_st, pm = zip(*lg_kv)
-
-		base_g = lgs_st[0]
-		seen_subgs = {pm[0]}
-		self.__optimize_layout_standard(graph_arg=base_g)
-		self.symmetry_breaking = False
-		for i in range(1, len(lgs)):
-			vis.draw_graph(base_g, f"example{i}", groups=[cg.subgraphs[nd.id] for nd in base_g])
-			x_v_save = {k: v for k, v in self.x_var_assign.items() if v != 2}
-			for nd in lgs_st[i].nodes:
-				base_g.add_node(nd.layer, idx=nd.id, is_anchor=nd.is_anchor_node)
-			for ed in lgs_st[i].edges:
-				base_g.add_edge(ed.n1.id, ed.n2.id)
-			for cr_ed in cg.crossing_edges:
-				if (cg.subgraphs[cr_ed[0]] == pm[i] and cg.subgraphs[cr_ed[1]] in seen_subgs) or (cg.subgraphs[cr_ed[1]] == pm[i] and cg.subgraphs[cr_ed[0]] in seen_subgs):
-					base_g.add_edge(cr_ed[0], cr_ed[1])
-			seen_subgs.add(pm[i])
-			self.__optimize_layout_standard(graph_arg=base_g, fix_x_vars=x_v_save)
-		vis.draw_graph(base_g, f"example{len(lgs)}", groups=[cg.subgraphs[nd.id] for nd in base_g])
-
-		self.__assign_y_given_x()
-		print("after", self.g.num_edge_crossings())
-
-		if do_bendiness_reduction:
-			self.__sequential_br()
-		if do_draw_graph:
-			vis.draw_graph(self.g, self.name, groups=cg.subgraphs)
-
-		return self.g.num_edge_crossings()
+	# def __optimize_incremental_local(self):  # TODO: split function into parts. the optimal part takes a subgraph as input. maintain "pos assigned?" array. Implement dummy subgraph generation algo (BFS on high dens nodes), dummy partition algo (spectral but randomly remove the extra bit)
+	# 	do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
+	# 	do_draw_graph, self.draw_graph = self.draw_graph, False
+	# 	cutoff_partitions, n_partitions = 100, 1
+	# 	cg = CollapsedGraph(self.g)
+	# 	if self.n_partitions == -1:
+	# 		n_cv = self.g.c_vars_count()
+	# 		while n_partitions * optimization_time_estimate(n_cv / n_partitions) > self.cutoff_time and n_partitions < cutoff_partitions:
+	# 			n_partitions += 1
+	# 		if n_partitions > 1:
+	# 			ub_n_cv = n_cv / (n_partitions - 1)
+	# 			lb_n_cv = n_cv / n_partitions
+	# 			while abs(ub_n_cv - lb_n_cv) > 1:
+	# 				mid = (ub_n_cv + lb_n_cv) / 2
+	# 				if calc_time_taken_for_partition_size(n_partitions - 1, mid, n_cv) < self.cutoff_time:
+	# 					lb_n_cv = mid
+	# 				else:
+	# 					ub_n_cv = mid
+	# 			cluster = simple_vertical_partition(self.g, lb_n_cv)
+	# 		else:
+	# 			pass
+	# 		# while n_partitions <= cutoff_partitions:
+	# 		# 	cluster = list(SpectralClustering(n_clusters=n_partitions, assign_labels="discretize", affinity="precomputed").fit_predict(self.g.adjacency_matrix()))
+	# 		# 	cg.subgraphs = cluster
+	# 		# 	lgs = cg.create_layered_graphs_from_subgraphs()
+	# 		# 	rt_ests = [lg.optimization_time_estimate() for lg in lgs]
+	# 		# 	if max(rt_ests) < self.cutoff_time:
+	# 		# 		print(f"Optimizing with {n_partitions} incremental partition{'s' if n_partitions > 1 else ''}")
+	# 		# 		print("Runtime estimates:", [lg.optimization_time_estimate() for lg in lgs])
+	# 		# 		break
+	# 	else:
+	# 		cluster = list(SpectralClustering(n_clusters=self.n_partitions, assign_labels="discretize", affinity="precomputed").fit_predict(self.g.adjacency_matrix()))
+	# 		cg.subgraphs = cluster
+	# 		lgs = cg.create_layered_graphs_from_subgraphs()
+	# 		rt_ests = [lg.optimization_time_estimate() for lg in lgs]
+	# 	cg.create_collapsed_graph_skeleton()
+	#
+	# 	lg_kv = [(lgs[i], i) for i in range(len(lgs))]
+	# 	lg_kv.sort(key=lambda x: -rt_ests[x[1]])
+	# 	lgs_st, pm = zip(*lg_kv)
+	#
+	# 	base_g = lgs_st[0]
+	# 	seen_subgs = {pm[0]}
+	# 	self.__optimize_layout_standard(graph_arg=base_g)
+	# 	self.symmetry_breaking = False
+	# 	for i in range(1, len(lgs)):
+	# 		vis.draw_graph(base_g, f"example{i}", groups=[cg.subgraphs[nd.id] for nd in base_g])
+	# 		x_v_save = {k: v for k, v in self.x_var_assign.items() if v != 2}
+	# 		for nd in lgs_st[i].nodes:
+	# 			base_g.add_node(nd.layer, idx=nd.id, is_anchor=nd.is_anchor_node)
+	# 		for ed in lgs_st[i].edges:
+	# 			base_g.add_edge(ed.n1.id, ed.n2.id)
+	# 		for cr_ed in cg.crossing_edges:
+	# 			if (cg.subgraphs[cr_ed[0]] == pm[i] and cg.subgraphs[cr_ed[1]] in seen_subgs) or (cg.subgraphs[cr_ed[1]] == pm[i] and cg.subgraphs[cr_ed[0]] in seen_subgs):
+	# 				base_g.add_edge(cr_ed[0], cr_ed[1])
+	# 		seen_subgs.add(pm[i])
+	# 		self.__optimize_layout_standard(graph_arg=base_g, fix_x_vars=x_v_save)
+	# 	vis.draw_graph(base_g, f"example{len(lgs)}", groups=[cg.subgraphs[nd.id] for nd in base_g])
+	#
+	# 	self.__assign_y_given_x()
+	# 	print("after", self.g.num_edge_crossings())
+	#
+	# 	if do_bendiness_reduction:
+	# 		self.__sequential_br()
+	# 	if do_draw_graph:
+	# 		vis.draw_graph(self.g, self.name, groups=cg.subgraphs)
+	#
+	# 	return self.g.num_edge_crossings()
 
 	def optimize_target(self, graph: LayeredGraph, return_list):
 		self.__optimize_layout_standard(graph_arg=graph)
@@ -1300,7 +1333,7 @@ class LayeredOptimizer:
 				out = self.__optimize_locally_optimal()
 			elif local_opt_heuristic == "incremental" and self.local_opt_heuristic == "incremental":
 				# out = self.__optimize_incremental_local()
-				out = self.__local_opt_increment(bucket_size, pct)
+				out = self.local_opt_increment(bucket_size)
 			else:
 				raise Exception("no heuristic of that name")
 		elif fix_xvars is not None:

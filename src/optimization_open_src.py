@@ -9,8 +9,8 @@ from src.helpers import *
 
 
 class HiGHSLayeredOptimizer(LayeredOptimizer):
-	def __init__(self, layered_graph, parameters=None):
-		LayeredOptimizer.__init__(self, layered_graph, parameters=parameters)
+	def __init__(self, layered_graph, **kwargs):
+		LayeredOptimizer.__init__(self, layered_graph, **kwargs)
 		if self.heuristic_start:
 			print("Heuristic start only available with Gurobi implementation")
 		del self.heuristic_start

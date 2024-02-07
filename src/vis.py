@@ -3,10 +3,11 @@ from src import graph
 import math
 import altair as alt
 import os
+import cairosvg
 # from altair_saver import save
 
 
-def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, gravity=False, edge_thickness=False, label_nodes=True):
+def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, emphasize_nodes=None, emphasize_edges=None, gravity=False, edge_thickness=False, label_nodes=True, as_png=False, color_scale=None):
     if nested:
         if "Images" not in os.listdir(".."):
             os.mkdir("../Images")
@@ -16,8 +17,8 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     node_radius = 15
     line_width = 4
     font_size = 12
-    palette = [(171/256, 221/256, 164/256), (94/256, 79/256, 162/256), (244/256, 109/256, 67/256), (254/256, 224/256, 139/256), (50/256, 136/256, 189/256), (158/256, 1/256, 66/256), (253/256, 174/256, 97/256), (102/256, 194/256, 165/256), (213/256, 62/256, 79/256), (230/256, 145/256, 152/256)]
-    width = (g.n_layers - 1) * node_x_distance + offset * 10
+    palette = [(254/256, 224/256, 139/256), (56/256, 146/256, 201/256), (158/256, 1/256, 66/256), (253/256, 174/256, 97/256), (102/256, 194/256, 165/256), (213/256, 62/256, 79/256), (230/256, 145/256, 152/256), (171/256, 221/256, 164/256), (94/256, 79/256, 162/256), (244/256, 109/256, 67/256)]
+    width = (g.n_layers - 1) * node_x_distance + offset * 2
     min_l = min((n.layer for n in g.nodes)) - 1
     min_y = min((n.y for n in g.nodes))
     for n in g.nodes:
@@ -34,6 +35,9 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
                 n.y += (max_n_nodes - len(node_list)) // 2
     height = max((n.y for n in g.nodes)) * node_y_distance + offset * 2
     if nested:
+        # if as_png:
+        #     surface = cairo.ImageSurface(f"../Images/{svg_name}.svg", width, height)
+        # else:
         surface = cairo.SVGSurface(f"../Images/{svg_name}.svg", width, height)
     elif motif:
         surface = cairo.SVGSurface(f"Images/Crossing-Motifs/{svg_name}.svg", width, height)
@@ -43,12 +47,14 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     ctx.set_source_rgb(1, 1, 1)
     ctx.rectangle(0, 0, width, height)
     ctx.fill()
-    ctx.set_source_rgb(0.2, 0.2, 0.2)
     ctx.set_line_width(line_width)
     for edge in g.edges:  # curve_to(c1x, c1y, c2x, c2y, ex, ey), control points c1, c2, end point e
+        ctx.set_source_rgb(0.8, 0.8, 0.8)
         ctx.move_to((edge.n1.layer - 1 - min_l) * node_x_distance + offset, edge.n1.y * node_y_distance + offset)
         if edge_thickness:
             ctx.set_line_width(edge.weight)
+        if emphasize_edges and ((edge.n1.id, edge.n2.id) in emphasize_edges or (edge.n2.id, edge.n1.id) in emphasize_edges):
+            ctx.set_source_rgb(30/256, 144/256, 255/256)
         if edge.same_layer_edge:
             ctx.curve_to((edge.n1.layer - 1 - min_l) * node_x_distance + offset + node_x_distance//1.5 - (node_x_distance//2)//(abs(edge.n1.y-edge.n2.y)), edge.n1.y * node_y_distance + offset, (edge.n1.layer - 1 - min_l) * node_x_distance + offset + node_x_distance//1.5 - (node_x_distance//2)//(abs(edge.n1.y-edge.n2.y)), edge.n2.y * node_y_distance + offset, (edge.n1.layer - 1 - min_l) * node_x_distance + offset, edge.n2.y * node_y_distance + offset)
         elif edge.n1.y == edge.n2.y:
@@ -65,12 +71,18 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
         if not node.is_anchor_node or groups is not None:
             if node.stacked or node.fix != 0:
                 ctx.set_source_rgb(222/256, 23/256, 56/256)
+            elif color_scale is not None:
+                max_moves = max(color_scale)
+                ctx.set_source_rgb(color_scale[i] / max_moves, 0, 0)
+                # ctx.set_source_rgb(color_scale[i] / max_moves, 20 / 256, 120 / 256)
             elif groups is not None:
                 ctx.set_source_rgb(palette[groups[i]][0], palette[groups[i]][1], palette[groups[i]][2])
             else:
                 ctx.set_source_rgb(163/256, 185/256, 182/256)  # light gray-cyan
             if node.is_anchor_node:
                 ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, node_radius//3, 0, 2 * math.pi)
+            elif emphasize_nodes is not None and emphasize_nodes[node.id]:
+                ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, node_radius * 1.7, 0, 2 * math.pi)
             else:
                 ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, node_radius, 0, 2 * math.pi)
             ctx.fill()
@@ -78,6 +90,8 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
             ctx.set_source_rgb(0.1, 0.1, 0.1)
             if node.is_anchor_node:
                 ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius//3, 0, 2 * math.pi)
+            elif emphasize_nodes is not None and emphasize_nodes[node.id]:
+                ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius * 1.7, 0, 2 * math.pi)
             else:
                 ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius, 0, 2 * math.pi)
             ctx.stroke()
@@ -104,6 +118,11 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
             # ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset,
             #         node_radius // 3, 0, 2 * math.pi)
             # ctx.stroke()
+    surface.finish()
+    if as_png:
+        cairosvg.svg2png(url=f"Images/{svg_name}.svg", write_to=f"Images/{svg_name}.png", output_width=width / 3, output_height=height / 3)
+        os.remove(f"Images/{svg_name}.svg")
+        # surface.write_to_png(svg_name + ".png")
 
 
 def draw_altair_scatter(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name, log_y_scale, plot_loess=False, loess_features=None):
@@ -143,9 +162,10 @@ def draw_altair_simple_line_chart(data_points, x_axis, y_axis, color_field, x_ti
         rng = ["#000000", "#e15759", "#4e79a7", "#9c755f", "#ff9da7", "#59a14f"]
     chart = alt.Chart(data).mark_line(clip=True).encode(
         x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title), scale=alt.Scale(domain=xdom) if xdom else alt.Scale()),
-        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title, format='%'), scale=alt.Scale(domain=ydom) if ydom else alt.Scale()),
-        color=alt.Color(f'{color_field}:N', scale=alt.Scale(domain=dom, range=rng)),
-        strokeDash=alt.StrokeDash("Dash:N", sort=["normal", "combined", "optimal"])
+        y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title), scale=alt.Scale(domain=ydom) if ydom else alt.Scale()),
+        # y=alt.Y(f'{y_axis}:Q', axis=alt.Axis(title=y_title, format='%'), scale=alt.Scale(domain=ydom) if ydom else alt.Scale()),
+        color=alt.Color(f'{color_field}:N')  # scale=alt.Scale(domain=dom, range=rng)),
+        # strokeDash=alt.StrokeDash("Dash:N", sort=["normal", "combined", "optimal"])
     )
     # .properties(
     #     width=800,
