@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/work/visdunneright/local_opt/layered-crossing-minimization/partition_experiment.py", line 4, in <module>
+    from src.optimization import LayeredOptimizer
+  File "/work/visdunneright/local_opt/layered-crossing-minimization/src/optimization.py", line 9, in <module>
+    from src import vis, reductions, motifs, type_conversions, read_data
+  File "/work/visdunneright/local_opt/layered-crossing-minimization/src/vis.py", line 6, in <module>
+    import cairosvg
+ModuleNotFoundError: No module named 'cairosvg'
+srun: error: c0488: task 0: Exited with exit code 1

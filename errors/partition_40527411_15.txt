@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/work/visdunneright/local_opt/layered-crossing-minimization/partition_experiment.py", line 101, in <module>
+    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], cv_sizes[cv_idx], heuristics.global_sifting, "random graphs/rectangles")
+  File "/work/visdunneright/local_opt/layered-crossing-minimization/partition_experiment.py", line 84, in run_experiment
+    output = optim.local_opt_increment(n_cvs, 1, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/visdunneright/local_opt/layered-crossing-minimization/src/optimization.py", line 1144, in local_opt_increment
+    next_partition = neighborhood_fn(g, candidate, bucket_size * percentage)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/visdunneright/local_opt/layered-crossing-minimization/src/neighborhood.py", line 91, in vertical_neighborhood
+    acc_cv += 2 * layer_edge_cts[g[nd_adj].layer - 1 + nd_lr]
+                  ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IndexError: list index out of range
+srun: error: c0400: task 0: Exited with exit code 1
