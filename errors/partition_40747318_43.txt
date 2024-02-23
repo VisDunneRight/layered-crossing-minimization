@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "/work/visdunneright/local_opt/layered-crossing-minimization/partition_experiment.py", line 117, in <module>
-    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], cv_sizes[cv_idx], heuristics.barycenter, "random graphs/ratio_d3")
-  File "/work/visdunneright/local_opt/layered-crossing-minimization/partition_experiment.py", line 83, in run_experiment
-    mkdir(path_to_dataset + "/results")
-FileExistsError: [Errno 17] File exists: 'random graphs/ratio_d3/results'
-srun: error: c0341: task 0: Exited with exit code 1
