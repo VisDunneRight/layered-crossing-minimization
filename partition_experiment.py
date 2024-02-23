@@ -22,55 +22,150 @@ def run_one(filename, gfile, fn, index):
 
 def get_start_position(filename):
     if os.path.exists(filename):
+        fset = set()
         with open(filename, 'r') as fd:
-            lines = fd.readlines()
-            last = lines[-1].split(',')
-            if last[0] == "Index":
-                return 0
-            else:
-                return int(last[0]) + 1
+            rdr = csv.reader(fd)
+            for ln in rdr:
+                fset.add(ln[1])
+            # lines = fd.readlines()
+            # last = lines[-1].split(',')
+            # if last[0] == "Index":
+            #     return 0
+            # else:
+            #     return int(last[0]) + 1
+        return fset
     else:
-        return -1
+        return set()
+
+
+def get_csv_lines(file, start, end):
+    with open(file, 'r') as fd:
+        rdr = csv.reader(fd)
+        return [row for idx, row in enumerate(rdr) if start <= idx <= end]
 
 
 def draw_line_charts():
-    for fl in os.listdir("random graphs/rectangles/results"):
-        with open(f"random graphs/rectangles/results/{fl}", 'r') as fd:
+    folder = "random graphs/ratio_d3/results"
+    n_repeats = 10
+    max_time = 300
+    nbhds = ["bfs", "degree_ratio", "vertical"]
+    cands = ["betweenness", "crossings", "degree", "avg_edge_length", "random"]
+    sizes = [1000, 2000, 3000]
+    ratios = [1.5, 1, 2]
+    breakpoints = [1, 61, 121, 181]
+    for size in sizes:
+        for ridx, ratio in enumerate(ratios):
+            all_data = {}
+            for nbhd in nbhds:
+                all_data[nbhd] = {}
+                for cand in cands:
+                    print(size, ratio, nbhd, cand)
+                    all_data[nbhd][cand] = {}
+                    fl = f"{folder}/{nbhd}+{cand}+{size}.csv"
+                    t_avgs = []
+                    for i, ln in enumerate(get_csv_lines(fl, breakpoints[ridx], breakpoints[ridx + 1])):
+                        st_cr = int(ln[4])
+                        all_vals = []
+                        for j in range(4, len(ln), 2):
+                            if int(ln[j]) == 0:
+                                print(ln)
+                            all_vals.append((st_cr / int(ln[j]), float(ln[j + 1])))
+                        ptr = 0
+                        ot_ptr = 0
+                        t_avgs.append([])
+                        for t1 in range(max_time):
+                            while all_vals[ot_ptr][1] <= t1:
+                                ot_ptr += 1
+                            if ptr == ot_ptr:
+                                t_avgs[-1].append(t_avgs[-1][-1])
+                            else:
+                                sum_x = sum((all_vals[i][0] for i in range(ptr, ot_ptr)))
+                                t_avgs[-1].append(sum_x / (ot_ptr - ptr))
+                            ptr = ot_ptr
+                        if i % n_repeats == n_repeats - 1:
+                            gid = ln[1].split("/")[2]
+                            # if gid == "r1.5k36n24" or gid == "r1k30n30" or gid == "r2k40n20":  # med-large graphs
+                            if gid == "r1.5k18n12" or gid == "r1k15n15" or gid == "r2k20n10":  # small graphs
+                                all_data[nbhd][cand][gid] = []
+                                for t1 in range(max_time):
+                                    avg_cr = sum((t_avgs[j][t1] for j in range(10))) / 10
+                                    all_data[nbhd][cand][gid].append(avg_cr)
+                                    # dat.append({"Graph": ln[1].split("/")[2], "Time": t1, "Crossings": avg_cr})
+
+                            t_avgs.clear()
             dat = []
-            rdr = csv.reader(fd)
-            next(rdr)
-            all_vals = []
-            for i, ln in enumerate(rdr):
-                st_cr = int(ln[4])
-                for j in range(6, len(ln), 2):
-                    all_vals.append((st_cr - int(ln[j]), float(ln[j+1]), i % 10))
-                if i % 10 == 9:
-                    cur_vals = [0] * 10
-                    dat.append({"Graph": ln[1].split("/")[2], "Time": 0, "Crossings": 0})
-                    all_vals.sort(key=lambda x: x[1])
-                    for cr, t, gid in all_vals:
-                        cur_vals[gid] = cr
-                        dat.append({"Graph": ln[1].split("/")[2], "Time": t, "Crossings": sum(cur_vals)/10})
-                    all_vals.clear()
-            vis.draw_altair_simple_line_chart(dat, "Time", "Crossings", "Graph", "Time", "Crossings Improvement", os.path.splitext(fl)[0])
+            for nbhd in nbhds:
+                for cand in cands:
+                    for gid, tvals in all_data[nbhd][cand].items():  # this is for specific sized graphs
+                        for t1, v in enumerate(tvals):
+                            dat.append({"Graph": gid, "Method": f"{nbhd}+{cand}", "Time": t1, "Crossings": v})
+
+                    # for t1 in range(300):  # this is for full averaging
+                    #     avg_inc = 0
+                    #     for _, tvals in all_data[nbhd][cand].items():
+                    #         avg_inc += tvals[t1]
+                    #     dat.append({"Method": f"{nbhd}+{cand}", "Time": t1, "Crossings": avg_inc / 6})
+
+            ymax = max((datx["Crossings"] for datx in dat))
+            vis.draw_altair_simple_line_chart(dat, "Time", "Crossings", "Method", "Time", "Crossings Improvement", f"feb20/small_graphs/nbhd_color/{ratio}x{size}", ydom=[1, ymax + 0.25])
+
+    # for fl in os.listdir(folder):
+    #     with open(f"{folder}/{fl}", 'r') as fd:
+    #         dat = []
+    #         rdr = csv.reader(fd)
+    #         next(rdr)
+    #         t_avgs = []
+    #         for i, ln in enumerate(rdr):
+    #             st_cr = int(ln[4])
+    #             all_vals = []
+    #             for j in range(4, len(ln), 2):
+    #                 all_vals.append((1 - int(ln[j])/st_cr, float(ln[j+1]), i % n_repeats))
+    #             ptr = 0
+    #             ot_ptr = 0
+    #             t_avgs.append([])
+    #             for t1 in range(max_time):
+    #                 while all_vals[ot_ptr][1] <= t1:
+    #                     ot_ptr += 1
+    #                 if ptr == ot_ptr:
+    #                     t_avgs[-1].append(t_avgs[-1][-1])
+    #                 else:
+    #                     sum_x = sum((all_vals[i][0] for i in range(ptr, ot_ptr)))
+    #                     t_avgs[-1].append(sum_x/(ot_ptr - ptr))
+    #                 ptr = ot_ptr
+    #
+    #             if i % n_repeats == n_repeats - 1:
+    #                 # dat.append({"Graph": ln[1].split("/")[2], "Time": 0, "Crossings": 0})
+    #                 print(t_avgs)
+    #                 for t1 in range(max_time):
+    #                     avg_cr = sum((t_avgs[j][t1] for j in range(10))) / 10
+    #                     dat.append({"Graph": ln[1].split("/")[2], "Time": t1, "Crossings": avg_cr})
+    #                 t_avgs.clear()
+    #
+    #         vis.draw_altair_simple_line_chart(dat, "Time", "Crossings", "Graph", "Time", "Crossings Improvement", os.path.splitext(fl)[0])
 
 
 def small_test():
-    # opt = LayeredOptimizer("random graphs/n_by_n/n25/graph0.lgbin")
-    opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k30n20/graph0.lgbin")
-    opt.cutoff_time = 120
-    # opt.create_video = True
-    opt.name = "r1.5k30n20g0"
+    opt = LayeredOptimizer("random graphs/ratio_d3/r1k10n10/graph0.lgbin")
+    # opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k30n20/graph0.lgbin")
+    opt.cutoff_time = 25
+    opt.create_video = True
+    opt.name = "r1k10n10lock"
     # opt.vertical_transitivity = True
     # opt = LayeredOptimizer("Rome-Lib/graficon96nodi/grafo3510.96")
     # n_cv = opt.g.c_vars_count()
 
-    heuristics.barycenter(opt.g)
+    # heuristics.barycenter(opt.g)
     # opt.just_bendiness_reductiont()
     #     # vis.draw_graph(opt.g, "heurisic_bend", groups=[0] * opt.g.n_nodes, label_nodes=False)
     # vis.draw_graph(opt.g, "solution_heuristic")
 
-    opt.local_opt_increment(2000, neighborhood_fn=vertical_neighborhood, candidate_fn=avg_edge_length_candidate)
+    for lay in opt.g.layers.values():
+        min_y = min((nd.y for nd in lay))
+        for nd in lay:
+            nd.y -= min_y
+
+    opt.local_opt_increment(500, neighborhood_fn=bfs_neighborhood, candidate_fn=random_candidate, vertical_width=0)
+    # opt.optimize_layout()
 
     # opt.m_val *= 2
     # opt.just_bendiness_reduction()
@@ -84,15 +179,17 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
     # if neighborhood_fn.__name__ not in listdir(path_to_dataset + "/results"):
     #     (path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", ""))
     fname = path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", "") + "+" + str(n_cvs) + ".csv"
-    fidx = get_start_position(fname)
-    if fidx == -1:
+    files_run = get_start_position(fname)
+    if len(files_run) == 0:
         insert_one(fname, ["Index", "File", "OptTime", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
     cur_idx = 0
     for root, dirs, files in os.walk(path_to_dataset):
         dirs.sort()
         for fl in sorted(files):
             if os.path.splitext(fl)[1] == ".lgbin":
-                if cur_idx >= fidx:
+                # if cur_idx >= fidx:
+                print(fl, files_run)
+                if f"{root}/{fl}" not in files_run:
                     optim = LayeredOptimizer(root + "/" + fl, cutoff_time=300, vertical_transitivity=True)
                     initial_layout_fn(optim.g)
                     output = optim.local_opt_increment(n_cvs, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn)
@@ -107,7 +204,7 @@ if __name__ == '__main__':
 
     cv_sizes = [1000, 2000, 3000]
     cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
-    nbhd_fns = [bfs_neighborhood, vertical_neighborhood, degree_ratio_neighborhood]
+    nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
     if len(sys.argv) >= 2:
         nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(cv_sizes))
         cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) % len(cand_fns)

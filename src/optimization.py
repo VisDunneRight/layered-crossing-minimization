@@ -1088,7 +1088,7 @@ class LayeredOptimizer:
 			a2.lb, a2.ub = 0, 1
 			a2.Start = v
 
-	def __incremetal_opt(self, graph: LayeredGraph, subgraph: list, m: gp.Model, env):
+	def __incremetal_opt(self, graph: LayeredGraph, subgraph: list, m: gp.Model, env, nbhd_width=0):
 		# Fix everything except subgraph and optimize.
 		# subgraph: idx=node id, val=True if in subgraph else False
 		# If all nodes already positioned, trust self.x_var_assign, else add the subgraph. Need crossing edges though
@@ -1102,16 +1102,22 @@ class LayeredOptimizer:
 		# print("before", len(self.x_var_assign))
 		# for xv in list(self.x_var_assign.keys()):
 		for xv, val in self.x_var_assign.items():
-			if subgraph[xv[0]] or subgraph[xv[1]]:  # delete x-var assignements
-				self.__unfix_x_var(m, xv, val)
-				# del self.x_var_assign[xv]
+			if nbhd_width == 0:
+				if subgraph[xv[0]] or subgraph[xv[1]]:  # delete x-var assignements
+					self.__unfix_x_var(m, xv, val)
+					# del self.x_var_assign[xv]
+				else:
+					self.__fix_x_var(m, xv, val)
 			else:
-				self.__fix_x_var(m, xv, val)
+				if (subgraph[xv[0]] or subgraph[xv[1]]) and graph[xv[0]].v_nbhd and graph[xv[1]].v_nbhd:
+					self.__unfix_x_var(m, xv, val)
+				else:
+					self.__fix_x_var(m, xv, val)
 		# print("after", len(self.x_var_assign))
 		# return self.__optimize_layout_standard(graph_arg=graph, fix_x_vars=self.x_var_assign)
 		return self.__optimize_crossing_reduction_model(m, graph, env)
 
-	def local_opt_increment(self, bucket_size, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate):
+	def local_opt_increment(self, bucket_size, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate, vertical_width=0):
 		# opt_g = LayeredGraph()
 		g = self.g
 		do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
@@ -1144,15 +1150,15 @@ class LayeredOptimizer:
 				iter_without_improvement = 0
 				while self.cutoff_time > 0:
 					if self.create_video:
-						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 3}", as_png=True, label_nodes=False, groups=[0] * g.n_nodes)
+						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 8}", as_png=True, label_nodes=False, groups=[0] * g.n_nodes, gravity=True, copies=2)
 					candidate = candidate_fn(g)
-					next_partition = neighborhood_fn(g, candidate, bucket_size)
+					next_partition = neighborhood_fn(g, candidate, bucket_size, nbhd_width=vertical_width)
 					neighborhood = [nid for nid, v in enumerate(next_partition) if v]
 					y_save = [g[nd].y for nd in neighborhood]
 					print(candidate, neighborhood)
 					if self.create_video:
-						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 3 + 1}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=next_partition, label_nodes=False)
-					out = self.__incremetal_opt(g, next_partition, m, env)
+						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 8 + 2}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=next_partition, gravity=True, label_nodes=False, copies=3)
+					out = self.__incremetal_opt(g, next_partition, m, env, nbhd_width=vertical_width)
 					self.cutoff_time -= time.time() - t_since_last
 					t_since_last = time.time()
 					opt_time += out[1]
@@ -1165,9 +1171,13 @@ class LayeredOptimizer:
 						iter_without_improvement += 1
 					else:
 						iter_without_improvement = 0
-					if self.create_video:
+					if self.create_video and not all((v == 0 for v in movement)):
+						gps = next_partition.copy()
+						for i, v in enumerate(neighborhood):
+							if movement[i] != 0:
+								gps[v] = 2
 						edges_moved = {(v, vp) for i, v in enumerate(neighborhood) if movement[i] != 0 for vp in g.get_adj_list()[v]}
-						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 3 + 2}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=next_partition, emphasize_edges=edges_moved, label_nodes=False)
+						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 8 + 5}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=gps, emphasize_edges=edges_moved, gravity=True, label_nodes=False, copies=3)
 					penalty_fn(g, neighborhood, candidate, movement, iter_ct, no_repeats=True)
 					iter_ct += 1
 					if iter_without_improvement == 5:
@@ -1182,8 +1192,8 @@ class LayeredOptimizer:
 			import imageio.v3 as iio
 			from numpy import stack
 			from pygifsicle import optimize
-			frames = stack([iio.imread(f"Images/{self.name}/frame_{i}.png") for i in range(iter_ct * 3)], axis=0)
-			iio.imwrite(f'Images/{self.name}.gif', frames, format="gif", fps=2)
+			frames = stack([iio.imread(f"Images/{self.name}/frame_{i}.png") for i in range(iter_ct * 8)], axis=0)
+			iio.imwrite(f'Images/{self.name}.gif', frames, format="gif", fps=5)
 			optimize(f'Images/{self.name}.gif')
 			# with imageio.get_writer(f'Images/{self.name}.gif', mode='I') as writer:
 			# 	for i in range(iter_ct * 3):
