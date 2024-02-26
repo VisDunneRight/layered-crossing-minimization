@@ -167,7 +167,7 @@ def draw_altair_simple_line_chart(data_points, x_axis, y_axis, color_field, x_ti
     dom = coldom if coldom is not None else sorted(list(set(dp[f"{color_field}"] for dp in data_points)))
     rng = ["#000000", "#e15759", "#4e79a7", "#b07aa1", "#f28e2b", "#9c755f", "#ff9da7", "#59a14f", "#4e79a7", "#ff9da7", "#59a14f"]  # "#edc948", "#76b7b2"]
     # color_palette = ["#ff8a80", "#ff1744", "#d50000", "#ea80fc", "#d500f9", "#aa00ff", "#82b1ff", "#2979ff", "#2962ff", "#ccff90", "#76ff03", "#64dd17", "#ffe57f", "#ffc400", "#ffab00"]
-    color_palette = ["#e1bee7", "#ce93d8", "#ab47bc", "#7b1fa2", "#4a148c", "#c8e6c9", "#a5d6a7", "#66bb6a", "#388e3c", "#1b5e20", "#ffe0b2", "#ffcc80", "#ffa726", "#f57c00", "#e65100"]
+    color_palette = ["#b3e5fc", "#81d4fa", "#29b6f6", "#0288d1", "#01579b", "#e1bee7", "#ce93d8", "#ab47bc", "#7b1fa2", "#4a148c", "#c8e6c9", "#a5d6a7", "#66bb6a", "#388e3c", "#1b5e20", "#ffe0b2", "#ffcc80", "#ffa726", "#f57c00", "#e65100"]
     if rng2:
         rng = ["#000000", "#e15759", "#4e79a7", "#9c755f", "#ff9da7", "#59a14f"]
     chart = alt.Chart(data).mark_line(clip=True).encode(

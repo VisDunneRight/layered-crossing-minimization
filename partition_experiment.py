@@ -48,7 +48,7 @@ def draw_line_charts():
     folder = "random graphs/ratio_d3/results"
     n_repeats = 10
     max_time = 300
-    nbhds = ["bfs", "degree_ratio", "vertical"]
+    nbhds = ["bfs", "degree_ratio", "vertical", "random"]
     cands = ["betweenness", "crossings", "degree", "avg_edge_length", "random"]
     sizes = [1000, 2000, 3000]
     ratios = [1.5, 1, 2]
@@ -144,27 +144,42 @@ def draw_line_charts():
     #         vis.draw_altair_simple_line_chart(dat, "Time", "Crossings", "Graph", "Time", "Crossings Improvement", os.path.splitext(fl)[0])
 
 
+def print_exp_optcounts(results_folder_path):
+    for root, dirs, files in os.walk(results_folder_path):
+        for fl in sorted(files):
+            if os.path.splitext(fl)[1] == ".csv":
+                with open(root + "/" + fl, 'r') as fd:
+                    rdr = csv.reader(fd)
+                    next(rdr)
+                    total_cts = 0
+                    nlines = 0
+                    for ln in rdr:
+                        total_cts += (len(ln) - 6) / 2
+                        nlines += 1
+                    print(fl, total_cts / nlines)
+
+
 def small_test():
-    opt = LayeredOptimizer("random graphs/ratio_d3/r1k10n10/graph0.lgbin")
-    # opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k30n20/graph0.lgbin")
-    opt.cutoff_time = 25
-    opt.create_video = True
+    # opt = LayeredOptimizer("random graphs/ratio_d3/r1k10n10/graph0.lgbin")
+    opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k42n28/graph0.lgbin")
+    opt.cutoff_time = 30
+    # opt.create_video = True
     opt.name = "r1k10n10lock"
     # opt.vertical_transitivity = True
     # opt = LayeredOptimizer("Rome-Lib/graficon96nodi/grafo3510.96")
     # n_cv = opt.g.c_vars_count()
 
-    # heuristics.barycenter(opt.g)
+    heuristics.barycenter(opt.g)
     # opt.just_bendiness_reductiont()
     #     # vis.draw_graph(opt.g, "heurisic_bend", groups=[0] * opt.g.n_nodes, label_nodes=False)
     # vis.draw_graph(opt.g, "solution_heuristic")
 
-    for lay in opt.g.layers.values():
+    for lay in opt.g.layers.values():  # central gravity, for making gifs
         min_y = min((nd.y for nd in lay))
         for nd in lay:
             nd.y -= min_y
 
-    opt.local_opt_increment(500, neighborhood_fn=bfs_neighborhood, candidate_fn=random_candidate, vertical_width=0)
+    opt.local_opt_increment(1000, neighborhood_fn=bfs_neighborhood, candidate_fn=random_candidate, vertical_width=0)
     # opt.optimize_layout()
 
     # opt.m_val *= 2
@@ -201,6 +216,7 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
 if __name__ == '__main__':
     # small_test()
     # draw_line_charts()
+    # print_exp_optcounts("./random graphs/ratio_d3/results")
 
     cv_sizes = [1000, 2000, 3000]
     cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate

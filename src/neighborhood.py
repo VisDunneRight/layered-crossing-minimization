@@ -34,7 +34,6 @@ def bfs_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_width=0):
     selected = [False] * g.n_nodes
     seen = [False] * g.n_nodes
     seen[candidate_id] = True
-    # layer_edge_cts = defaultdict(int)
     if nbhd_width == 0:
         layer_edge_cts = [len(g.get_edges_by_layer()[i]) for i in range(g.n_layers - 1)]
     else:
@@ -50,10 +49,10 @@ def bfs_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_width=0):
                     if selected[nd_adj]:
                         if g[nd_adj].layer < g[nd].layer:  # C-VAR CALCULATION
                             acc_cv += 2 * layer_edge_cts[g[nd_adj].layer]
-                            # layer_edge_cts[g[nd_adj].layer] += 1
+                            layer_edge_cts[g[nd_adj].layer] -= 1
                         else:
                             acc_cv += 2 * layer_edge_cts[g[nd].layer]
-                            # layer_edge_cts[g[nd].layer] += 1
+                            layer_edge_cts[g[nd].layer] -= 1
                     elif not seen[nd_adj]:
                         bfsq.append(nd_adj)
                         seen[nd_adj] = True
@@ -71,7 +70,6 @@ def vertical_neighborhood(g: LayeredGraph, candidate_node: int, cutoff):
     selected = [False] * g.n_nodes
     for n in g.layers[g[candidate_node].layer]:
         selected[n.id] = True
-    # layer_edge_cts = defaultdict(int)
     layer_edge_cts = [len(g.get_edges_by_layer()[i]) for i in range(g.n_layers - 1)]
     layer_node_cts = defaultdict(int)
     layer_node_cts[g[candidate_node].layer] = len(g.layers[g[candidate_node].layer])
@@ -96,9 +94,10 @@ def vertical_neighborhood(g: LayeredGraph, candidate_node: int, cutoff):
         # print(d_adj[next_nd][nd_lr], nd_lr, next_layer, next_nd, right_layer, g[d_adj[next_nd][nd_lr][0]].layer - 1 + nd_lr)
         # print(layer_edge_cts[g[d_adj[next_nd][nd_lr][0]].layer - 1 + nd_lr])
         for i in range(2):  # C-VAR CALCULATION
-            for v in d_adj[next_nd][i]:
-                acc_cv += 2 * layer_edge_cts[next_layer - 1 + i]
-                # layer_edge_cts[g[nd_adj].layer - 1 + nd_lr] += 1
+            for nd_adj in d_adj[next_nd][i]:
+                if selected[nd_adj]:
+                    acc_cv += 2 * layer_edge_cts[next_layer - 1 + i]
+                    layer_edge_cts[next_layer - 1 + i] -= 1
         if acc_cv > cutoff:
             break
         selected[next_nd] = True
@@ -157,8 +156,10 @@ def vertical_re_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_wi
     while pqueue:
         next_nd = heapq.heappop(pqueue)[1]
         for i in range(2):  # C-VAR CALCULATION
-            for _ in d_adj[next_nd][i]:
-                acc_cv += 2 * layer_edge_cts[g[next_nd].layer - 1 + i]
+            for nd_adj in d_adj[next_nd][i]:
+                if selected[nd_adj]:
+                    acc_cv += 2 * layer_edge_cts[g[next_nd].layer - 1 + i]
+                    layer_edge_cts[g[next_nd].layer - 1 + i] -= 1
         if acc_cv > cutoff:
             break
         selected[next_nd] = True
@@ -204,10 +205,10 @@ def degree_ratio_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_w
             if selected[nd_adj]:
                 if g[nd_adj].layer < g[next_node].layer:  # C-VAR CALCULATION
                     acc_cv += 2 * layer_edge_cts[g[nd_adj].layer]
-                    # layer_edge_cts[g[nd_adj].layer] += 1
+                    layer_edge_cts[g[nd_adj].layer] -= 1
                 else:
                     acc_cv += 2 * layer_edge_cts[g[next_node].layer]
-                    # layer_edge_cts[g[nd].layer] += 1
+                    layer_edge_cts[g[next_node].layer] -= 1
             else:
                 if nd_adj not in included_counts:
                     included_counts[nd_adj] = 0
@@ -223,7 +224,10 @@ def degree_ratio_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_w
 
 
 def random_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_width=0):
-    layer_edge_cts = [len(g.get_edges_by_layer()[i]) for i in range(g.n_layers - 1)]
+    if nbhd_width == 0:
+        layer_edge_cts = [len(g.get_edges_by_layer()[i]) for i in range(g.n_layers - 1)]
+    else:
+        layer_edge_cts = find_vertical_nbhd_and_edge_counts(g, candidate_id, nbhd_width)
     selected = [False] * g.n_nodes
     selected[candidate_id] = True
     adj = g.get_adj_list()
@@ -237,8 +241,10 @@ def random_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_width=0
             if selected[nd_adj]:
                 if g[nd_adj].layer < next_node.layer:  # C-VAR CALCULATION
                     acc_cv += 2 * layer_edge_cts[g[nd_adj].layer]
+                    layer_edge_cts[g[nd_adj].layer] -= 1
                 else:
                     acc_cv += 2 * layer_edge_cts[next_node.layer]
+                    layer_edge_cts[next_node.layer] -= 1
         if acc_cv <= cutoff:
             selected[next_node.id] = True
             n_selected += 1
