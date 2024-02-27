@@ -202,7 +202,7 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
     for root, dirs, files in os.walk(path_to_dataset):
         dirs.sort()
         for fl in sorted(files):
-            if os.path.splitext(fl)[1] == ".lgbin":
+            if os.path.splitext(fl)[1] == ".lgbin" and "r1.5k" in root:
                 # if cur_idx >= fidx:
                 print(fl, files_run)
                 if f"{root}/{fl}" not in files_run:
