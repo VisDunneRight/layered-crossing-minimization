@@ -259,13 +259,16 @@ def in_vertical_nbhd(yv, bounds, size):
     return False
 
 
-def find_vertical_nbhd_and_edge_counts(g: LayeredGraph, candidate, size):
+def find_vertical_nbhd_and_edge_counts(g: LayeredGraph, candidate, percent):
     # ASSUMPTION: all nodes nd have nd.y unique integer in [0, len(nd_layer)]
     edge_counts = [0] * (g.n_layers - 1)
     cnd = g[candidate]
     d_adj = g.get_double_adj_list()
+    max_layer_size = max((len(lay) for lay in g.layers.values()))
+    size = max_layer_size * percent
     for lid, lay in g.layers.items():
-        lb = max(0, cnd.y - size // 2)
+        scaled_y = cnd.y / len(cnd.layer) * len(lay)
+        lb = max(0, scaled_y - size // 2)
         ub = min(len(lay), lb + size)
         lb = min(ub - size, lb)
         for nd in lay:

@@ -161,7 +161,8 @@ def print_exp_optcounts(results_folder_path):
 
 def small_test():
     # opt = LayeredOptimizer("random graphs/ratio_d3/r1k10n10/graph0.lgbin")
-    opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k42n28/graph0.lgbin")
+    opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k12n8/graph0.lgbin")
+    # opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k42n28/graph0.lgbin")
     opt.cutoff_time = 30
     # opt.create_video = True
     opt.name = "r1k10n10lock"
@@ -179,7 +180,7 @@ def small_test():
         for nd in lay:
             nd.y -= min_y
 
-    opt.local_opt_increment(1000, neighborhood_fn=bfs_neighborhood, candidate_fn=random_candidate, vertical_width=0)
+    opt.local_opt_increment(2000, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate, vertical_width=0)
     # opt.optimize_layout()
 
     # opt.m_val *= 2
