@@ -521,29 +521,29 @@ def generate_ratio_graphs_degree_3(seed=22201):
 	if "ratio_d3" not in os.listdir("../random graphs"):
 		os.mkdir(f"../random graphs/ratio_d3")
 
-	for kn in [10, 15, 20, 25, 30, 35]:
-		# if f"r1k{kn}n{kn}" not in os.listdir("../random graphs/ratio_d3"):
-		# 	os.mkdir(f"../random graphs/ratio_d3/r1k{kn}n{kn}")
-		for i in range(10, 20):
-			ng = random_layered_graph_edgecount_drop_unconnected(kn, kn, round(1.5 * kn * (kn - 1)))
-			print(f"k={kn}/n={kn} graph {i + 1}")
-			ng.write_out(f"../random graphs/ratio_d3/r1k{kn}n{kn}/graph{i}.lgbin")
+	# for kn in [10, 15, 20, 25, 30, 35]:
+	# 	# if f"r1k{kn}n{kn}" not in os.listdir("../random graphs/ratio_d3"):
+	# 	# 	os.mkdir(f"../random graphs/ratio_d3/r1k{kn}n{kn}")
+	# 	for i in range(10, 20):
+	# 		ng = random_layered_graph_edgecount_drop_unconnected(kn, kn, round(1.5 * kn * (kn - 1)))
+	# 		print(f"k={kn}/n={kn} graph {i + 1}")
+	# 		ng.write_out(f"../random graphs/ratio_d3/r1k{kn}n{kn}/graph{i}.lgbin")
 	for n in [8, 12, 16, 20, 24, 28]:
 		k = int(n * 1.5)
 		# if f"r1.5k{k}n{n}" not in os.listdir("../random graphs/ratio_d3"):
 		# 	os.mkdir(f"../random graphs/ratio_d3/r1.5k{k}n{n}")
-		for i in range(10, 20):
+		for i in range(20, 50):
 			ng = random_layered_graph_edgecount_drop_unconnected(k, n, round(1.5 * n * (k - 1)))
 			print(f"k={k}/n={n} graph {i + 1}")
 			ng.write_out(f"../random graphs/ratio_d3/r1.5k{k}n{n}/graph{i}.lgbin")
-	for n in [6, 10, 13, 17, 20, 24]:
-		k = n * 2
-		# if f"r2k{k}n{n}" not in os.listdir("../random graphs/ratio_d3"):
-		# 	os.mkdir(f"../random graphs/ratio_d3/r2k{k}n{n}")
-		for i in range(10, 20):
-			ng = random_layered_graph_edgecount_drop_unconnected(k, n, round(1.5 * n * (k - 1)))
-			print(f"k={k}/n={n} graph {i + 1}")
-			ng.write_out(f"../random graphs/ratio_d3/r2k{k}n{n}/graph{i}.lgbin")
+	# for n in [6, 10, 13, 17, 20, 24]:
+	# 	k = n * 2
+	# 	# if f"r2k{k}n{n}" not in os.listdir("../random graphs/ratio_d3"):
+	# 	# 	os.mkdir(f"../random graphs/ratio_d3/r2k{k}n{n}")
+	# 	for i in range(10, 20):
+	# 		ng = random_layered_graph_edgecount_drop_unconnected(k, n, round(1.5 * n * (k - 1)))
+	# 		print(f"k={k}/n={n} graph {i + 1}")
+	# 		ng.write_out(f"../random graphs/ratio_d3/r2k{k}n{n}/graph{i}.lgbin")
 	# for n in [5, 8, 11, 14, 17, 20]:
 	# 	k = n * 3
 	# 	if f"r3k{k}n{n}" not in os.listdir("../random graphs/ratio_d3"):
@@ -562,18 +562,19 @@ if __name__ == '__main__':
 	# generate_big_n_by_n_graphs()
 	# generate_rectangle_graphs()
 	# generate_ratio_graphs()
-	# generate_ratio_graphs_degree_3()
+	generate_ratio_graphs_degree_3()
 	# generate_ratio1dot5_graphs_d3_with_big_layers()
 
-	gr = src.read_data.read("../random graphs/big_layer/k36n24/graph1.lgbin")
-	print(gr.layers)
-	print(gr.nodes)
-	print(gr.node_ids)
-	print(gr.edge_ids)
-	adj = gr.get_adj_list()
-	print(sum((len(adj[v.id]) for v in gr))/gr.n_nodes)
-	print([len(lay) for lay in gr.layers.values()])
-	print([len(gr.get_edges_by_layer()[ls]) for ls in range(gr.n_layers - 1)])
+	# gr = src.read_data.read("../random graphs/big_layer/k36n24/graph1.lgbin")
+	# gr = src.read_data.read("../random graphs/ratio_d3/r1.5k24n16/graph44.lgbin")
+	# print(gr.layers)
+	# print(gr.nodes)
+	# print(gr.node_ids)
+	# print(gr.edge_ids)
+	# adj = gr.get_adj_list()
+	# print(sum((len(adj[v.id]) for v in gr))/gr.n_nodes)
+	# print([len(lay) for lay in gr.layers.values()])
+	# print([len(gr.get_edges_by_layer()[ls]) for ls in range(gr.n_layers - 1)])
 
 	# gr = src.read_data.read("../random graphs/matuszewski/10_by_10_density/d15/graph0.lgbin")
 	# gr = src.read_data.read("../random graphs/rectangles/k70n20/graph0.lgbin")

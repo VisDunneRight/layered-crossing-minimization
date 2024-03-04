@@ -38,21 +38,20 @@ def get_start_position(filename):
         return set()
 
 
-def get_csv_lines(file, start, end):
+def get_csv_lines(file, exp):
     with open(file, 'r') as fd:
         rdr = csv.reader(fd)
-        return [row for idx, row in enumerate(rdr) if start <= idx <= end]
+        return [row for idx, row in enumerate(rdr) if exp in row[1]]
 
 
-def draw_line_charts():
-    folder = "random graphs/ratio_d3/results"
+def draw_line_charts(folder):
     n_repeats = 10
     max_time = 300
-    nbhds = ["bfs", "degree_ratio", "vertical", "random"]
+    nbhds = ["bfs", "degree_ratio", "vertical_re", "random"]
     cands = ["betweenness", "crossings", "degree", "avg_edge_length", "random"]
     sizes = [1000, 2000, 3000]
     ratios = [1.5, 1, 2]
-    breakpoints = [1, 61, 121, 181]
+    exps = ["r1.5k", "r1k", "r2k"]
     for size in sizes:
         for ridx, ratio in enumerate(ratios):
             all_data = {}
@@ -63,12 +62,14 @@ def draw_line_charts():
                     all_data[nbhd][cand] = {}
                     fl = f"{folder}/{nbhd}+{cand}+{size}.csv"
                     t_avgs = []
-                    for i, ln in enumerate(get_csv_lines(fl, breakpoints[ridx], breakpoints[ridx + 1])):
+                    for i, ln in enumerate(get_csv_lines(fl, exps[ridx])):
                         st_cr = int(ln[4])
                         all_vals = []
                         for j in range(4, len(ln), 2):
-                            if int(ln[j]) == 0:
-                                print(ln)
+                            if int(ln[j]) == 0 and j == len(ln) - 2:
+                                # print(ln)
+                                print(f"zero problem, line {ln[0]}")
+                                ln[j] = ln[j - 2]
                             all_vals.append((st_cr / int(ln[j]), float(ln[j + 1])))
                         ptr = 0
                         ot_ptr = 0
@@ -85,7 +86,8 @@ def draw_line_charts():
                         if i % n_repeats == n_repeats - 1:
                             gid = ln[1].split("/")[2]
                             # if gid == "r1.5k36n24" or gid == "r1k30n30" or gid == "r2k40n20":  # med-large graphs
-                            if gid == "r1.5k18n12" or gid == "r1k15n15" or gid == "r2k20n10":  # small graphs
+                            # if gid == "r1.5k18n12" or gid == "r1k15n15" or gid == "r2k20n10":  # small graphs
+                            if gid == "r1.5k12n8":
                                 all_data[nbhd][cand][gid] = []
                                 for t1 in range(max_time):
                                     avg_cr = sum((t_avgs[j][t1] for j in range(10))) / 10
@@ -106,8 +108,9 @@ def draw_line_charts():
                     #         avg_inc += tvals[t1]
                     #     dat.append({"Method": f"{nbhd}+{cand}", "Time": t1, "Crossings": avg_inc / 6})
 
-            ymax = max((datx["Crossings"] for datx in dat))
-            vis.draw_altair_simple_line_chart(dat, "Time", "Crossings", "Method", "Time", "Crossings Improvement", f"feb20/small_graphs/nbhd_color/{ratio}x{size}", ydom=[1, ymax + 0.25])
+            if dat:
+                ymax = max((datx["Crossings"] for datx in dat))
+                vis.draw_altair_simple_line_chart(dat, "Time", "Crossings", "Method", "Time", "Crossings Improvement", f"feb20/r1.5k12n8/{ratio}x{size}", ydom=[1, ymax + 0.25])
 
     # for fl in os.listdir(folder):
     #     with open(f"{folder}/{fl}", 'r') as fd:
@@ -145,6 +148,7 @@ def draw_line_charts():
 
 
 def print_exp_optcounts(results_folder_path):
+    by_nbhd = {"bfs": [[0] * 3 for _ in range(6)], "degree_ratio": [[0] * 3 for _ in range(6)], "random": [[0] * 3 for _ in range(6)], "vertical_re": [[0] * 3 for _ in range(6)]}
     for root, dirs, files in os.walk(results_folder_path):
         for fl in sorted(files):
             if os.path.splitext(fl)[1] == ".csv":
@@ -153,15 +157,36 @@ def print_exp_optcounts(results_folder_path):
                     next(rdr)
                     total_cts = 0
                     nlines = 0
+                    grouped_by_size = {}
+                    grpcounts = {}
                     for ln in rdr:
+                        grpsize = ln[1].split('/')[2]
                         total_cts += (len(ln) - 6) / 2
                         nlines += 1
+                        if grpsize not in grouped_by_size:
+                            grouped_by_size[grpsize] = 0
+                            grpcounts[grpsize] = 0
+                        grouped_by_size[grpsize] += (len(ln) - 6) / (2 * float(ln[2])) * 60
+                        grpcounts[grpsize] += 1
+                    for k in grouped_by_size:
+                        grouped_by_size[k] /= grpcounts[k]
                     print(fl, total_cts / nlines)
+                    nsize = "1000" if "1000" in fl else ("2000" if "2000" in fl else "3000")
+                    for k, v in grouped_by_size.items():
+                        print(f"{k},{nsize},{v}")
+                    # nsize = 0 if "1000" in fl else (1 if "2000" in fl else 2)
+                    # gsize =
+                    # if "bfs" in fl:
+                    #     by_nbhd["bfs"][][nsize] += total_cts / nlines
+    # print(by_nbhd)
+    # for nh in by_nbhd:
+    #     by_nbhd[nh] = [v / 5 for i in range(len(by_nbhd[nh])) for v in by_nbhd[nh][i]]
+    # print(by_nbhd)
 
 
-def small_test():
+def sandbox():
     # opt = LayeredOptimizer("random graphs/ratio_d3/r1k10n10/graph0.lgbin")
-    opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k12n8/graph0.lgbin")
+    opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k36n24/graph3.lgbin")
     # opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k42n28/graph0.lgbin")
     opt.cutoff_time = 30
     # opt.create_video = True
@@ -180,7 +205,7 @@ def small_test():
         for nd in lay:
             nd.y -= min_y
 
-    opt.local_opt_increment(2000, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate, vertical_width=0)
+    opt.local_opt_increment(2000, neighborhood_fn=vertical_re_neighborhood, candidate_fn=degree_candidate, vertical_width=0)
     # opt.optimize_layout()
 
     # opt.m_val *= 2
@@ -189,7 +214,7 @@ def small_test():
     print(opt.g.num_edge_crossings())
 
 
-def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path_to_dataset):
+def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path_to_dataset, subdirs, num_graphs):
     if "results" not in listdir(path_to_dataset):
         mkdir(path_to_dataset + "/results")
     # if neighborhood_fn.__name__ not in listdir(path_to_dataset + "/results"):
@@ -199,37 +224,35 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
     if len(files_run) == 0:
         insert_one(fname, ["Index", "File", "OptTime", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
     cur_idx = 0
-    for root, dirs, files in os.walk(path_to_dataset):
-        dirs.sort()
-        for fl in sorted(files):
-            if os.path.splitext(fl)[1] == ".lgbin" and "r1.5k" in root:
-                # if cur_idx >= fidx:
-                print(fl, files_run)
-                if f"{root}/{fl}" not in files_run:
-                    optim = LayeredOptimizer(root + "/" + fl, cutoff_time=300, vertical_transitivity=True)
-                    initial_layout_fn(optim.g)
-                    output = optim.local_opt_increment(n_cvs, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn)
-                    reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
-                    insert_one(fname, [cur_idx, root + "/" + fl, output[0], output[1]] + reordered)
-                cur_idx += 1
+    for subdir in subdirs:
+        for fl_num in range(num_graphs):
+            fl = f"graph{fl_num}.lgbin"
+            file_path = f"{path_to_dataset}/{subdir}/{fl}"
+            print(file_path)
+            if file_path not in files_run:
+                optim = LayeredOptimizer(file_path, cutoff_time=300)
+                initial_layout_fn(optim.g)
+                output = optim.local_opt_increment(n_cvs, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn)
+                reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
+                insert_one(fname, [cur_idx, file_path, output[0], output[1]] + reordered)
+            cur_idx += 1
 
 
 if __name__ == '__main__':
-    # small_test()
-    # draw_line_charts()
-    # print_exp_optcounts("./random graphs/ratio_d3/results")
+    # sandbox()
+    # draw_line_charts("random graphs/ratio_d3/results")
+    print_exp_optcounts("./random graphs/ratio_d3/results")
 
-    cv_sizes = [1000, 2000, 3000]
-    cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
-    nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
-    if len(sys.argv) >= 2:
-        nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(cv_sizes))
-        cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) % len(cand_fns)
-        cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) // len(cand_fns)
-    else:
-        nbhd_idx, cand_idx, cv_idx = 1, 1, 1
-    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], cv_sizes[cv_idx], heuristics.barycenter, "random graphs/ratio_d3")
-
-    # opt = LayeredOptimizer("random graphs/n_by_n/n25/graph0.lgbin")
-    # crossings_candidate(opt.g, init=True)
-    # print([nd.energy for nd in opt.g])
+    # dataset_path = "random graphs/ratio_d3"
+    # subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    # num_graphs_in_subdir = 50
+    # cv_sizes = [1000, 2000, 3000]
+    # cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
+    # nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
+    # if len(sys.argv) >= 2:
+    #     nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(cv_sizes))
+    #     cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) % len(cand_fns)
+    #     cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) // len(cand_fns)
+    # else:
+    #     nbhd_idx, cand_idx, cv_idx = 1, 1, 1
+    # run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], cv_sizes[cv_idx], heuristics.barycenter, dataset_path, subdirectories, num_graphs_in_subdir)
