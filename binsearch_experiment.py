@@ -33,7 +33,7 @@ def get_starting_bounds(file_path, graph_size: str, target_avg: float):
     return cur_bnds, cur_avgs, n_times_searched
 
 
-def get_start_position_binsearch(filename):
+def get_start_position_binsearch(filename, cur_cv):
     if os.path.exists(filename):
         fset = {}
         with open(filename, 'r') as fd:
@@ -42,7 +42,8 @@ def get_start_position_binsearch(filename):
             for ln in rdr:
                 if ln[1] in fset:
                     fset.clear()
-                fset[ln[1]] = (len(ln) - 7) / (2 * float(ln[2])) * 60
+                if ln[2] == str(cur_cv):
+                    fset[ln[1]] = (len(ln) - 7) / (2 * float(ln[2])) * 60
         return fset
     else:
         return {}
@@ -64,8 +65,8 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
     nbhd = neighborhood_fn.__name__.replace('_neighborhood', '')
     fname = f"{path_to_dataset}/bounds_results/{nbhd}+{graph_size}+{str(target_avg)}.csv"
     binfname = f"{path_to_dataset}/bounds_results/{nbhd}_bounds.csv"
-    files_run = get_start_position_binsearch(fname)
     starting_bounds, starting_avgs, n_searches = get_starting_bounds(binfname, graph_size, target_avg)
+    files_run = get_start_position_binsearch(fname, sum(starting_bounds)//2)
     if len(files_run) == 0:
         insert_one(fname, ["Index", "File", "CVcalc", "OptTime", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
     if len(files_run) == n_graph_copies:
