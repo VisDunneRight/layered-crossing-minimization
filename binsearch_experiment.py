@@ -67,7 +67,7 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
     binfname = f"{path_to_dataset}/bounds_results/{nbhd}_bounds.csv"
     starting_bounds, starting_avgs, n_searches = get_starting_bounds(binfname, graph_size, target_avg)
     files_run = get_start_position_binsearch(fname, sum(starting_bounds)//2)
-    if len(files_run) == 0:
+    if len(files_run) == 0 and (not os.path.isfile(fname) or os.path.getsize(fname) == 0):
         insert_one(fname, ["Index", "File", "CVcalc", "OptTime", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
     if len(files_run) == n_graph_copies:
         files_run.clear()
