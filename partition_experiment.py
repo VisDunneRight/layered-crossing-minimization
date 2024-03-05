@@ -217,7 +217,27 @@ def sandbox():
     # print(opt.g.num_edge_crossings())
 
 
-def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path_to_dataset, subdirs, num_graphs):
+def get_closest_cv(file_path, graph_size: str, target_avg: float):
+    with open(file_path, 'r') as fd:
+        rdr = csv.reader(fd)
+        best_bnd = -1
+        best_avg = -1
+        n_times_searched = 0
+        for ln in rdr:
+            if ln[0] == graph_size:
+                if int(ln[1]) > cur_bnds[0] and float(ln[2]) >= target_avg:
+                    cur_bnds[0] = int(ln[1])
+                    cur_avgs[0] = float(ln[2])
+                elif int(ln[1]) < cur_bnds[1] and float(ln[2]) <= target_avg:
+                    cur_bnds[1] = int(ln[1])
+                    cur_avgs[1] = float(ln[2])
+                n_times_searched += 1
+        if cur_bnds[1] == sys.maxsize:
+            cur_bnds[1] = 2 * cur_bnds[0]
+    return cur_bnds, cur_avgs, n_times_searched
+
+
+def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, path_to_dataset, subdirs, num_graphs):
     if "results" not in listdir(path_to_dataset):
         mkdir(path_to_dataset + "/results")
     # if neighborhood_fn.__name__ not in listdir(path_to_dataset + "/results"):
@@ -242,20 +262,20 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
 
 
 if __name__ == '__main__':
-    sandbox()
+    # sandbox()
     # draw_line_charts("random graphs/ratio_d3/results")
     # print_exp_optcounts("./random graphs/ratio_d3/results")
 
-    # dataset_path = "random graphs/ratio_d3"
-    # subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
-    # num_graphs_in_subdir = 50
-    # cv_sizes = [1000, 2000, 3000]
-    # cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
-    # nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
-    # if len(sys.argv) >= 2:
-    #     nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(cv_sizes))
-    #     cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) % len(cand_fns)
-    #     cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(cv_sizes))) // len(cand_fns)
-    # else:
-    #     nbhd_idx, cand_idx, cv_idx = 1, 1, 1
-    # run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], cv_sizes[cv_idx], heuristics.barycenter, dataset_path, subdirectories, num_graphs_in_subdir)
+    dataset_path = "random graphs/ratio_d3"
+    subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    num_graphs_in_subdir = 50
+    nbhd_sizes = [10, 50, 100]
+    cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
+    nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
+    if len(sys.argv) >= 2:
+        nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
+        cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
+        cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
+    else:
+        nbhd_idx, cand_idx, cv_idx = 1, 1, 1
+    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, dataset_path, subdirectories, num_graphs_in_subdir)

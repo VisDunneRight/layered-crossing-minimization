@@ -73,7 +73,7 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
     cur_idx = 0
     while n_searches < depth:
         if n_searches == 0:
-            cv = random.randint(1000, 300)
+            cv = random.randint(1000, 3000)
             for i in range(n_graph_copies):
                 fl = f"graph{i}.lgbin"
                 print(fl)
