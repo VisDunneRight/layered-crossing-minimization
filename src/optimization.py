@@ -1138,19 +1138,22 @@ class LayeredOptimizer:
 			if self.cutoff_time > 0:
 				candidate_fn(g, init=True)
 				iter_ct = 0
+				frame_count = 0
 				t_since_last = time.time()
 				st_time = time.time()
 				iter_without_improvement = 0
 				while self.cutoff_time > 0:
 					if self.create_video:
-						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 8}", as_png=True, label_nodes=False, groups=[0] * g.n_nodes, gravity=True, copies=2)
+						vis.draw_graph(g, f"{self.name}/frame_{frame_count}", as_png=True, label_nodes=False, groups=[0] * g.n_nodes, gravity=True, copies=2)
+						frame_count += 2
 					candidate = candidate_fn(g)
 					next_partition = neighborhood_fn(g, candidate, bucket_size, nbhd_width=vertical_width)
 					neighborhood = [nid for nid, v in enumerate(next_partition) if v]
 					y_save = [g[nd].y for nd in neighborhood]
 					print(candidate, neighborhood)
 					if self.create_video:
-						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 8 + 2}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=next_partition, gravity=True, label_nodes=False, copies=3)
+						vis.draw_graph(g, f"{self.name}/frame_{frame_count}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=next_partition, gravity=True, label_nodes=False, copies=3)
+						frame_count += 3
 					out = self.__incremetal_opt(g, next_partition, m, env, nbhd_width=vertical_width)
 					self.cutoff_time -= time.time() - t_since_last
 					t_since_last = time.time()
@@ -1170,7 +1173,8 @@ class LayeredOptimizer:
 							if movement[i] != 0:
 								gps[v] = 2
 						edges_moved = {(v, vp) for i, v in enumerate(neighborhood) if movement[i] != 0 for vp in g.get_adj_list()[v]}
-						vis.draw_graph(g, f"{self.name}/frame_{iter_ct * 8 + 5}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=gps, emphasize_edges=edges_moved, gravity=True, label_nodes=False, copies=3)
+						vis.draw_graph(g, f"{self.name}/frame_{frame_count}", as_png=True, emphasize_nodes=[True if ind == candidate else False for ind in range(g.n_nodes)], groups=gps, emphasize_edges=edges_moved, gravity=True, label_nodes=False, copies=3)
+						frame_count += 3
 					penalty_fn(g, neighborhood, candidate, movement, iter_ct, no_repeats=True)
 					iter_ct += 1
 					if iter_without_improvement == 5:
@@ -1185,7 +1189,7 @@ class LayeredOptimizer:
 			import imageio.v3 as iio
 			from numpy import stack
 			from pygifsicle import optimize
-			frames = stack([iio.imread(f"Images/{self.name}/frame_{i}.png") for i in range(iter_ct * 8)], axis=0)
+			frames = stack([iio.imread(f"Images/{self.name}/frame_{i}.png") for i in range(frame_count)], axis=0)
 			iio.imwrite(f'Images/{self.name}.gif', frames, format="gif", fps=5)
 			optimize(f'Images/{self.name}.gif')
 			# with imageio.get_writer(f'Images/{self.name}.gif', mode='I') as writer:

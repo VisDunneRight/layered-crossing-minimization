@@ -165,17 +165,20 @@ def vertical_re_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_wi
         selected[next_nd] = True
         layer_node_cts[next_layer] += 1
         if layer_node_cts[next_layer] == len(g.layers[next_layer]):
-            if lr_minmax[0] == 0:
-                next_layer = lr_minmax[1] + 1
-            elif lr_minmax[1] == g.n_layers - 1:
-                next_layer = lr_minmax[0] - 1
-            else:
-                next_layer = random.choice([lr_minmax[0] - 1, lr_minmax[1] + 1])
+            if lr_minmax[0] != 0 or lr_minmax[1] != g.n_layers - 1:
+                if lr_minmax[0] == 0:
+                    next_layer = lr_minmax[1] + 1
+                elif lr_minmax[1] == g.n_layers - 1:
+                    next_layer = lr_minmax[0] - 1
+                else:
+                    next_layer = random.choice([lr_minmax[0] - 1, lr_minmax[1] + 1])
             if next_layer > lr_minmax[1]:
+                lr_minmax[1] = next_layer
                 for nd in g.layers[next_layer]:
                     if nbhd_width == 0 or g[nd].v_nbhd:
                         heapq.heappush(pqueue, (-(len(d_adj[nd.id][0]) / (len(d_adj[nd.id][1]) + 1)), nd.id))
             if next_layer < lr_minmax[0]:
+                lr_minmax[0] = next_layer
                 for nd in g.layers[next_layer]:
                     if nbhd_width == 0 or g[nd].v_nbhd:
                         heapq.heappush(pqueue, (-(len(d_adj[nd.id][1]) / (len(d_adj[nd.id][0]) + 1)), nd.id))
@@ -218,7 +221,6 @@ def degree_ratio_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_w
             selected[next_node] = True
             n_selected += 1
         else:
-            # print(acc_cv)
             break
     return selected
 
@@ -234,9 +236,7 @@ def random_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_width=0
     acc_cv = 0
     n_selected = 1
     while acc_cv <= cutoff and n_selected < g.n_nodes:
-        next_node = random.choice(g.nodes)
-        while selected[next_node.id]:
-            next_node = random.choice(g.nodes)
+        next_node = random.choice([nd for nd in g.nodes if not selected[nd.id]])
         for nd_adj in adj[next_node.id]:
             if selected[nd_adj]:
                 if g[nd_adj].layer < next_node.layer:  # C-VAR CALCULATION

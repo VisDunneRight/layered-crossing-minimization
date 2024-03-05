@@ -186,11 +186,11 @@ def print_exp_optcounts(results_folder_path):
 
 def sandbox():
     # opt = LayeredOptimizer("random graphs/ratio_d3/r1k10n10/graph0.lgbin")
-    opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k36n24/graph3.lgbin")
+    opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k30n20/graph12.lgbin")
     # opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k42n28/graph0.lgbin")
     opt.cutoff_time = 30
     # opt.create_video = True
-    opt.name = "r1k10n10lock"
+    opt.name = "r1.5k12n8.deg"
     # opt.vertical_transitivity = True
     # opt = LayeredOptimizer("Rome-Lib/graficon96nodi/grafo3510.96")
     # n_cv = opt.g.c_vars_count()
@@ -205,13 +205,16 @@ def sandbox():
         for nd in lay:
             nd.y -= min_y
 
-    opt.local_opt_increment(2000, neighborhood_fn=vertical_re_neighborhood, candidate_fn=degree_candidate, vertical_width=0)
+    print([idx for idx, v in enumerate(random_neighborhood(opt.g, 140, 11694)) if v])
+    print(opt.g.n_nodes)
+
+    opt.local_opt_increment(11694, neighborhood_fn=random_neighborhood, candidate_fn=random_candidate, vertical_width=0)
     # opt.optimize_layout()
 
     # opt.m_val *= 2
     # opt.just_bendiness_reduction()
     # vis.draw_graph(opt.g, "solution_bend", groups=[0] * opt.g.n_nodes, label_nodes=False)
-    print(opt.g.num_edge_crossings())
+    # print(opt.g.num_edge_crossings())
 
 
 def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path_to_dataset, subdirs, num_graphs):
@@ -239,9 +242,9 @@ def run_experiment(neighborhood_fn, candidate_fn, n_cvs, initial_layout_fn, path
 
 
 if __name__ == '__main__':
-    # sandbox()
+    sandbox()
     # draw_line_charts("random graphs/ratio_d3/results")
-    print_exp_optcounts("./random graphs/ratio_d3/results")
+    # print_exp_optcounts("./random graphs/ratio_d3/results")
 
     # dataset_path = "random graphs/ratio_d3"
     # subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
