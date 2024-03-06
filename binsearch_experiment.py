@@ -30,7 +30,7 @@ def get_starting_bounds(file_path, graph_size: str, target_avg: float):
                 n_times_searched += 1
         if cur_bnds[1] == sys.maxsize:
             cur_bnds[1] = 2 * cur_bnds[0]
-    return cur_bnds, cur_avgs, n_times_searched
+    return cur_bnds, cur_avgs, n_times_searched // 3
 
 
 def get_start_position_binsearch(filename, cur_cv):
@@ -43,7 +43,7 @@ def get_start_position_binsearch(filename, cur_cv):
                 if ln[1] in fset:
                     fset.clear()
                 if ln[2] == str(cur_cv):
-                    fset[ln[1]] = (len(ln) - 7) / (2 * float(ln[2])) * 60
+                    fset[ln[1]] = (len(ln) - 7) / (2 * float(ln[3])) * 60
         return fset
     else:
         return {}
@@ -88,7 +88,7 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
                     insert_one(fname, [cur_idx, f"{path_to_dataset}/{graph_size}/{fl}", cv, output[0], output[1]] + reordered)
                 cur_idx += 1
             avg_opts = sorted(list(files_run.values()))[n_graph_copies // 2]
-            insert_one(binfname, [graph_size, sum(starting_bounds) // 2, avg_opts])
+            insert_one(binfname, [graph_size, cv, avg_opts])
             starting_bounds, starting_avgs, n_searches = get_starting_bounds(binfname, graph_size, target_avg)
             n_searches -= 1
         else:
