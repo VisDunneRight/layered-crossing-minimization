@@ -257,20 +257,20 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
 
 
 if __name__ == '__main__':
-    sandbox()
+    # sandbox()
     # draw_line_charts("random graphs/ratio_d3/results")
     # print_exp_optcounts("./random graphs/ratio_d3/results")
 
-    # dataset_path = "random graphs/ratio_d3"
-    # subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
-    # num_graphs_in_subdir = 50
-    # nbhd_sizes = [10, 50, 100]
-    # cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
-    # nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
-    # if len(sys.argv) >= 2:
-    #     nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
-    #     cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
-    #     cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
-    # else:
-    #     nbhd_idx, cand_idx, cv_idx = 1, 1, 1
-    # run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, dataset_path, subdirectories, num_graphs_in_subdir)
+    dataset_path = "random graphs/ratio_d3"
+    subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    num_graphs_in_subdir = 50
+    nbhd_sizes = [10, 50, 100]
+    cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
+    nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
+    if len(sys.argv) >= 2:
+        nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
+        cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
+        cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
+    else:
+        nbhd_idx, cand_idx, cv_idx = 0, 1, 1
+    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, dataset_path, subdirectories, num_graphs_in_subdir)
