@@ -6,6 +6,7 @@ from src.helpers import *
 from src import heuristics, vis
 from src.neighborhood import *
 from os import mkdir, listdir
+import json
 
 
 def insert_one(filename, entry):
@@ -45,12 +46,12 @@ def get_csv_lines(file, exp):
 
 
 def draw_line_charts(folder):
-    n_repeats = 10
+    n_repeats = 50
     max_time = 300
     nbhds = ["bfs", "degree_ratio", "vertical_re", "random"]
     cands = ["betweenness", "crossings", "degree", "avg_edge_length", "random"]
-    sizes = [1000, 2000, 3000]
-    ratios = [1.5, 1, 2]
+    sizes = [10, 50, 100]
+    ratios = [1.5]  # , 1, 2]
     exps = ["r1.5k", "r1k", "r2k"]
     for size in sizes:
         for ridx, ratio in enumerate(ratios):
@@ -87,20 +88,21 @@ def draw_line_charts(folder):
                             gid = ln[1].split("/")[2]
                             # if gid == "r1.5k36n24" or gid == "r1k30n30" or gid == "r2k40n20":  # med-large graphs
                             # if gid == "r1.5k18n12" or gid == "r1k15n15" or gid == "r2k20n10":  # small graphs
-                            if gid == "r1.5k12n8":
+                            if "r1.5k" in gid:
                                 all_data[nbhd][cand][gid] = []
                                 for t1 in range(max_time):
-                                    avg_cr = sum((t_avgs[j][t1] for j in range(10))) / 10
+                                    avg_cr = sum((t_avgs[j][t1] for j in range(n_repeats))) / n_repeats
                                     all_data[nbhd][cand][gid].append(avg_cr)
                                     # dat.append({"Graph": ln[1].split("/")[2], "Time": t1, "Crossings": avg_cr})
 
                             t_avgs.clear()
-            dat = []
+            dat = [[] for _ in range(5)]
             for nbhd in nbhds:
                 for cand in cands:
-                    for gid, tvals in all_data[nbhd][cand].items():  # this is for specific sized graphs
+
+                    for szidx, (gid, tvals) in enumerate(all_data[nbhd][cand].items()):  # this is for specific sized graphs
                         for t1, v in enumerate(tvals):
-                            dat.append({"Graph": gid, "Method": f"{nbhd}+{cand}", "Time": t1, "Crossings": v})
+                            dat[szidx].append({"Graph": gid, "Method": f"{nbhd}+{cand}", "Time": t1, "Crossings": v})
 
                     # for t1 in range(300):  # this is for full averaging
                     #     avg_inc = 0
@@ -109,8 +111,9 @@ def draw_line_charts(folder):
                     #     dat.append({"Method": f"{nbhd}+{cand}", "Time": t1, "Crossings": avg_inc / 6})
 
             if dat:
-                ymax = max((datx["Crossings"] for datx in dat))
-                vis.draw_altair_simple_line_chart(dat, "Time", "Crossings", "Method", "Time", "Crossings Improvement", f"feb20/r1.5k12n8/{ratio}x{size}", ydom=[1, ymax + 0.25])
+                for datblock in dat:
+                    # ymax = max((datx["Crossings"] for datx in dat))
+                    vis.draw_altair_simple_line_chart(datblock, "Time", "Crossings", "Method", "Time", "Crossings Improvement", f"mar8/{datblock[0]['Graph']}/{ratio}x{size}", ydom=[1, 2.4])
 
     # for fl in os.listdir(folder):
     #     with open(f"{folder}/{fl}", 'r') as fd:
@@ -147,11 +150,81 @@ def draw_line_charts(folder):
     #         vis.draw_altair_simple_line_chart(dat, "Time", "Crossings", "Graph", "Time", "Crossings Improvement", os.path.splitext(fl)[0])
 
 
+def create_json_file(folder):
+    n_repeats = 10
+    max_time = 300
+    nbhds = ["bfs", "degree_ratio", "vertical_re", "random"]
+    cands = ["betweenness", "crossings", "degree", "avg_edge_length", "random"]
+    sizes = [1000, 2000, 3000]
+    ratios = [1.5]  # , 1, 2]
+    exps = ["r1.5k", "r1k", "r2k"]
+    json_object = []
+    for size in sizes:
+        for ridx, ratio in enumerate(ratios):
+            all_data = {}
+            for nbhd in nbhds:
+                all_data[nbhd] = {}
+                for cand in cands:
+                    print(size, ratio, nbhd, cand)
+                    all_data[nbhd][cand] = {}
+                    fl = f"{folder}/{nbhd}+{cand}+{size}.csv"
+                    t_avgs = []
+                    for i, ln in enumerate(get_csv_lines(fl, exps[ridx])):
+                        st_cr = int(ln[4])
+                        all_vals = []
+                        for j in range(4, len(ln), 2):
+                            if int(ln[j]) == 0 and j == len(ln) - 2:
+                                # print(ln)
+                                print(f"zero problem, line {ln[0]}")
+                                ln[j] = ln[j - 2]
+                            all_vals.append((st_cr / int(ln[j]), float(ln[j + 1])))
+                        ptr = 0
+                        ot_ptr = 0
+                        t_avgs.append([])
+                        for t1 in range(max_time):
+                            while all_vals[ot_ptr][1] <= t1:
+                                ot_ptr += 1
+                            if ptr == ot_ptr:
+                                t_avgs[-1].append(t_avgs[-1][-1])
+                            else:
+                                sum_x = sum((all_vals[i][0] for i in range(ptr, ot_ptr)))
+                                t_avgs[-1].append(sum_x / (ot_ptr - ptr))
+                            ptr = ot_ptr
+                        if i % n_repeats == n_repeats - 1:
+                            gid = ln[1].split("/")[2]
+                            # if gid == "r1.5k36n24" or gid == "r1k30n30" or gid == "r2k40n20":  # med-large graphs
+                            # if gid == "r1.5k18n12" or gid == "r1k15n15" or gid == "r2k20n10":  # small graphs
+                            if "r1.5k" in gid:
+                                all_data[nbhd][cand][gid] = []
+                                for t1 in range(max_time):
+                                    avg_cr = sum((t_avgs[j][t1] for j in range(10))) / 10
+                                    all_data[nbhd][cand][gid].append(avg_cr)
+                                    # dat.append({"Graph": ln[1].split("/")[2], "Time": t1, "Crossings": avg_cr})
+
+                            t_avgs.clear()
+            for nbhd in nbhds:
+                for cand in cands:
+
+                    for gid, tvals in all_data[nbhd][cand].items():  # this is for specific sized graphs
+                        nlay = int(gid[gid.index("k")+1:gid.index("k") + 3])
+                        nnod = int(gid[gid.index("k")+4:])
+                        json_object.append({"Graph": gid, "NodesPerLayer": nnod, "Layers": nlay, "Neighborhood": nbhd, "Candidate": cand, "NbhdSize": size, "CrossingImprovement": tvals})
+
+                    # for t1 in range(300):  # this is for full averaging
+                    #     avg_inc = 0
+                    #     for _, tvals in all_data[nbhd][cand].items():
+                    #         avg_inc += tvals[t1]
+                    #     dat.append({"Method": f"{nbhd}+{cand}", "Time": t1, "Crossings": avg_inc / 6})
+
+    with open(f"{folder}/results.json", "w") as fd:
+        json.dump(json_object, fd, indent=4)
+
+
 def print_exp_optcounts(results_folder_path):
-    by_nbhd = {"bfs": [[0] * 3 for _ in range(6)], "degree_ratio": [[0] * 3 for _ in range(6)], "random": [[0] * 3 for _ in range(6)], "vertical_re": [[0] * 3 for _ in range(6)]}
+    # by_nbhd = {"bfs": [[0] * 3 for _ in range(6)], "degree_ratio": [[0] * 3 for _ in range(6)], "random": [[0] * 3 for _ in range(6)], "vertical_re": [[0] * 3 for _ in range(6)]}
     for root, dirs, files in os.walk(results_folder_path):
         for fl in sorted(files):
-            if os.path.splitext(fl)[1] == ".csv":
+            if os.path.splitext(fl)[1] == ".csv" and "000" not in fl:
                 with open(root + "/" + fl, 'r') as fd:
                     rdr = csv.reader(fd)
                     next(rdr)
@@ -164,16 +237,16 @@ def print_exp_optcounts(results_folder_path):
                         total_cts += (len(ln) - 6) / 2
                         nlines += 1
                         if grpsize not in grouped_by_size:
-                            grouped_by_size[grpsize] = 0
+                            grouped_by_size[grpsize] = 0  # []
                             grpcounts[grpsize] = 0
-                        grouped_by_size[grpsize] += (len(ln) - 6) / (2 * float(ln[2])) * 60
+                        grouped_by_size[grpsize] += (len(ln) - 6) / (2 * float(ln[2])) * 60  # .append
                         grpcounts[grpsize] += 1
-                    for k in grouped_by_size:
+                    for k in grouped_by_size:  # mean not median
                         grouped_by_size[k] /= grpcounts[k]
                     print(fl, total_cts / nlines)
-                    nsize = "1000" if "1000" in fl else ("2000" if "2000" in fl else "3000")
+                    nsize = "10" if "10." in fl else ("50" if "50." in fl else "100")
                     for k, v in grouped_by_size.items():
-                        print(f"{k},{nsize},{v}")
+                        print(f"{k},{nsize},{v}")  # {v[len(v)//2]}")
                     # nsize = 0 if "1000" in fl else (1 if "2000" in fl else 2)
                     # gsize =
                     # if "bfs" in fl:
@@ -259,18 +332,19 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
 if __name__ == '__main__':
     # sandbox()
     # draw_line_charts("random graphs/ratio_d3/results")
-    # print_exp_optcounts("./random graphs/ratio_d3/results")
+    # create_json_file("random graphs/ratio_d3/results")
+    print_exp_optcounts("./random graphs/ratio_d3/results")
 
-    dataset_path = "random graphs/ratio_d3"
-    subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
-    num_graphs_in_subdir = 50
-    nbhd_sizes = [10, 50, 100]
-    cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
-    nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
-    if len(sys.argv) >= 2:
-        nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
-        cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
-        cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
-    else:
-        nbhd_idx, cand_idx, cv_idx = 0, 1, 1
-    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, dataset_path, subdirectories, num_graphs_in_subdir)
+    # dataset_path = "random graphs/ratio_d3"
+    # subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    # num_graphs_in_subdir = 50
+    # nbhd_sizes = [10, 50, 100]
+    # cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
+    # nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
+    # if len(sys.argv) >= 2:
+    #     nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
+    #     cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
+    #     cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
+    # else:
+    #     nbhd_idx, cand_idx, cv_idx = 0, 1, 1
+    # run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, dataset_path, subdirectories, num_graphs_in_subdir)

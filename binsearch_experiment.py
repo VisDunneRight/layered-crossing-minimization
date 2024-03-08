@@ -49,7 +49,7 @@ def get_start_position_binsearch(filename, cur_cv):
         return {}
 
 
-def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_layout_fn, path_to_dataset: str, n_graph_copies: int, depth=10, time_per_graph=60):
+def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_layout_fn, path_to_dataset: str, n_graph_copies: int, depth=10, time_per_graph=60, mean=True):
     """
     :param neighborhood_fn: neighborhood aggregation function, e.g. bfs_neighborhood from src/neighborhood.py
     :param target_avg: target num of opts/5mins
@@ -63,8 +63,8 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
     """
 
     nbhd = neighborhood_fn.__name__.replace('_neighborhood', '')
-    fname = f"{path_to_dataset}/bounds_results/{nbhd}+{graph_size}+{str(target_avg)}.csv"
-    binfname = f"{path_to_dataset}/bounds_results/{nbhd}_bounds.csv"
+    fname = f"{path_to_dataset}/bounds_results_2/{nbhd}+{graph_size}+{str(target_avg)}.csv"
+    binfname = f"{path_to_dataset}/bounds_results_2/{nbhd}_bounds.csv"
     starting_bounds, starting_avgs, n_searches = get_starting_bounds(binfname, graph_size, target_avg)
     files_run = get_start_position_binsearch(fname, sum(starting_bounds)//2)
     if len(files_run) == 0 and (not os.path.isfile(fname) or os.path.getsize(fname) == 0):
@@ -87,7 +87,10 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
                     files_run[f"{path_to_dataset}/{graph_size}/{fl}"] = (len(reordered) - 2) / (2 * output[0]) * 60
                     insert_one(fname, [cur_idx, f"{path_to_dataset}/{graph_size}/{fl}", cv, output[0], output[1]] + reordered)
                 cur_idx += 1
-            avg_opts = sorted(list(files_run.values()))[n_graph_copies // 2]
+            if mean:
+                avg_opts = sum(files_run.values()) / n_graph_copies
+            else:
+                avg_opts = sorted(list(files_run.values()))[n_graph_copies // 2]
             insert_one(binfname, [graph_size, cv, avg_opts])
             starting_bounds, starting_avgs, n_searches = get_starting_bounds(binfname, graph_size, target_avg)
             n_searches -= 1
@@ -106,8 +109,10 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
                     insert_one(fname, [cur_idx, f"{path_to_dataset}/{graph_size}/{fl}", sum(starting_bounds) // 2, output[0], output[1]] + reordered)
                 cur_idx += 1
             if len(files_run) == n_graph_copies:
-                # avg_opts = sum(files_run.values()) / n_graph_copies
-                avg_opts = sorted(list(files_run.values()))[n_graph_copies // 2]
+                if mean:
+                    avg_opts = sum(files_run.values()) / n_graph_copies
+                else:
+                    avg_opts = sorted(list(files_run.values()))[n_graph_copies // 2]
                 insert_one(binfname, [graph_size, sum(starting_bounds) // 2, avg_opts])
                 if starting_avgs[1] == -1 or avg_opts < starting_avgs[1]:  # top priority is finding valid upper bound
                     if avg_opts < target_avg:  # upper bound found
