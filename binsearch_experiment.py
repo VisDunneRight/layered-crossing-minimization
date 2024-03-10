@@ -145,4 +145,4 @@ if __name__ == '__main__':
         graph_idx = (int(sys.argv[1]) % (len(nbhd_fns) * len(graph_sizes))) // len(nbhd_fns)
     else:
         target_idx, nbhd_idx, graph_idx = 0, 0, 0
-    run_experiment(nbhd_fns[nbhd_idx], opts_targets[target_idx], graph_sizes[graph_idx], heuristics.barycenter, "random graphs/ratio_d3", n_graphs_in_bin, time_per_graph=60)
+    run_experiment(nbhd_fns[nbhd_idx], opts_targets[target_idx], graph_sizes[graph_idx], heuristics.barycenter, "random graphs/ratio_d3", n_graphs_in_bin, time_per_graph=60, mean=True)

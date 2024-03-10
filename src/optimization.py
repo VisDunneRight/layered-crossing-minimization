@@ -1117,7 +1117,7 @@ class LayeredOptimizer:
 		# return self.__optimize_layout_standard(graph_arg=graph, fix_x_vars=self.x_var_assign)
 		return self.__optimize_crossing_reduction_model(m, graph, env)
 
-	def local_opt_increment(self, bucket_size, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate, vertical_width=0):
+	def local_opt_increment(self, bucket_size, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate, vertical_width=0, movement_data=False):
 		# opt_g = LayeredGraph()
 		g = self.g
 		do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
@@ -1131,6 +1131,8 @@ class LayeredOptimizer:
 		cr_counts = [g.num_edge_crossings()]
 		times = [0]
 		times_moved = [0] * g.n_nodes
+		candidate_moved = 0
+		iterations_with_movement = 0
 		opt_time = 0
 		with gp.Env() as env, gp.Model(env=env) as m:
 			x_vs, _ = self.__crossing_reduction_model(m, g)
@@ -1163,6 +1165,10 @@ class LayeredOptimizer:
 					for i, v in enumerate(movement):
 						if v != 0:
 							times_moved[neighborhood[i]] += 1
+						if neighborhood[i] == candidate and v != 0:
+							candidate_moved += 1
+					if not all((v == 0 for v in movement)):
+						iterations_with_movement += 1
 					if cr_counts[-1] == cr_counts[-2]:
 						iter_without_improvement += 1
 					else:
@@ -1201,7 +1207,11 @@ class LayeredOptimizer:
 		if do_draw_graph:
 			print(times_moved)
 			vis.draw_graph(g, "solution_neighborhood", color_scale=times_moved)
-		return opt_time, cr_counts[-1], cr_counts, times
+
+		if movement_data:
+			return opt_time, cr_counts[-1], cr_counts, times, times_moved, candidate_moved, iterations_with_movement
+		else:
+			return opt_time, cr_counts[-1], cr_counts, times
 
 	# def __optimize_incremental_local(self):  # TODO: split function into parts. the optimal part takes a subgraph as input. maintain "pos assigned?" array. Implement dummy subgraph generation algo (BFS on high dens nodes), dummy partition algo (spectral but randomly remove the extra bit)
 	# 	do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
