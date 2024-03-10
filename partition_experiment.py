@@ -326,7 +326,7 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
             file_path = f"{path_to_dataset}/{subdir}/{fl}"
             print(file_path)
             if file_path not in files_run:
-                optim = LayeredOptimizer(file_path, cutoff_time=30)
+                optim = LayeredOptimizer(file_path, cutoff_time=300)
                 initial_layout_fn(optim.g)
                 output = optim.local_opt_increment(n_cvs, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn, movement_data=True)
                 reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
