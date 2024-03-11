@@ -516,6 +516,26 @@ def generate_ratio1dot5_graphs_d3_with_big_layers(seed=222201):
 				ng.write_out(f"../random graphs/big_layer/k{k}n{n}/graph{i}.lgbin")
 
 
+def generate_ratio1dot5_graphs_d3_triangle(seed=222222):
+	# random.seed(seed)
+	if "triangle" not in os.listdir("../random graphs"):
+		os.mkdir("../random graphs/triangle")
+
+	for n in [12, 16, 20, 24]:
+		k = int(n * 1.5)
+		if f"k{k}n{n}" not in os.listdir("../random graphs/triangle"):
+			os.mkdir(f"../random graphs/triangle/k{k}n{n}")
+			lcounts = []
+			for xv in range(k):
+				lcounts.append(round(xv * ((2 * n - 1) / (k - 1)) + 1))
+			print(lcounts)
+			for i in range(50):
+				ng = random_layered_graph_edgecount_difflayers(round(1.5 * n * (k - 1)), lcounts)
+				# print([len(lay) for lay in ng.layers.values()])
+				print(f"k={k}/n={n} graph {i + 1}")
+				ng.write_out(f"../random graphs/triangle/k{k}n{n}/graph{i}.lgbin")
+
+
 def generate_ratio_graphs_degree_3(seed=22201):
 	# random.seed(seed)
 	if "ratio_d3" not in os.listdir("../random graphs"):
@@ -562,8 +582,9 @@ if __name__ == '__main__':
 	# generate_big_n_by_n_graphs()
 	# generate_rectangle_graphs()
 	# generate_ratio_graphs()
-	generate_ratio_graphs_degree_3()
+	# generate_ratio_graphs_degree_3()
 	# generate_ratio1dot5_graphs_d3_with_big_layers()
+	generate_ratio1dot5_graphs_d3_triangle()
 
 	# gr = src.read_data.read("../random graphs/big_layer/k36n24/graph1.lgbin")
 	# gr = src.read_data.read("../random graphs/ratio_d3/r1.5k24n16/graph44.lgbin")
@@ -578,5 +599,8 @@ if __name__ == '__main__':
 
 	# gr = src.read_data.read("../random graphs/matuszewski/10_by_10_density/d15/graph0.lgbin")
 	# gr = src.read_data.read("../random graphs/rectangles/k70n20/graph0.lgbin")
+	# gr = src.read_data.read("../random graphs/triangle/k30n20/graph9.lgbin")
+	# gr = src.read_data.read("../random graphs/ratio_d3/r1.5k18n12/graph8.lgbin")
+	# print(gr.n_layers)
 	# gr = random_layered_graph_connect_help_edgecount(3, 10, 35)
 	# src.vis.draw_graph(gr, "rand", gravity=True, nested=True)
