@@ -221,40 +221,50 @@ def create_json_file(folder):
 
 
 def print_exp_optcounts(results_folder_path):
-    # by_nbhd = {"bfs": [[0] * 3 for _ in range(6)], "degree_ratio": [[0] * 3 for _ in range(6)], "random": [[0] * 3 for _ in range(6)], "vertical_re": [[0] * 3 for _ in range(6)]}
-    for root, dirs, files in os.walk(results_folder_path):
-        for fl in sorted(files):
-            if os.path.splitext(fl)[1] == ".csv" and "000" not in fl:
-                with open(root + "/" + fl, 'r') as fd:
-                    rdr = csv.reader(fd)
-                    next(rdr)
-                    total_cts = 0
-                    nlines = 0
-                    grouped_by_size = {}
-                    grpcounts = {}
-                    for ln in rdr:
-                        grpsize = ln[1].split('/')[2]
-                        total_cts += (len(ln) - 6) / 2
-                        nlines += 1
-                        if grpsize not in grouped_by_size:
-                            grouped_by_size[grpsize] = 0  # []
-                            grpcounts[grpsize] = 0
-                        grouped_by_size[grpsize] += (len(ln) - 6) / (2 * float(ln[2])) * 60  # .append
-                        grpcounts[grpsize] += 1
-                    for k in grouped_by_size:  # mean not median
-                        grouped_by_size[k] /= grpcounts[k]
-                    print(fl, total_cts / nlines)
-                    nsize = "10" if "10." in fl else ("50" if "50." in fl else "100")
-                    for k, v in grouped_by_size.items():
-                        print(f"{k},{nsize},{v}")  # {v[len(v)//2]}")
-                    # nsize = 0 if "1000" in fl else (1 if "2000" in fl else 2)
-                    # gsize =
-                    # if "bfs" in fl:
-                    #     by_nbhd["bfs"][][nsize] += total_cts / nlines
-    # print(by_nbhd)
-    # for nh in by_nbhd:
-    #     by_nbhd[nh] = [v / 5 for i in range(len(by_nbhd[nh])) for v in by_nbhd[nh][i]]
-    # print(by_nbhd)
+    nb_idxs = {"bfs": 0, "degree_ratio": 1, "random": 2, "vertical_re": 3}
+    cd_idxs = {"degree": 0, "betweenness": 1, "crossings": 2, "avg_edge_length": 3, "random": 4}
+    all_dat = {}
+    for fl in sorted(os.listdir(results_folder_path)):
+        if os.path.splitext(fl)[1] == ".csv" and "000" not in fl:
+            with open(results_folder_path + "/" + fl, 'r') as fd:
+                rdr = csv.reader(fd)
+                next(rdr)
+                total_cts = 0
+                nlines = 0
+                grouped_by_size = {}
+                grpcounts = {}
+                for ln in rdr:
+                    grpsize = ln[1].split('/')[2]
+                    total_cts += (len(ln) - 7) / 2
+                    nlines += 1
+                    if grpsize not in grouped_by_size:
+                        grouped_by_size[grpsize] = 0  # []
+                        grpcounts[grpsize] = 0
+                    grouped_by_size[grpsize] += (len(ln) - 6) / (2 * float(ln[3])) * 60  # .append
+                    grpcounts[grpsize] += 1
+                for k in grouped_by_size:  # mean not median
+                    grouped_by_size[k] /= grpcounts[k]
+                # print(fl, total_cts / nlines)
+                nsize = "10" if "10." in fl else ("50" if "50." in fl else "100")
+                nbhd = fl.split("+")[0]
+                cand = fl.split("+")[1]
+                for k, v in grouped_by_size.items():
+                    if f"{k} : {nsize}" not in all_dat:
+                        all_dat[f"{k} : {nsize}"] = [["0.0000000000"] * 4 for _ in range(5)]
+                    all_dat[f"{k} : {nsize}"][cd_idxs[cand]][nb_idxs[nbhd]] = str(v)[:12]
+                    # print(f"{k},{nsize},{v}")  # {v[len(v)//2]}")
+                # nsize = 0 if "1000" in fl else (1 if "2000" in fl else 2)
+                # gsize =
+                # if "bfs" in fl:
+                #     by_nbhd["bfs"][][nsize] += total_cts / nlines
+    for k, v in all_dat.items():
+        print(k)
+        print("="*82)
+        print(" " * 21, "bfs\t\t\t  degree_ratio\t  random\t\t  vertical_re")
+        for idx, row in enumerate(v):
+            the_cand = [cc for cc in cd_idxs if cd_idxs[cc] == idx][0]
+            print(the_cand, " " * (20 - len(the_cand)), '    '.join(row))
+        print("="*82, "\n\n")
 
 
 def sandbox():
@@ -336,7 +346,32 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
 
 
 def add_cvar_to_csv():
-    datapath = "random graphs/ratio_d3/results"
+    datapath = "random graphs/ratio_d3_results"
+    bounds_path = "random graphs/ratio_d3/bounds_results"
+    sizes = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    cands = ["degree", "random", "betweenness", "avg_edge_length", "crossings"]
+    nbhd_size = [10, 50, 100]
+    func_names = ["bfs", "vertical_re", "degree_ratio", "random"]
+    for nbfn in func_names:
+        for cdfn in cands:
+            for nbsz in nbhd_size:
+                fpath = f"{datapath}/{nbfn}+{cdfn}+{nbsz}.csv"
+                cur_gsize = sizes[0]
+                cur_idx = 0
+                cv = get_closest_cv(f"{bounds_path}/{nbfn}_bounds.csv", cur_gsize, nbsz)
+                with open(fpath, 'r') as fd:
+                    rdr = csv.reader(fd)
+                    rows = list(rdr)
+                rows[0].insert(2, "SizeCalc")
+                for row in rows[1:]:
+                    if cur_gsize not in row[1]:
+                        cur_idx += 1
+                        cur_gsize = sizes[cur_idx]
+                        cv = get_closest_cv(f"{bounds_path}/{nbfn}_bounds.csv", cur_gsize, nbsz)
+                    row.insert(2, cv)
+                with open(fpath, 'w') as fd:
+                    wrt = csv.writer(fd)
+                    wrt.writerows(rows)
 
 
 def print_binsearch_results(path_to_results):
@@ -357,6 +392,7 @@ if __name__ == '__main__':
     # create_json_file("random graphs/ratio_d3/results")
     # print_exp_optcounts("./random graphs/ratio_d3/results")
     # print_binsearch_results("random graphs/ratio_d3/bounds_results_2")
+    # add_cvar_to_csv()
 
     dataset_path = "random graphs/ratio_d3"
     subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]

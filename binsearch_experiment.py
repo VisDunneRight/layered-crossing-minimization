@@ -59,12 +59,13 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
     :param n_graph_copies: num graphs in above directory, will optimize graph[0...n].lgbin
     :param depth: binary search depth to stop at
     :param time_per_graph: time spent optimizing each graph (seconds)
+    :param mean: use mean number of optimizations per minute instead of median
     :return: runs binary search to zero in on relative val for size calculation on this neighborhood, graph size
     """
 
     nbhd = neighborhood_fn.__name__.replace('_neighborhood', '')
-    fname = f"{path_to_dataset}/bounds_results_2/{nbhd}+{graph_size}+{str(target_avg)}.csv"
-    binfname = f"{path_to_dataset}/bounds_results_2/{nbhd}_bounds.csv"
+    fname = f"{path_to_dataset}/bounds_results/{nbhd}+{graph_size}+{str(target_avg)}.csv"
+    binfname = f"{path_to_dataset}/bounds_results/{nbhd}_bounds.csv"
     starting_bounds, starting_avgs, n_searches = get_starting_bounds(binfname, graph_size, target_avg)
     files_run = get_start_position_binsearch(fname, sum(starting_bounds)//2)
     if len(files_run) == 0 and (not os.path.isfile(fname) or os.path.getsize(fname) == 0):
@@ -139,10 +140,12 @@ if __name__ == '__main__':
     opts_targets = [10, 50, 100]
     nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
     graph_sizes = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    datasets = ["ratio_d3", "big_layer", "triangle"]
     if len(sys.argv) >= 2:
         target_idx = int(sys.argv[1]) // (len(nbhd_fns) * len(graph_sizes))
         nbhd_idx = (int(sys.argv[1]) % (len(nbhd_fns) * len(graph_sizes))) % len(nbhd_fns)
         graph_idx = (int(sys.argv[1]) % (len(nbhd_fns) * len(graph_sizes))) // len(nbhd_fns)
+        dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
     else:
-        target_idx, nbhd_idx, graph_idx = 0, 0, 0
-    run_experiment(nbhd_fns[nbhd_idx], opts_targets[target_idx], graph_sizes[graph_idx], heuristics.barycenter, "random graphs/ratio_d3", n_graphs_in_bin, time_per_graph=60, mean=True)
+        target_idx, nbhd_idx, graph_idx, dataset_idx = 0, 0, 0, 0
+    run_experiment(nbhd_fns[nbhd_idx], opts_targets[target_idx], graph_sizes[graph_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", n_graphs_in_bin, time_per_graph=60, mean=True)
