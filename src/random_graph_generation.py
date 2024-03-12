@@ -513,7 +513,7 @@ def generate_ratio1dot5_graphs_d3_with_big_layers(seed=222201):
 				ng = random_layered_graph_edgecount_difflayers(round(1.5 * n * (k - 1)), lcounts)
 				# print([len(lay) for lay in ng.layers.values()])
 				print(f"k={k}/n={n} graph {i + 1}")
-				ng.write_out(f"../random graphs/big_layer/k{k}n{n}/graph{i}.lgbin")
+				ng.write_out(f"../random graphs/big_layer/r1.5k{k}n{n}/graph{i}.lgbin")
 
 
 def generate_ratio1dot5_graphs_d3_triangle(seed=222222):
@@ -521,7 +521,7 @@ def generate_ratio1dot5_graphs_d3_triangle(seed=222222):
 	if "triangle" not in os.listdir("../random graphs"):
 		os.mkdir("../random graphs/triangle")
 
-	for n in [12, 16, 20, 24]:
+	for n in [12, 16, 20, 24, 28]:
 		k = int(n * 1.5)
 		if f"k{k}n{n}" not in os.listdir("../random graphs/triangle"):
 			os.mkdir(f"../random graphs/triangle/k{k}n{n}")
@@ -533,7 +533,7 @@ def generate_ratio1dot5_graphs_d3_triangle(seed=222222):
 				ng = random_layered_graph_edgecount_difflayers(round(1.5 * n * (k - 1)), lcounts)
 				# print([len(lay) for lay in ng.layers.values()])
 				print(f"k={k}/n={n} graph {i + 1}")
-				ng.write_out(f"../random graphs/triangle/k{k}n{n}/graph{i}.lgbin")
+				ng.write_out(f"../random graphs/triangle/r1.5k{k}n{n}/graph{i}.lgbin")
 
 
 def generate_ratio_graphs_degree_3(seed=22201):

@@ -139,13 +139,16 @@ if __name__ == '__main__':
     n_graphs_in_bin = 50
     opts_targets = [10, 50, 100]
     nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
-    graph_sizes = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    graph_sizes = ["r1.5k12n8", "r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    graphsz_len = 5
     datasets = ["ratio_d3", "big_layer", "triangle"]
     if len(sys.argv) >= 2:
-        target_idx = int(sys.argv[1]) // (len(nbhd_fns) * len(graph_sizes))
-        nbhd_idx = (int(sys.argv[1]) % (len(nbhd_fns) * len(graph_sizes))) % len(nbhd_fns)
-        graph_idx = (int(sys.argv[1]) % (len(nbhd_fns) * len(graph_sizes))) // len(nbhd_fns)
+        target_idx = int(sys.argv[1]) // (len(nbhd_fns) * graphsz_len)
+        nbhd_idx = (int(sys.argv[1]) % (len(nbhd_fns) * graphsz_len)) % len(nbhd_fns)
+        graph_idx = (int(sys.argv[1]) % (len(nbhd_fns) * graphsz_len)) // len(nbhd_fns)
         dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
     else:
-        target_idx, nbhd_idx, graph_idx, dataset_idx = 0, 0, 0, 0
+        target_idx, nbhd_idx, graph_idx, dataset_idx = 0, 0, 0, 2
+    if dataset_idx == 0 or dataset_idx == 2:
+        graph_idx += 1
     run_experiment(nbhd_fns[nbhd_idx], opts_targets[target_idx], graph_sizes[graph_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", n_graphs_in_bin, time_per_graph=60, mean=True)

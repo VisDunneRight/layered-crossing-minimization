@@ -315,36 +315,6 @@ def get_closest_cv(file_path, graph_size: str, target_avg: float, print_best=Fal
     return best_bnd
 
 
-def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, path_to_dataset, subdirs, num_graphs):
-    if "results" not in listdir(path_to_dataset):
-        mkdir(path_to_dataset + "/results")
-    # if neighborhood_fn.__name__ not in listdir(path_to_dataset + "/results"):
-    #     (path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", ""))
-    nbhd_name = neighborhood_fn.__name__.replace("_neighborhood", "")
-    fname = path_to_dataset + "/results/" + nbhd_name + "+" + candidate_fn.__name__.replace("_candidate", "") + "+" + str(nbhd_size) + ".csv"
-    movefname = f"{path_to_dataset}/results/movement/{nbhd_name}+{candidate_fn.__name__.replace('_candidate', '')}+{str(nbhd_size)}.csv"
-    files_run = get_start_position(fname)
-    if len(files_run) == 0 and (not os.path.isfile(fname) or os.path.getsize(fname) == 0):
-        insert_one(fname, ["Index", "File", "SizeCalc", "OptTime", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
-    if len(files_run) == 0 and (not os.path.isfile(movefname) or os.path.getsize(movefname) == 0):
-        insert_one(movefname, ["Index", "File", "SizeCalc", "nOpts", "CandTimesMoved", "TotalMoves", "TimesMoved"])
-    cur_idx = 0
-    for subdir in subdirs:
-        n_cvs = get_closest_cv(f"{path_to_dataset}/bounds_results_2/{nbhd_name}_bounds.csv", subdir, nbhd_size)
-        for fl_num in range(num_graphs):
-            fl = f"graph{fl_num}.lgbin"
-            file_path = f"{path_to_dataset}/{subdir}/{fl}"
-            print(file_path)
-            if file_path not in files_run:
-                optim = LayeredOptimizer(file_path, cutoff_time=300)
-                initial_layout_fn(optim.g)
-                output = optim.local_opt_increment(n_cvs, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn, movement_data=True)
-                reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
-                insert_one(fname, [cur_idx, file_path, n_cvs, output[0], output[1]] + reordered)
-                insert_one(movefname, [cur_idx, file_path, n_cvs, len(output[2]), output[5], output[6], output[4]])
-            cur_idx += 1
-
-
 def add_cvar_to_csv():
     datapath = "random graphs/ratio_d3_results"
     bounds_path = "random graphs/ratio_d3/bounds_results"
@@ -374,6 +344,20 @@ def add_cvar_to_csv():
                     wrt.writerows(rows)
 
 
+def merge_csvs(path_to_merge_from, path_to_merge_into):
+    with open(path_to_merge_from, 'r') as fd1:
+        rdr = csv.reader(fd1)
+        lines_from = list(rdr)
+    with open(path_to_merge_into, 'r') as fd2:
+        rdr = csv.reader(fd2)
+        lines_into = list(rdr)
+    lines_into = lines_into[len(lines_from):]
+    new_lines = lines_from + lines_into
+    with open(path_to_merge_into, 'w') as fd:
+        wrt = csv.writer(fd)
+        wrt.writerows(new_lines)
+
+
 def print_binsearch_results(path_to_results):
     sizes = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
     nbhd_size = [10, 50, 100]
@@ -384,6 +368,36 @@ def print_binsearch_results(path_to_results):
             for nbsz in nbhd_size:
                 get_closest_cv(f"{path_to_results}/{nbfn}_bounds.csv", sz, nbsz, print_best=True)
         print("==============\n")
+
+
+def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, path_to_dataset, subdirs, num_graphs):
+    if "results" not in listdir(path_to_dataset):
+        mkdir(path_to_dataset + "/results")
+    # if neighborhood_fn.__name__ not in listdir(path_to_dataset + "/results"):
+    #     (path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", ""))
+    nbhd_name = neighborhood_fn.__name__.replace("_neighborhood", "")
+    fname = path_to_dataset + "/results/" + nbhd_name + "+" + candidate_fn.__name__.replace("_candidate", "") + "+" + str(nbhd_size) + ".csv"
+    movefname = f"{path_to_dataset}/results/movement/{nbhd_name}+{candidate_fn.__name__.replace('_candidate', '')}+{str(nbhd_size)}.csv"
+    files_run = get_start_position(fname)
+    if len(files_run) == 0 and (not os.path.isfile(fname) or os.path.getsize(fname) == 0):
+        insert_one(fname, ["Index", "File", "SizeCalc", "OptTime", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
+    if len(files_run) == 0 and (not os.path.isfile(movefname) or os.path.getsize(movefname) == 0):
+        insert_one(movefname, ["Index", "File", "SizeCalc", "nOpts", "CandTimesMoved", "TotalMoves", "TimesMoved"])
+    cur_idx = 0
+    for subdir in subdirs:
+        n_cvs = get_closest_cv(f"{path_to_dataset}/bounds_results_2/{nbhd_name}_bounds.csv", subdir, nbhd_size)
+        for fl_num in range(num_graphs):
+            fl = f"graph{fl_num}.lgbin"
+            file_path = f"{path_to_dataset}/{subdir}/{fl}"
+            print(file_path)
+            if file_path not in files_run:
+                optim = LayeredOptimizer(file_path, cutoff_time=300)
+                initial_layout_fn(optim.g)
+                output = optim.local_opt_increment(n_cvs, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn, movement_data=True)
+                reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
+                insert_one(fname, [cur_idx, file_path, n_cvs, output[0], output[1]] + reordered)
+                insert_one(movefname, [cur_idx, file_path, n_cvs, len(output[2]), output[5], output[6], output[4]])
+            cur_idx += 1
 
 
 if __name__ == '__main__':
