@@ -49,7 +49,7 @@ def get_start_position_binsearch(filename, cur_cv):
         return {}
 
 
-def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_layout_fn, path_to_dataset: str, n_graph_copies: int, depth=10, time_per_graph=60, mean=True):
+def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_layout_fn, path_to_dataset: str, n_graph_copies: int, restriction: float, depth=10, time_per_graph=60, mean=True):
     """
     :param neighborhood_fn: neighborhood aggregation function, e.g. bfs_neighborhood from src/neighborhood.py
     :param target_avg: target num of opts/5mins
@@ -136,19 +136,21 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
 
 
 if __name__ == '__main__':
-    n_graphs_in_bin = 50
+    n_graphs_in_bin = 20
     opts_targets = [10, 50, 100]
     nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
     graph_sizes = ["r1.5k12n8", "r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    restrictions = [1, 0.75, 0.5]
     graphsz_len = 5
     datasets = ["ratio_d3", "big_layer", "triangle"]
     if len(sys.argv) >= 2:
         target_idx = int(sys.argv[1]) // (len(nbhd_fns) * graphsz_len)
         nbhd_idx = (int(sys.argv[1]) % (len(nbhd_fns) * graphsz_len)) % len(nbhd_fns)
         graph_idx = (int(sys.argv[1]) % (len(nbhd_fns) * graphsz_len)) // len(nbhd_fns)
+        restrict_idx = int(sys.argv[3]) if len(sys.argv) > 3 else 0
         dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
     else:
-        target_idx, nbhd_idx, graph_idx, dataset_idx = 0, 0, 0, 2
+        target_idx, nbhd_idx, graph_idx, dataset_idx, restrict_idx = 0, 0, 0, 2, 0
     if dataset_idx == 0 or dataset_idx == 2:
         graph_idx += 1
-    run_experiment(nbhd_fns[nbhd_idx], opts_targets[target_idx], graph_sizes[graph_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", n_graphs_in_bin, time_per_graph=60, mean=True)
+    run_experiment(nbhd_fns[nbhd_idx], opts_targets[target_idx], graph_sizes[graph_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", n_graphs_in_bin, restrictions[restrict_idx], time_per_graph=60, mean=True)

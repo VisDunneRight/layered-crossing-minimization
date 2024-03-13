@@ -204,6 +204,11 @@ def degree_ratio_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_w
         next_node = max(degree_ratios, key=lambda x: (degree_ratios[x], included_counts[x]))
         del degree_ratios[next_node]
         del included_counts[next_node]
+        if nbhd_width != 0:
+            while not g[next_node].v_nbhd:
+                next_node = max(degree_ratios, key=lambda x: (degree_ratios[x], included_counts[x]))
+                del degree_ratios[next_node]
+                del included_counts[next_node]
         for nd_adj in adj[next_node]:
             if selected[nd_adj]:
                 if g[nd_adj].layer < g[next_node].layer:  # C-VAR CALCULATION

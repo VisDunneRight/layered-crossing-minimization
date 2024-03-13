@@ -150,12 +150,13 @@ def draw_line_charts(folder):
     #         vis.draw_altair_simple_line_chart(dat, "Time", "Crossings", "Graph", "Time", "Crossings Improvement", os.path.splitext(fl)[0])
 
 
-def create_json_file(folder):
-    n_repeats = 10
+def create_averaged_json_file(folder):
+    n_repeats = 50
+    n_graph_sizes = 5
     max_time = 300
     nbhds = ["bfs", "degree_ratio", "vertical_re", "random"]
     cands = ["betweenness", "crossings", "degree", "avg_edge_length", "random"]
-    sizes = [1000, 2000, 3000]
+    sizes = [10, 50, 100]
     ratios = [1.5]  # , 1, 2]
     exps = ["r1.5k", "r1k", "r2k"]
     json_object = []
@@ -197,11 +198,12 @@ def create_json_file(folder):
                             if "r1.5k" in gid:
                                 all_data[nbhd][cand][gid] = []
                                 for t1 in range(max_time):
-                                    avg_cr = sum((t_avgs[j][t1] for j in range(10))) / 10
+                                    avg_cr = sum((t_avgs[j][t1] for j in range(n_repeats))) / n_repeats
                                     all_data[nbhd][cand][gid].append(avg_cr)
                                     # dat.append({"Graph": ln[1].split("/")[2], "Time": t1, "Crossings": avg_cr})
 
                             t_avgs.clear()
+
             for nbhd in nbhds:
                 for cand in cands:
 
@@ -216,8 +218,54 @@ def create_json_file(folder):
                     #         avg_inc += tvals[t1]
                     #     dat.append({"Method": f"{nbhd}+{cand}", "Time": t1, "Crossings": avg_inc / 6})
 
-    with open(f"{folder}/results.json", "w") as fd:
+    with open(f"{folder}/averaged_results.json", "w") as fd:
         json.dump(json_object, fd, indent=4)
+
+
+def create_raw_results_json(folder):
+    n_repeats = 50
+    nbhds = ["bfs", "degree_ratio", "vertical_re", "random"]
+    cands = ["betweenness", "crossings", "degree", "avg_edge_length", "random"]
+    gsizes = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    nsizes = [10, 50, 100]
+    json_object = {"r1.5k18n12": {}, "r1.5k24n16": {}, "r1.5k30n20": {}, "r1.5k36n24": {}, "r1.5k42n28": {}}
+    for nsize in nsizes:
+        for kv in json_object:
+            json_object[kv][nsize] = {}
+        for nbhd in nbhds:
+            for cand in cands:
+                ncid = f"{nbhd}+{cand}"
+                for kv in json_object:
+                    json_object[kv][nsize][ncid] = []
+                with open(f"{folder}/movement/{ncid}+{nsize}.csv", 'r') as fdm:
+                    rdr = csv.reader(fdm)
+                    move_lines = list(rdr)[1:]
+                with open(f"{folder}/{ncid}+{nsize}.csv", 'r') as fd1:
+                    rdr = csv.reader(fd1)
+                    next(rdr)
+                    gsize_idx = 0
+                    for ln in rdr:
+                        idx = int(ln[0])
+                        crossins = [int(ln[v]) for v in range(5, len(ln), 2)]
+                        if crossins[-1] == 0:
+                            crossins[-1] = crossins[-2]
+                        json_object[gsizes[gsize_idx]][nsize][ncid].append({
+                            "gid": idx % n_repeats,
+                            "sizeCalc": int(ln[2]),
+                            "nOpts": int(move_lines[idx][3]),
+                            "crInit": int(ln[5]),
+                            "crFinal": int(ln[4]),
+                            "candTimesMoved": int(move_lines[idx][4]),
+                            "totalMoves": int(move_lines[idx][5]),
+                            "timesteps": [float(ln[v]) for v in range(6, len(ln), 2)],
+                            "crossings": crossins,
+                            "nodeMovement": json.loads(move_lines[idx][6])
+                        })
+                        if idx % 50 == 49:
+                            gsize_idx += 1
+
+    with open(f"{folder}/nbhd+cand_results.json", 'w') as fdR:
+        json.dump(json_object, fdR)
 
 
 def print_exp_optcounts(results_folder_path):
@@ -344,18 +392,36 @@ def add_cvar_to_csv():
                     wrt.writerows(rows)
 
 
-def merge_csvs(path_to_merge_from, path_to_merge_into):
-    with open(path_to_merge_from, 'r') as fd1:
-        rdr = csv.reader(fd1)
-        lines_from = list(rdr)
-    with open(path_to_merge_into, 'r') as fd2:
-        rdr = csv.reader(fd2)
-        lines_into = list(rdr)
-    lines_into = lines_into[len(lines_from):]
-    new_lines = lines_from + lines_into
-    with open(path_to_merge_into, 'w') as fd:
-        wrt = csv.writer(fd)
-        wrt.writerows(new_lines)
+def merge_csvs(movement=False):
+    path_to_merge_from = "random graphs/ratio_d3/results" + "/movement" if movement else ""
+    path_to_merge_into = "random graphs/temporary rd3 storage copy" + "/movement" if movement else ""
+    # sizes = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    cands = ["degree", "random", "betweenness", "avg_edge_length", "crossings"]
+    nbhd_size = [10, 50, 100]
+    func_names = ["bfs", "vertical_re", "degree_ratio", "random"]
+    for nbfn in func_names:
+        for cdfn in cands:
+            for nbsz in nbhd_size:
+                fpath = f"{path_to_merge_from}/{nbfn}+{cdfn}+{nbsz}.csv"
+                ipath = f"{path_to_merge_into}/{nbfn}+{cdfn}+{nbsz}.csv"
+                with open(fpath, 'r') as fd1:
+                    rdr = csv.reader(fd1)
+                    lines_from = list(rdr)
+                if os.path.isfile(ipath):
+                    with open(ipath, 'r') as fd2:
+                        rdr = csv.reader(fd2)
+                        lines_into = list(rdr)
+                    if movement:
+                        last_idx = int(lines_from[-1][0])
+                        lines_into = [ln for ln in lines_into if int(ln[0]) > last_idx]
+                    else:
+                        lines_into = lines_into[len(lines_from):]
+                else:
+                    lines_into = []
+                new_lines = lines_from + lines_into
+                with open(ipath, 'w') as fd:
+                    wrt = csv.writer(fd)
+                    wrt.writerows(new_lines)
 
 
 def print_binsearch_results(path_to_results):
@@ -385,7 +451,7 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
         insert_one(movefname, ["Index", "File", "SizeCalc", "nOpts", "CandTimesMoved", "TotalMoves", "TimesMoved"])
     cur_idx = 0
     for subdir in subdirs:
-        n_cvs = get_closest_cv(f"{path_to_dataset}/bounds_results_2/{nbhd_name}_bounds.csv", subdir, nbhd_size)
+        n_cvs = get_closest_cv(f"{path_to_dataset}/bounds_results/{nbhd_name}_bounds.csv", subdir, nbhd_size)
         for fl_num in range(num_graphs):
             fl = f"graph{fl_num}.lgbin"
             file_path = f"{path_to_dataset}/{subdir}/{fl}"
@@ -403,21 +469,27 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
 if __name__ == '__main__':
     # sandbox()
     # draw_line_charts("random graphs/ratio_d3/results")
-    # create_json_file("random graphs/ratio_d3/results")
-    # print_exp_optcounts("./random graphs/ratio_d3/results")
+    # create_raw_results_json("random graphs/temporary rd3 storage copy")
+    # print_exp_optcounts("./random graphs/temporary rd3 storage copy")
     # print_binsearch_results("random graphs/ratio_d3/bounds_results_2")
     # add_cvar_to_csv()
+    # merge_csvs(movement=True)
 
     dataset_path = "random graphs/ratio_d3"
-    subdirectories = ["r1.5k18n12", "r1.5k24n16"]  # , "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
     num_graphs_in_subdir = 50
     nbhd_sizes = [10, 50, 100]
     cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
     nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
+    datasets = ["ratio_d3", "big_layer", "triangle"]
     if len(sys.argv) >= 2:
         nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
         cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
         cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
+        dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
     else:
-        nbhd_idx, cand_idx, cv_idx = 0, 1, 0
-    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, dataset_path, subdirectories, num_graphs_in_subdir)
+        nbhd_idx, cand_idx, cv_idx, dataset_idx = 0, 1, 0, 0
+    if dataset_idx == 1:
+        subdirectories.insert(0, "r1.5k12n8")
+        subdirectories.pop()
+    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", subdirectories, num_graphs_in_subdir)
