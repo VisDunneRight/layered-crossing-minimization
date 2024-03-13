@@ -266,6 +266,7 @@ def random_layered_graph_edgecount_difflayers(n_edges, layercounts: list):
 	:return: LayeredGraph object g
 
 	Randomly samples edges over the entire network. Any nodes left unconnected are removed
+	TODO sample from all adjacent nodes
 	"""
 
 	max_edges = sum((layercounts[i] * layercounts[i + 1] for i in range(len(layercounts) - 1)))

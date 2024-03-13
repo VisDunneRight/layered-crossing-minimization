@@ -1089,6 +1089,7 @@ class LayeredOptimizer:
 			a2.Start = v
 
 	def __incremetal_opt(self, graph: LayeredGraph, subgraph: list, m: gp.Model, env, nbhd_width=0):
+		# TODO (future): make it re-fix all vars used after optimizing, and only unfix subgraph node vars
 		# Fix everything except subgraph and optimize.
 		# subgraph: idx=node id, val=True if in subgraph else False
 		# If all nodes already positioned, trust self.x_var_assign, else add the subgraph. Need crossing edges though

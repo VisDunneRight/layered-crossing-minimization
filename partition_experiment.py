@@ -266,6 +266,8 @@ def create_raw_results_json(folder):
 
     with open(f"{folder}/nbhd+cand_results.json", 'w') as fdR:
         json.dump(json_object, fdR)
+    # js1 = {"r1.5k18n12": json_object["r1.5k18n12"], "r1.5k24n16": json_object["r1.5k24n16"], "r1.5k30n20": json_object["r1.5k30n20"]}
+    # js2 = {"r1.5k36n24": json_object["r1.5k36n24"], "r1.5k42n28": json_object["r1.5k42n28"]}
 
 
 def print_exp_optcounts(results_folder_path):
@@ -317,11 +319,11 @@ def print_exp_optcounts(results_folder_path):
 
 def sandbox():
     # opt = LayeredOptimizer("random graphs/ratio_d3/r1k10n10/graph0.lgbin")
-    opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k30n20/graph12.lgbin")
+    opt = LayeredOptimizer("random graphs/triangle/r1.5k30n20/graph12.lgbin")
     # opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k42n28/graph0.lgbin")
     opt.cutoff_time = 30
-    # opt.create_video = True
-    opt.name = "r1.5k12n8.deg"
+    opt.create_video = True
+    opt.name = "r1.5k30n20.tri+deg"
     # opt.vertical_transitivity = True
     # opt = LayeredOptimizer("Rome-Lib/graficon96nodi/grafo3510.96")
     # n_cv = opt.g.c_vars_count()
@@ -336,10 +338,10 @@ def sandbox():
         for nd in lay:
             nd.y -= min_y
 
-    print([idx for idx, v in enumerate(bfs_neighborhood(opt.g, 140, 0)) if v])
-    print(opt.g.n_nodes)
+    # print([idx for idx, v in enumerate(bfs_neighborhood(opt.g, 140, 0)) if v])
+    # print(opt.g.n_nodes)
 
-    opt.local_opt_increment(0, neighborhood_fn=bfs_neighborhood, candidate_fn=random_candidate, vertical_width=0)
+    opt.local_opt_increment(1500, neighborhood_fn=degree_ratio_neighborhood, candidate_fn=random_candidate, vertical_width=0)
     # opt.optimize_layout()
 
     # opt.m_val *= 2
@@ -467,7 +469,7 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
 
 
 if __name__ == '__main__':
-    # sandbox()
+    sandbox()
     # draw_line_charts("random graphs/ratio_d3/results")
     # create_raw_results_json("random graphs/temporary rd3 storage copy")
     # print_exp_optcounts("./random graphs/temporary rd3 storage copy")
@@ -475,21 +477,21 @@ if __name__ == '__main__':
     # add_cvar_to_csv()
     # merge_csvs(movement=True)
 
-    dataset_path = "random graphs/ratio_d3"
-    subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
-    num_graphs_in_subdir = 50
-    nbhd_sizes = [10, 50, 100]
-    cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
-    nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
-    datasets = ["ratio_d3", "big_layer", "triangle"]
-    if len(sys.argv) >= 2:
-        nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
-        cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
-        cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
-        dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-    else:
-        nbhd_idx, cand_idx, cv_idx, dataset_idx = 0, 1, 0, 0
-    if dataset_idx == 1:
-        subdirectories.insert(0, "r1.5k12n8")
-        subdirectories.pop()
-    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", subdirectories, num_graphs_in_subdir)
+    # dataset_path = "random graphs/ratio_d3"
+    # subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    # num_graphs_in_subdir = 50
+    # nbhd_sizes = [10, 50, 100]
+    # cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
+    # nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
+    # datasets = ["ratio_d3", "big_layer", "triangle"]
+    # if len(sys.argv) >= 2:
+    #     nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
+    #     cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
+    #     cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
+    #     dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+    # else:
+    #     nbhd_idx, cand_idx, cv_idx, dataset_idx = 0, 1, 0, 0
+    # if dataset_idx == 1:
+    #     subdirectories.insert(0, "r1.5k12n8")
+    #     subdirectories.pop()
+    # run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", subdirectories, num_graphs_in_subdir)

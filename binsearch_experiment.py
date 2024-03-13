@@ -64,8 +64,8 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
     """
 
     nbhd = neighborhood_fn.__name__.replace('_neighborhood', '')
-    fname = f"{path_to_dataset}/bounds_results/{nbhd}+{graph_size}+{str(target_avg)}.csv"
-    binfname = f"{path_to_dataset}/bounds_results/{nbhd}_bounds.csv"
+    fname = f"{path_to_dataset}/bounds_results/{nbhd}+{graph_size}+{str(target_avg)}{'' if restriction == 0 else '+' + str(restriction)}.csv"
+    binfname = f"{path_to_dataset}/bounds_results/{nbhd}_bounds{'' if restriction == 0 else str(restriction)}.csv"
     starting_bounds, starting_avgs, n_searches = get_starting_bounds(binfname, graph_size, target_avg)
     files_run = get_start_position_binsearch(fname, sum(starting_bounds)//2)
     if len(files_run) == 0 and (not os.path.isfile(fname) or os.path.getsize(fname) == 0):
@@ -83,7 +83,7 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
                 if f"{path_to_dataset}/{graph_size}/{fl}" not in files_run:
                     optim = LayeredOptimizer(f"{path_to_dataset}/{graph_size}/{fl}", cutoff_time=time_per_graph)
                     initial_layout_fn(optim.g)
-                    output = optim.local_opt_increment(cv, neighborhood_fn=neighborhood_fn, candidate_fn=random_candidate)
+                    output = optim.local_opt_increment(cv, neighborhood_fn=neighborhood_fn, candidate_fn=random_candidate, vertical_width=restriction)
                     reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
                     files_run[f"{path_to_dataset}/{graph_size}/{fl}"] = (len(reordered) - 2) / (2 * output[0]) * 60
                     insert_one(fname, [cur_idx, f"{path_to_dataset}/{graph_size}/{fl}", cv, output[0], output[1]] + reordered)
@@ -104,7 +104,7 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
                 if f"{path_to_dataset}/{graph_size}/{fl}" not in files_run:
                     optim = LayeredOptimizer(f"{path_to_dataset}/{graph_size}/{fl}", cutoff_time=time_per_graph)
                     initial_layout_fn(optim.g)
-                    output = optim.local_opt_increment(sum(starting_bounds) // 2, neighborhood_fn=neighborhood_fn, candidate_fn=random_candidate)
+                    output = optim.local_opt_increment(sum(starting_bounds) // 2, neighborhood_fn=neighborhood_fn, candidate_fn=random_candidate, vertical_width=restriction)
                     reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
                     files_run[f"{path_to_dataset}/{graph_size}/{fl}"] = (len(reordered) - 2) / (2 * output[0]) * 60
                     insert_one(fname, [cur_idx, f"{path_to_dataset}/{graph_size}/{fl}", sum(starting_bounds) // 2, output[0], output[1]] + reordered)
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     opts_targets = [10, 50, 100]
     nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
     graph_sizes = ["r1.5k12n8", "r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
-    restrictions = [1, 0.75, 0.5]
+    restrictions = [0, 0.75, 0.5]
     graphsz_len = 5
     datasets = ["ratio_d3", "big_layer", "triangle"]
     if len(sys.argv) >= 2:
