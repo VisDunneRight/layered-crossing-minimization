@@ -26,6 +26,9 @@ def get_start_position(filename):
         fset = set()
         with open(filename, 'r') as fd:
             rdr = csv.reader(fd)
+            l1 = next(rdr)
+            if l1[1] != "File":
+                fset.add(l1[1])
             for ln in rdr:
                 fset.add(ln[1])
             # lines = fd.readlines()
@@ -426,7 +429,7 @@ def merge_csvs(movement=False):
                     wrt.writerows(new_lines)
 
 
-def print_binsearch_results(path_to_results):
+def print_binsearch_results(path_to_results, restriction=0):
     sizes = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
     nbhd_size = [10, 50, 100]
     func_names = ["bfs", "vertical_re", "degree_ratio", "random"]
@@ -434,26 +437,27 @@ def print_binsearch_results(path_to_results):
         print(nbfn, "\n=============")
         for sz in sizes:
             for nbsz in nbhd_size:
-                get_closest_cv(f"{path_to_results}/{nbfn}_bounds.csv", sz, nbsz, print_best=True)
+                get_closest_cv(f"{path_to_results}/{nbfn}_bounds{'' if restriction == 0 else str(restriction)}.csv", sz, nbsz, print_best=True)
         print("==============\n")
 
 
-def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, path_to_dataset, subdirs, num_graphs):
-    if "results" not in listdir(path_to_dataset):
-        mkdir(path_to_dataset + "/results")
+def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, path_to_dataset, subdirs, num_graphs, restriction, movement=True):
+    # if "results" not in listdir(path_to_dataset):
+    #     mkdir(path_to_dataset + "/results")
+    #     mkdir(path_to_dataset + "/results/movement")
     # if neighborhood_fn.__name__ not in listdir(path_to_dataset + "/results"):
     #     (path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", ""))
     nbhd_name = neighborhood_fn.__name__.replace("_neighborhood", "")
-    fname = path_to_dataset + "/results/" + nbhd_name + "+" + candidate_fn.__name__.replace("_candidate", "") + "+" + str(nbhd_size) + ".csv"
-    movefname = f"{path_to_dataset}/results/movement/{nbhd_name}+{candidate_fn.__name__.replace('_candidate', '')}+{str(nbhd_size)}.csv"
+    fname = path_to_dataset + "/results/" + nbhd_name + "+" + candidate_fn.__name__.replace("_candidate", "") + "+" + str(nbhd_size) + (f"+{restriction}" if restriction != 0 else "") + ".csv"
+    movefname = f"{path_to_dataset}/results/movement/{nbhd_name}+{candidate_fn.__name__.replace('_candidate', '')}+{str(nbhd_size)}{f'+{restriction}' if restriction != 0 else ''}.csv"
     files_run = get_start_position(fname)
     if len(files_run) == 0 and (not os.path.isfile(fname) or os.path.getsize(fname) == 0):
         insert_one(fname, ["Index", "File", "SizeCalc", "OptTime", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
-    if len(files_run) == 0 and (not os.path.isfile(movefname) or os.path.getsize(movefname) == 0):
+    if movement and len(files_run) == 0 and (not os.path.isfile(movefname) or os.path.getsize(movefname) == 0):
         insert_one(movefname, ["Index", "File", "SizeCalc", "nOpts", "CandTimesMoved", "TotalMoves", "TimesMoved"])
     cur_idx = 0
     for subdir in subdirs:
-        n_cvs = get_closest_cv(f"{path_to_dataset}/bounds_results/{nbhd_name}_bounds.csv", subdir, nbhd_size)
+        n_cvs = get_closest_cv(f"{path_to_dataset}/bounds_results/{nbhd_name}_bounds{str(restriction) if restriction != 0 else ''}.csv", subdir, nbhd_size)
         for fl_num in range(num_graphs):
             fl = f"graph{fl_num}.lgbin"
             file_path = f"{path_to_dataset}/{subdir}/{fl}"
@@ -461,37 +465,40 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
             if file_path not in files_run:
                 optim = LayeredOptimizer(file_path, cutoff_time=300)
                 initial_layout_fn(optim.g)
-                output = optim.local_opt_increment(n_cvs, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn, movement_data=True)
+                output = optim.local_opt_increment(n_cvs, neighborhood_fn=neighborhood_fn, candidate_fn=candidate_fn, movement_data=movement, vertical_width=restriction)
                 reordered = [v for i in range(len(output[2])) for v in (output[2][i], output[3][i])]
                 insert_one(fname, [cur_idx, file_path, n_cvs, output[0], output[1]] + reordered)
-                insert_one(movefname, [cur_idx, file_path, n_cvs, len(output[2]), output[5], output[6], output[4]])
+                if movement:
+                    insert_one(movefname, [cur_idx, file_path, n_cvs, len(output[2]), output[5], output[6], output[4]])
             cur_idx += 1
 
 
 if __name__ == '__main__':
-    sandbox()
+    # sandbox()
     # draw_line_charts("random graphs/ratio_d3/results")
     # create_raw_results_json("random graphs/temporary rd3 storage copy")
     # print_exp_optcounts("./random graphs/temporary rd3 storage copy")
-    # print_binsearch_results("random graphs/ratio_d3/bounds_results_2")
+    # print_binsearch_results("random graphs/big_layer/bounds_results", restriction=0.5)
     # add_cvar_to_csv()
     # merge_csvs(movement=True)
 
-    # dataset_path = "random graphs/ratio_d3"
-    # subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
-    # num_graphs_in_subdir = 50
-    # nbhd_sizes = [10, 50, 100]
-    # cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
-    # nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
-    # datasets = ["ratio_d3", "big_layer", "triangle"]
-    # if len(sys.argv) >= 2:
-    #     nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
-    #     cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
-    #     cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
-    #     dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-    # else:
-    #     nbhd_idx, cand_idx, cv_idx, dataset_idx = 0, 1, 0, 0
-    # if dataset_idx == 1:
-    #     subdirectories.insert(0, "r1.5k12n8")
-    #     subdirectories.pop()
-    # run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", subdirectories, num_graphs_in_subdir)
+    dataset_path = "random graphs/ratio_d3"
+    subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    num_graphs_in_subdir = 20
+    nbhd_sizes = [10, 50, 100]
+    cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
+    nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
+    datasets = ["ratio_d3", "big_layer", "triangle"]
+    restrictions = [0, 0.75, 0.5]
+    if len(sys.argv) >= 2:
+        nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
+        cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
+        cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
+        dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+        restrict_idx = int(sys.argv[3]) if len(sys.argv) > 2 else 0
+    else:
+        nbhd_idx, cand_idx, cv_idx, dataset_idx, restrict_idx = 0, 1, 0, 1, 2
+    if dataset_idx == 1:
+        subdirectories.insert(0, "r1.5k12n8")
+        subdirectories.pop()
+    run_experiment(nbhd_fns[nbhd_idx], cand_fns[cand_idx], nbhd_sizes[cv_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", subdirectories, num_graphs_in_subdir, restrictions[restrict_idx], movement=True)
