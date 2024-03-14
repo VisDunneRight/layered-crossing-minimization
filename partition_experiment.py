@@ -484,20 +484,27 @@ if __name__ == '__main__':
 
     dataset_path = "random graphs/ratio_d3"
     subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
-    num_graphs_in_subdir = 20
+    num_graphs_in_subdir = 50
     nbhd_sizes = [10, 50, 100]
     cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
     nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
     datasets = ["ratio_d3", "big_layer", "triangle"]
     restrictions = [0, 0.75, 0.5]
-    if len(sys.argv) >= 2:
+    if 2 <= len(sys.argv) <= 3:
         nbhd_idx = int(sys.argv[1]) // (len(cand_fns) * len(nbhd_sizes))
         cand_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) % len(cand_fns)
         cv_idx = (int(sys.argv[1]) % (len(cand_fns) * len(nbhd_sizes))) // len(cand_fns)
         dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-        restrict_idx = int(sys.argv[3]) if len(sys.argv) > 2 else 0
+        restrict_idx = 0
+    elif len(sys.argv) > 3:  # Limited mobility experiment
+        cand_idx = 1  # use random candidate
+        nbhd_idx = int(sys.argv[1]) // len(nbhd_sizes)
+        cv_idx = int(sys.argv[1]) % len(nbhd_sizes)
+        dataset_idx = int(sys.argv[2])
+        restrict_idx = int(sys.argv[3])
     else:
         nbhd_idx, cand_idx, cv_idx, dataset_idx, restrict_idx = 0, 1, 0, 1, 2
+
     if dataset_idx == 1:
         subdirectories.insert(0, "r1.5k12n8")
         subdirectories.pop()
