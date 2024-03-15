@@ -484,7 +484,7 @@ if __name__ == '__main__':
 
     dataset_path = "random graphs/ratio_d3"
     subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
-    num_graphs_in_subdir = 50
+    num_graphs_in_subdir = 20
     nbhd_sizes = [10, 50, 100]
     cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
     nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]

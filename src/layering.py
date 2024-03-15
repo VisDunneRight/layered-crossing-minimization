@@ -133,7 +133,7 @@ def create_edge_list_layered_graph_given_layering(filepath, layer_assign):
 
 def run_good_graph_tests(s_g):
     nlist = [1]
-    seen = [False] * (len(s_g)+1)
+    seen = [False] * (len(s_g))
     seen[1], seen[0] = True, True
     while nlist:
         next_layer = nlist.copy()
@@ -150,7 +150,25 @@ def run_good_graph_tests(s_g):
     for edgelist in s_g.values():
         if len(set(edgelist)) != len(edgelist):
             print("Contains duplicate edges")
-    return [i for i in range(1, len(s_g)+1) if not seen[i]]
+
+    in_deg = {n: 0 for n in s_g.keys()}
+    for adj_list in s_g.values():
+        for j in adj_list:
+            in_deg[j] += 1
+    st = [v for v in s_g if in_deg[v] == 0]
+    while st:
+        next_nd = st.pop()
+        for adj_nd in s_g[next_nd]:
+            in_deg[adj_nd] -= 1
+            if in_deg[adj_nd] == 0:
+                st.append(adj_nd)
+    if all(v == 0 for v in in_deg.values()):
+        print("Graph is acyclic")
+    else:
+        cycle_nds = [v for v in in_deg if in_deg[v] > 0]
+        print("Graph has a CYCLE", cycle_nds)
+
+    return [i for i in range(len(s_g)) if not seen[i]]
 
 
 def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
@@ -159,7 +177,8 @@ def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
     for node in nxg:
         simple_g[names[node]] = []
         for adj in nxg[node]:
-            simple_g[names[node]].append(names[adj])
+            if names[node] != names[adj]:
+                simple_g[names[node]].append(names[adj])
     # print(simple_g)
     # bad = run_good_graph_tests(simple_g)
     # for b in bad:
@@ -170,7 +189,8 @@ def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
     # run_good_graph_tests(simple_g)
     g = min_width(simple_g, w, c)[0]
     for edge in to_remove:
-        g.add_edge(edge[0], edge[1])
+        if edge not in g.edge_ids and (edge[1], edge[0]) not in g.edge_ids:
+            g.add_edge(edge[0], edge[1])
     for edge in g.edges:
         edge.update()
     g.add_anchors()
@@ -242,6 +262,15 @@ def min_width(s_g, w, c):
     cur_layer, width_cur, width_up = 0, 0, 0
     while len(v_minus_u) > 0:
         chosen = False
+        options = [v for v in v_minus_u if all(z_list[nd] is True for nd in s_g[v])]
+        # if options:
+        #     chosen = True
+        #     selected = max(options, key=lambda x: len(s_g[x]))
+        #     g.add_node(cur_layer, idx=selected)
+        #     v_minus_u.remove(selected)
+        #     u_list.append(selected)
+        #     width_cur += - len(s_g[selected]) + 1
+        #     width_up += in_deg[selected]
         for node in v_minus_u:
             if all(z_list[v] is True for v in s_g[node]):
                 chosen = True
