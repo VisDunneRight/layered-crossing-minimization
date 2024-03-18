@@ -9,4 +9,4 @@
 #SBATCH -e errors/partition_%A_%a.txt        # Standard error file
 
 module load gurobi
-srun python partition_experiment.py $SLURM_ARRAY_TASK_ID 2
+srun python partition_experiment.py $SLURM_ARRAY_TASK_ID 2 2
