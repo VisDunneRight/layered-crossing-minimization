@@ -298,13 +298,14 @@ def print_exp_optcounts(results_folder_path):
                 for k in grouped_by_size:  # mean not median
                     grouped_by_size[k] /= grpcounts[k]
                 # print(fl, total_cts / nlines)
-                nsize = "10" if "10." in fl else ("50" if "50." in fl else "100")
+                nsize = "10" if "10." in fl or "10+" in fl else ("50" if "50." in fl or "50+" in fl else "100")
                 nbhd = fl.split("+")[0]
                 cand = fl.split("+")[1]
+                rstr = fl.split("+")[3].replace(".csv", "") if len(fl.split("+")) > 3 else "1.0"
                 for k, v in grouped_by_size.items():
-                    if f"{k} : {nsize}" not in all_dat:
-                        all_dat[f"{k} : {nsize}"] = [["0.0000000000"] * 4 for _ in range(5)]
-                    all_dat[f"{k} : {nsize}"][cd_idxs[cand]][nb_idxs[nbhd]] = str(v)[:12]
+                    if f"{k} : {nsize} : {rstr}" not in all_dat:
+                        all_dat[f"{k} : {nsize} : {rstr}"] = [["0.0000000000"] * 4 for _ in range(5)]
+                    all_dat[f"{k} : {nsize} : {rstr}"][cd_idxs[cand]][nb_idxs[nbhd]] = str(v)[:12]
                     # print(f"{k},{nsize},{v}")  # {v[len(v)//2]}")
                 # nsize = 0 if "1000" in fl else (1 if "2000" in fl else 2)
                 # gsize =
@@ -477,7 +478,7 @@ if __name__ == '__main__':
     # sandbox()
     # draw_line_charts("random graphs/ratio_d3/results")
     # create_raw_results_json("random graphs/temporary rd3 storage copy")
-    # print_exp_optcounts("./random graphs/temporary rd3 storage copy")
+    # print_exp_optcounts("./random graphs/ratio_d3/results")
     # print_binsearch_results("random graphs/big_layer/bounds_results", restriction=0.5)
     # add_cvar_to_csv()
     # merge_csvs(movement=True)

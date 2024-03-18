@@ -13,14 +13,14 @@ def insert_one(filename, entry):
         wrt.writerow(entry)
 
 
-def get_starting_bounds(file_path, graph_size: str, target_avg: float):
+def get_starting_bounds(file_path, graph_size: str, target_avg: int):
     with open(file_path, 'r') as fd:
         rdr = csv.reader(fd)
         cur_bnds = [0, sys.maxsize]
         cur_avgs = [sys.maxsize, -1]
         n_times_searched = 0
         for ln in rdr:
-            if ln[0] == graph_size:
+            if ln[0] == graph_size and int(ln[3]) == target_avg:
                 if int(ln[1]) > cur_bnds[0] and float(ln[2]) >= target_avg:
                     cur_bnds[0] = int(ln[1])
                     cur_avgs[0] = float(ln[2])
@@ -49,7 +49,15 @@ def get_start_position_binsearch(filename, cur_cv):
         return {}
 
 
-def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_layout_fn, path_to_dataset: str, n_graph_copies: int, restriction: float, depth=10, time_per_graph=60, mean=True):
+def mk_binresults_files(dir_path):
+    nbhds = ["bfs", "vertical_re", "degree_ratio", "random"]
+    restrs = ["", "0.75", "0.5"]
+    for nbhd in nbhds:
+        for restr in restrs:
+            insert_one(f"{dir_path}/{nbhd}_bounds{restr}.csv", ["GraphSize", "CVcalc", "AvgOptsPerMin", "TargetOptsPerMin"])
+
+
+def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_layout_fn, path_to_dataset: str, n_graph_copies: int, restriction: float, depth=10, mean=True, use_diff_params=False):
     """
     :param neighborhood_fn: neighborhood aggregation function, e.g. bfs_neighborhood from src/neighborhood.py
     :param target_avg: target num of opts/5mins
@@ -58,14 +66,15 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
     :param path_to_dataset: path to dataset, full path will be path_to_dataset/graph_size
     :param n_graph_copies: num graphs in above directory, will optimize graph[0...n].lgbin
     :param depth: binary search depth to stop at
-    :param time_per_graph: time spent optimizing each graph (seconds)
     :param mean: use mean number of optimizations per minute instead of median
     :return: runs binary search to zero in on relative val for size calculation on this neighborhood, graph size
     """
 
     nbhd = neighborhood_fn.__name__.replace('_neighborhood', '')
-    fname = f"{path_to_dataset}/bounds_results/{nbhd}+{graph_size}+{str(target_avg)}{'' if restriction == 0 else '+' + str(restriction)}.csv"
-    binfname = f"{path_to_dataset}/bounds_results/{nbhd}_bounds{'' if restriction == 0 else str(restriction)}.csv"
+    bfolder = "bounds_results_5m" if use_diff_params else "bounds_results"
+    fname = f"{path_to_dataset}/{bfolder}/{nbhd}+{graph_size}+{str(target_avg)}{'' if restriction == 0 else '+' + str(restriction)}.csv"
+    binfname = f"{path_to_dataset}/{bfolder}/{nbhd}_bounds{'' if restriction == 0 else str(restriction)}.csv"
+    time_per_graph = 300 if use_diff_params else 60
     starting_bounds, starting_avgs, n_searches = get_starting_bounds(binfname, graph_size, target_avg)
     files_run = get_start_position_binsearch(fname, sum(starting_bounds)//2)
     if len(files_run) == 0 and (not os.path.isfile(fname) or os.path.getsize(fname) == 0):
@@ -114,7 +123,7 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
                     avg_opts = sum(files_run.values()) / n_graph_copies
                 else:
                     avg_opts = sorted(list(files_run.values()))[n_graph_copies // 2]
-                insert_one(binfname, [graph_size, sum(starting_bounds) // 2, avg_opts])
+                insert_one(binfname, [graph_size, sum(starting_bounds) // 2, avg_opts, target_avg])
                 if starting_avgs[1] == -1 or avg_opts < starting_avgs[1]:  # top priority is finding valid upper bound
                     if avg_opts < target_avg:  # upper bound found
                         starting_bounds[1] = sum(starting_bounds) // 2
@@ -136,7 +145,9 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
 
 
 if __name__ == '__main__':
-    n_graphs_in_bin = 20
+    # mk_binresults_files("random graphs/big_layer/bounds_results_5m")
+
+    n_graphs_in_bin = 5
     opts_targets = [10, 50, 100]
     nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]
     graph_sizes = ["r1.5k12n8", "r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
@@ -144,13 +155,16 @@ if __name__ == '__main__':
     graphsz_len = 5
     datasets = ["ratio_d3", "big_layer", "triangle"]
     if len(sys.argv) >= 2:
-        target_idx = int(sys.argv[1]) // (len(nbhd_fns) * graphsz_len)
-        nbhd_idx = (int(sys.argv[1]) % (len(nbhd_fns) * graphsz_len)) % len(nbhd_fns)
-        graph_idx = (int(sys.argv[1]) % (len(nbhd_fns) * graphsz_len)) // len(nbhd_fns)
-        restrict_idx = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+        exp_num = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+        cand_rstr_size = 1 if exp_num == 0 else len(restrictions)
+        target_idx = int(sys.argv[1]) // (len(nbhd_fns) * graphsz_len * cand_rstr_size)
+        nbhd_idx = (int(sys.argv[1]) % (len(nbhd_fns) * graphsz_len * cand_rstr_size)) // (graphsz_len * cand_rstr_size)
+        cand_rstr_idx = ((int(sys.argv[1]) % (len(nbhd_fns) * graphsz_len * cand_rstr_size)) % (graphsz_len * cand_rstr_size)) // graphsz_len
+        graph_idx = ((int(sys.argv[1]) % (len(nbhd_fns) * graphsz_len * cand_rstr_size)) % (graphsz_len * cand_rstr_size)) % graphsz_len
         dataset_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+        restriction = restrictions[cand_rstr_idx] if exp_num == 1 else 0
     else:
-        target_idx, nbhd_idx, graph_idx, dataset_idx, restrict_idx = 0, 0, 0, 2, 0
+        target_idx, nbhd_idx, graph_idx, dataset_idx, restriction = 0, 0, 0, 2, 0
     if dataset_idx == 0 or dataset_idx == 2:
         graph_idx += 1
-    run_experiment(nbhd_fns[nbhd_idx], opts_targets[target_idx], graph_sizes[graph_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", n_graphs_in_bin, restrictions[restrict_idx], time_per_graph=60, mean=True)
+    run_experiment(nbhd_fns[nbhd_idx], opts_targets[target_idx], graph_sizes[graph_idx], heuristics.barycenter, f"random graphs/{datasets[dataset_idx]}", n_graphs_in_bin, restriction, mean=True, use_diff_params=True)
