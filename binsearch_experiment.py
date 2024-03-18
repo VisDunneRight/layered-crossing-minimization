@@ -101,7 +101,7 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
                 avg_opts = sum(files_run.values()) / n_graph_copies
             else:
                 avg_opts = sorted(list(files_run.values()))[n_graph_copies // 2]
-            insert_one(binfname, [graph_size, cv, avg_opts])
+            insert_one(binfname, [graph_size, cv, avg_opts, target_avg])
             starting_bounds, starting_avgs, n_searches = get_starting_bounds(binfname, graph_size, target_avg)
             n_searches -= 1
         else:
@@ -145,7 +145,7 @@ def run_experiment(neighborhood_fn, target_avg: int, graph_size: str, initial_la
 
 
 if __name__ == '__main__':
-    # mk_binresults_files("random graphs/big_layer/bounds_results_5m")
+    # mk_binresults_files("random graphs/ratio_d3/bounds_results_5m")
 
     n_graphs_in_bin = 5
     opts_targets = [10, 50, 100]
