@@ -449,8 +449,8 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
     # if neighborhood_fn.__name__ not in listdir(path_to_dataset + "/results"):
     #     (path_to_dataset + "/results/" + neighborhood_fn.__name__.replace("_neighborhood", "") + "+" + candidate_fn.__name__.replace("_candidate", ""))
     nbhd_name = neighborhood_fn.__name__.replace("_neighborhood", "")
-    fname = path_to_dataset + "/results/" + nbhd_name + "+" + candidate_fn.__name__.replace("_candidate", "") + "+" + str(nbhd_size) + (f"+{restriction}" if restriction != 0 else "") + ".csv"
-    movefname = f"{path_to_dataset}/results/movement/{nbhd_name}+{candidate_fn.__name__.replace('_candidate', '')}+{str(nbhd_size)}{f'+{restriction}' if restriction != 0 else ''}.csv"
+    fname = path_to_dataset + "/results_5m/" + nbhd_name + "+" + candidate_fn.__name__.replace("_candidate", "") + "+" + str(nbhd_size) + (f"+{restriction}" if restriction != 0 else "") + ".csv"
+    movefname = f"{path_to_dataset}/results_5m/movement/{nbhd_name}+{candidate_fn.__name__.replace('_candidate', '')}+{str(nbhd_size)}{f'+{restriction}' if restriction != 0 else ''}.csv"
     files_run = get_start_position(fname)
     if len(files_run) == 0 and (not os.path.isfile(fname) or os.path.getsize(fname) == 0):
         insert_one(fname, ["Index", "File", "SizeCalc", "OptTime", "CrFinal", "Cr1", "T1", "Cr2", "T2..."])
@@ -458,7 +458,7 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
         insert_one(movefname, ["Index", "File", "SizeCalc", "nOpts", "CandTimesMoved", "TotalMoves", "TimesMoved"])
     cur_idx = 0
     for subdir in subdirs:
-        n_cvs = get_closest_cv(f"{path_to_dataset}/bounds_results/{nbhd_name}_bounds{str(restriction) if restriction != 0 else ''}.csv", subdir, nbhd_size)
+        n_cvs = get_closest_cv(f"{path_to_dataset}/bounds_results_5m/{nbhd_name}_bounds{str(restriction) if restriction != 0 else ''}.csv", subdir, nbhd_size)
         for fl_num in range(num_graphs):
             fl = f"graph{fl_num}.lgbin"
             file_path = f"{path_to_dataset}/{subdir}/{fl}"
@@ -485,7 +485,7 @@ if __name__ == '__main__':
 
     dataset_path = "random graphs/ratio_d3"
     subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
-    num_graphs_in_subdir = 20
+    num_graphs_in_subdir = 50
     nbhd_sizes = [10, 50, 100]
     cand_fns = [degree_candidate, random_candidate, betweenness_candidate, avg_edge_length_candidate, crossings_candidate]  # biconnected candidate
     nbhd_fns = [bfs_neighborhood, vertical_re_neighborhood, degree_ratio_neighborhood, random_neighborhood]

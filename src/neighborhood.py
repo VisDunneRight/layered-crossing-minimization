@@ -1,8 +1,7 @@
-import random
-
 from src.graph import *
 from collections import defaultdict
 import heapq
+import random
 import networkx as nx
 
 
@@ -194,7 +193,6 @@ def degree_ratio_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_w
         layer_edge_cts = [len(g.get_edges_by_layer()[i]) for i in range(g.n_layers - 1)]
     else:
         layer_edge_cts = find_vertical_nbhd_and_edge_counts(g, candidate_id, nbhd_width)
-    print(layer_edge_cts)
     adj = g.get_adj_list()
     degree_ratios = {}
     included_counts = {}
@@ -234,7 +232,6 @@ def random_neighborhood(g: LayeredGraph, candidate_id: int, cutoff, nbhd_width=0
         layer_edge_cts = [len(g.get_edges_by_layer()[i]) for i in range(g.n_layers - 1)]
     else:
         layer_edge_cts = find_vertical_nbhd_and_edge_counts(g, candidate_id, nbhd_width)
-    print(layer_edge_cts)
     selected = [False] * g.n_nodes
     selected[candidate_id] = True
     adj = g.get_adj_list()

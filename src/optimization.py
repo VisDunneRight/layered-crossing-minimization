@@ -257,7 +257,7 @@ class LayeredOptimizer:
 		# print(f"g calc: {g.num_edge_crossings()}")
 
 		""" Sequential bendiness reduction """
-		if self.bendiness_reduction:
+		if self.bendiness_reduction and self.sequential_bendiness:
 			t3 = time.time()
 			self.__sequential_br(graph_arg=g, env=env)
 			t3 = time.time() - t3
@@ -1070,23 +1070,34 @@ class LayeredOptimizer:
 
 		return self.g.num_edge_crossings()
 
-	def __fix_x_var(self, m: gp.Model, k, v):
-		a1 = m.getVarByName(f"x[{k[0]},{k[1]}]")
-		if a1:
-			a1.lb, a1.ub = v, v
+	def __fix_x_var(self, m: gp.Model, k, v, y_var=False):
+		if y_var:
+			a1 = m.getVarByName(f"y[{k}]")
+			if a1:
+				a1.lb, a1.ub = v, v
 		else:
-			a2 = m.getVarByName(f"x[{k[1]},{k[0]}]")
-			a2.lb, a2.ub = 1 - v, 1 - v
+			a1 = m.getVarByName(f"x[{k[0]},{k[1]}]")
+			if a1:
+				a1.lb, a1.ub = v, v
+			else:
+				a2 = m.getVarByName(f"x[{k[1]},{k[0]}]")
+				a2.lb, a2.ub = 1 - v, 1 - v
 
-	def __unfix_x_var(self, m: gp.Model, k, v):
-		a1 = m.getVarByName(f"x[{k[0]},{k[1]}]")
-		if a1:
-			a1.lb, a1.ub = 0, 1
-			a1.Start = v
+	def __unfix_x_var(self, m: gp.Model, k, v, y_var=False):
+		if y_var:
+			a1 = m.getVarByName(f"y[{k}]")
+			if a1:
+				a1.lb, a1.ub = 0, self.m_val
+				a1.Start = v
 		else:
-			a2 = m.getVarByName(f"x[{k[1]},{k[0]}]")
-			a2.lb, a2.ub = 0, 1
-			a2.Start = v
+			a1 = m.getVarByName(f"x[{k[0]},{k[1]}]")
+			if a1:
+				a1.lb, a1.ub = 0, 1
+				a1.Start = v
+			else:
+				a2 = m.getVarByName(f"x[{k[1]},{k[0]}]")
+				a2.lb, a2.ub = 0, 1
+				a2.Start = v
 
 	def __incremetal_opt(self, graph: LayeredGraph, subgraph: list, m: gp.Model, env, nbhd_width=0):
 		# TODO (future): make it re-fix all vars used after optimizing, and only unfix subgraph node vars
@@ -1114,6 +1125,16 @@ class LayeredOptimizer:
 					self.__unfix_x_var(m, xv, val)
 				else:
 					self.__fix_x_var(m, xv, val)
+		# if self.vertical_transitivity:  # Fix y-vars (probably not necessary since fixed by xvars)
+		# 	subg_layers = {nd.layer for nd in graph if subgraph[nd.id]}
+		# 	for nid, nd in graph.node_ids.items():
+		# 		if nd.layer in subg_layers:
+		# 			self.__unfix_x_var(m, nid, nd.y, y_var=True)
+		# 		else:
+		# 			self.__fix_x_var(m, nid, nd.y, y_var=True)
+
+		# print([nd for nd in graph if nd.layer in subg_layers])
+		# print([xv for xv in self.x_var_assign if subgraph[xv[0]] or subgraph[xv[1]]])
 		# print("after", len(self.x_var_assign))
 		# return self.__optimize_layout_standard(graph_arg=graph, fix_x_vars=self.x_var_assign)
 		return self.__optimize_crossing_reduction_model(m, graph, env)
@@ -1121,7 +1142,8 @@ class LayeredOptimizer:
 	def local_opt_increment(self, bucket_size, neighborhood_fn=bfs_neighborhood, candidate_fn=degree_candidate, vertical_width=0, movement_data=False):
 		# opt_g = LayeredGraph()
 		g = self.g
-		do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
+		if self.sequential_bendiness:
+			do_bendiness_reduction, self.bendiness_reduction = self.bendiness_reduction, False
 		do_draw_graph, self.draw_graph = self.draw_graph, False
 		collapse_leaves, self.collapse_leaves, self.collapse_subgraphs = self.collapse_leaves, False, False
 		if self.create_video and not os.path.isdir(f"Images/{self.name}"):
@@ -1326,7 +1348,7 @@ class LayeredOptimizer:
 
 	def __assign_x_given_y(self):
 		for k in self.x_var_assign:
-			if self.g[k[0]].y < self.g[k[1]].y:
+			if self.g[k[0]].y > self.g[k[1]].y:
 				self.x_var_assign[k] = 0
 			else:
 				self.x_var_assign[k] = 1

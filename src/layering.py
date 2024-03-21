@@ -262,8 +262,8 @@ def min_width(s_g, w, c):
     cur_layer, width_cur, width_up = 0, 0, 0
     while len(v_minus_u) > 0:
         chosen = False
-        options = [v for v in v_minus_u if all(z_list[nd] is True for nd in s_g[v])]
-        # if options:
+        # options = [v for v in v_minus_u if all(z_list[nd] is True for nd in s_g[v])]
+        # if options:  # choose highest degree option,
         #     chosen = True
         #     selected = max(options, key=lambda x: len(s_g[x]))
         #     g.add_node(cur_layer, idx=selected)
