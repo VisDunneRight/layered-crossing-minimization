@@ -630,6 +630,13 @@ class LayeredGraph:
 						visited[nd_adj] = True
 		return all(visited)
 
+	def calculate_stratisfimal_objective(self, gamma_1, gamma_2):
+		n_cr = self.num_edge_crossings()
+		n_bends = 0
+		for ed in self.edges:
+			n_bends += abs(ed.n1.y - ed.n2.y)
+		return gamma_1 * n_cr + gamma_2 * n_bends
+
 	def collapse_ap_cases(self, leaves_only=False):
 		# 1) Recursive DFS to label all articulation points
 		idx = 0

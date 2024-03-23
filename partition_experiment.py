@@ -322,17 +322,17 @@ def print_exp_optcounts(results_folder_path):
 
 
 def sandbox():
-    # opt = LayeredOptimizer("random graphs/ratio_d3/r1k10n10/graph0.lgbin")
-    opt = LayeredOptimizer("random graphs/triangle/r1.5k30n20/graph12.lgbin")
+    opt = LayeredOptimizer("random graphs/ratio_d3/r1k10n10/graph19.lgbin")
+    # opt = LayeredOptimizer("random graphs/triangle/r1.5k30n20/graph12.lgbin")
     # opt = LayeredOptimizer("random graphs/ratio_d3/r1.5k42n28/graph0.lgbin")
     opt.cutoff_time = 30
     opt.create_video = True
-    opt.name = "r1.5k30n20.tri+deg"
+    opt.name = "eduardo"
     # opt.vertical_transitivity = True
     # opt = LayeredOptimizer("Rome-Lib/graficon96nodi/grafo3510.96")
     # n_cv = opt.g.c_vars_count()
 
-    heuristics.barycenter(opt.g)
+    # heuristics.barycenter(opt.g)
     # opt.just_bendiness_reductiont()
     #     # vis.draw_graph(opt.g, "heurisic_bend", groups=[0] * opt.g.n_nodes, label_nodes=False)
     # vis.draw_graph(opt.g, "solution_heuristic")
@@ -345,7 +345,7 @@ def sandbox():
     # print([idx for idx, v in enumerate(bfs_neighborhood(opt.g, 140, 0)) if v])
     # print(opt.g.n_nodes)
 
-    opt.local_opt_increment(1500, neighborhood_fn=degree_ratio_neighborhood, candidate_fn=random_candidate, vertical_width=0)
+    opt.local_opt_increment(300, neighborhood_fn=degree_ratio_neighborhood, candidate_fn=random_candidate, vertical_width=0)
     # opt.optimize_layout()
 
     # opt.m_val *= 2
