@@ -133,13 +133,13 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
         # surface.write_to_png(svg_name + ".png")
 
 
-def draw_altair_scatter(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name, log_y_scale, plot_loess=False, loess_features=None):
+def draw_altair_scatter(data_points, x_axis, y_axis, color_field, x_title, y_title, chart_name, log_y_scale, plot_loess=False, loess_features=None, opacity=1, xdom=None):
     data = alt.Data(values=data_points)
     chart = alt.Chart(data).mark_circle(size=60).encode(
-        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title)),
-        y=alt.Y(f'{y_axis}:Q', scale=alt.Scale(type="log") if log_y_scale else None, axis=alt.Axis(title=y_title)) #,
+        x=alt.X(f'{x_axis}:Q', axis=alt.Axis(title=x_title), scale=alt.Scale(domain=xdom) if xdom else alt.Scale()),
+        y=alt.Y(f'{y_axis}:Q', scale=alt.Scale(type="log") if log_y_scale else alt.Scale(), axis=alt.Axis(title=y_title)) #,
         # color=alt.Color(f'{color_field}:N', scale=alt.Scale(scheme='dark2'))
-    )
+    ).configure_mark(opacity=opacity)
     # .facet(column=f'{color_field}:N')
     # if plot_loess:
     #     for feature in loess_features:

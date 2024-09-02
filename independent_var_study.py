@@ -43,6 +43,11 @@ def calc_transform_3(dpt):
 	# return card_c
 
 
+def calc_transform_lognodes(dpt):
+	gr = read_data.read(dpt[0])
+	return math.log(gr.n_nodes)
+
+
 if __name__ == '__main__':
 	with open(f"data storage previous/individual switch/direct_transitivity/symmetry_breaking_5m.csv", 'r') as fd:
 		rdr = csv.reader(fd)
@@ -141,6 +146,7 @@ if __name__ == '__main__':
 	datay = []
 	colors = []
 	for bval in basevals:
+		# datax.append(calc_transform_lognodes(bval))
 		datax.append(calc_transform_3(bval))
 		datay.append(math.log(1000*bval[1]))
 		# datay.append(bval[1])
@@ -164,7 +170,8 @@ if __name__ == '__main__':
 	line_dicts = [{'x': line_xv[i], 'y': np.e**(p(line_xv[i]))} for i in range(500)]
 	scatter_dicts = [{'x': datax[i], 'y': datay[i], 'c': colors[i]} for i in range(len(datax))]
 	# vis.draw_altair_scatter_with_custom_line(scatter_dicts, line_dicts, 'x', 'y', 'c', '|C|', 'ln(t)', f'Cscore')
-	vis.draw_altair_scatter_with_custom_line(scatter_dicts, line_dicts, 'x', 'y', 'c', 'ln|C|', 'ln(t)', f'Cscore_symbreak')
+	# vis.draw_altair_scatter_with_custom_line(scatter_dicts, line_dicts, 'x', 'y', 'c', 'ln|C|', 'ln(t)', f'Cscore_symbreak')
+	vis.draw_altair_scatter(scatter_dicts, 'x', 'y', '', 'Log C-vars', 'Log Runtime (s)', "Cscore_new", False, xdom=[2, 10], opacity=0.1)
 
 	print(p)
 	print(f"f(t) = e^({p}), where x=ln|C|, t in ms")

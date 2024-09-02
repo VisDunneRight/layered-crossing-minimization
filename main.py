@@ -7,9 +7,9 @@ from src.neighborhood import *
 if __name__ == '__main__':
 	""" Example use case. Optimizes and draws a 40-node Rome-Lib graph with direct transitivity (default) and a selection of switches. """
 	# optimizer = LayeredOptimizer("Rome-Lib/graficon40nodi/grafo3216.40")
-	optimizer = LayeredOptimizer("Rome-Lib/graficon96nodi/grafo3510.96")
-	optimizer.local_opt = True
-	# optimizer.symmetry_breaking = True
+	# optimizer = LayeredOptimizer("Rome-Lib/graficon96nodi/grafo3510.96")
+	optimizer = LayeredOptimizer("random graphs/ratio_d3/r1.5k12n8/graph5.lgbin")
+	optimizer.symmetry_breaking = True
 	# optimizer.local_opt_heuristic = "partition"
 	# optimizer.mip_relax = True
 	# optimizer.bendiness_reduction = True

@@ -108,18 +108,31 @@ class LayeredGraph:
 	# 		return self.nodes[node_id]
 	# 	return None
 
-	def get_edge(self, node1_name, node2_name):
-		if (node1_name, node2_name) in self.edge_ids:
-			return self.edge_ids[node1_name, node2_name]
+	def get_edge(self, n1_id, n2_id):
+		"""
+		:param n1_id: Required, ID of first node in edge
+		:param n2_id: Required, ID of second node in edge
+		:return: Edge object associated with (n1_id, n2_id), or None if no such edge exists
+		"""
+		if (n1_id, n2_id) in self.edge_ids:
+			return self.edge_ids[n1_id, n2_id]
+		elif (n2_id, n1_id) in self.edge_ids:
+			return self.edge_ids[n2_id, n1_id]
 		return None
 
 	def get_ids(self):
+		"""
+		:return: List of node IDs in G
+		"""
 		names = []
 		for n in self.nodes:
 			names.append(n.id)
 		return names
 
 	def get_ids_by_layer(self):
+		"""
+		:return: Dictionary mapping layer ID -> list of node IDs in that layer. Also stored in g.ids_by_layer
+		"""
 		if self.ids_by_layer == {}:
 			for n in self.nodes:
 				if n.layer not in self.ids_by_layer:
@@ -128,6 +141,10 @@ class LayeredGraph:
 		return self.ids_by_layer
 
 	def get_edge_ids_by_layer(self, only_diff_layer=False):
+		"""
+		:param only_diff_layer: Boolean, exclude same-layer edges. Default False (same-layer edges are included)
+		:return: Dictionary mapping layer ID -> list of edge tuples (u,v) with L(u) = layer ID. Also stored in g.edge_ids_by_layer
+		"""
 		if self.edge_ids_by_layer == {}:
 			for edge in self.edges:
 				if not only_diff_layer or edge.n1.layer != edge.n2.layer:
@@ -137,6 +154,10 @@ class LayeredGraph:
 		return self.edge_ids_by_layer
 
 	def get_edges_by_layer(self, only_diff_layer=False):
+		"""
+		:param only_diff_layer: Boolean, exclude same-layer edges. Default False (same-layer edges are included)
+		:return: Dictionary mapping layer ID -> list of edge objects (u,v) with L(u) = layer ID. Also stored in g.edges_by_layer
+		"""
 		if self.edges_by_layer == {}:
 			for edge in self.edges:
 				if not only_diff_layer or edge.n1.layer != edge.n2.layer:
@@ -146,22 +167,34 @@ class LayeredGraph:
 		return self.edges_by_layer
 
 	def get_name_to_id(self):
+		"""
+		:return: Dicionary mapping node name -> node ID. Also stored in self.name_to_id
+		"""
 		if self.name_to_id == {}:
 			for i, nd in enumerate(self.nodes):
 				self.name_to_id[nd.name] = i
 		return self.name_to_id
 
 	def get_adj_list(self):
+		"""
+		:return: Adjacency list object. Wrapper for g.create_adj_list(), but returns stored copy if called previously
+		"""
 		if self.adj_list == {}:
 			self.create_normal_adj_list()
 		return self.adj_list
 
 	def get_double_adj_list(self):
+		"""
+		:return: Double adjacency list object. Wrapper for g.create_double_adj_list(), but returns stored copy if called previously
+		"""
 		if self.double_adj_list == {}:
 			self.create_double_adj_list()
 		return self.double_adj_list
 
 	def invalidate_data(self):
+		"""
+		:return: None. Internal method to wipe stored data if the graph's structure is modified
+		"""
 		if self.adj_list != {}:
 			self.adj_list = {}
 		if self.double_adj_list != {}:
@@ -176,8 +209,17 @@ class LayeredGraph:
 			self.name_to_id = {}
 
 	def add_node(self, layer, idx=None, name=None, is_anchor=False, stacked=False, data=None):
+		"""
+		:param layer: Required integer, layer ID for this node
+		:param idx: Optional integer, ID to be associated with this node. Next available integer assigned by default
+		:param name: Optional string, name associated with this node
+		:param is_anchor: Optional boolean, indicates if node is an anchor node. Default False
+		:param stacked: Optional boolean, indicates if node represents multiple nodes combined. Default False
+		:param data: Optional dictionary of key-value pairs to be associate with the node in g.node_data
+		:return: New node object u which has been added to the graph
+		"""
 		if idx is None:
-			idx = self.n_nodes
+			idx = self.n_nodes if self.n_nodes not in self.node_ids else self.n_nodes + 1
 		elif idx in self.node_ids:
 			raise Exception(f"node {idx} already exists in graph")
 		elif name is not None and name in self.node_names:
@@ -203,10 +245,22 @@ class LayeredGraph:
 		return x
 
 	def add_nodes(self, ids_and_layers):
+		"""
+		:param ids_and_layers: Required, list of tuples [(u1, l1), (u2, l2), ...] such that ui is a node ID and li is a layer ID
+		:return: None. Adds all tuples to the graph as nodes
+		"""
 		for nl in ids_and_layers:
 			self.add_node(nl[1], idx=nl[0])
 
 	def add_edge(self, n1_id, n2_id, stacked=False, weight=1, data=None):
+		"""
+		:param n1_id: Required, node 1 ID. Integer in [0, |V|) is recommended
+		:param n2_id: Required, node 2 ID. Integer in [0, |V|) is recommended
+		:param stacked: Optional, if the edge represents multiple edges combined. Default False
+		:param weight: Optional number, weight value associated with the edge. Default 1
+		:param data: Optional dictionary of key-value pairs to be added to g.edge_data associated with this edge. Default None
+		:return: New edge object e which has been added to the graph
+		"""
 		if n1_id not in self.node_ids or n2_id not in self.node_ids:
 			raise Exception(f"failed to add edge ({n1_id}, {n2_id}): node DNE")
 		if (n1_id, n2_id) in self.edge_ids:
@@ -228,6 +282,10 @@ class LayeredGraph:
 		return e
 
 	def add_graph_by_edges(self, edge_list):
+		"""
+		:param edge_list: Required, list of node ID pairs [(u1, v1), (u2, v2), ...] to be added as edges. Node IDs which do not exist will be added as well
+		:return: None
+		"""
 		for edge in edge_list:
 			if edge[0] not in self.node_ids:
 				self.add_node(edge[1], idx=edge[0])
@@ -236,6 +294,10 @@ class LayeredGraph:
 			self.add_edge(edge[0], edge[2])
 
 	def add_edges(self, edge_list):
+		"""
+		:param edge_list: Required, list of valid node ID pairs [(u1, v1), (u2, v2), ...] to be added as edges
+		:return: None
+		"""
 		for edge in edge_list:
 			self.add_edge(edge[0], edge[1])
 
@@ -429,6 +491,9 @@ class LayeredGraph:
 	# 	self.stacked_edges = []
 
 	def adjacency_matrix(self):
+		"""
+		:return: |V|*|V| adjacency matrix structure
+		"""
 		adj_list = self.get_adj_list()
 		new_matrix = [[0] * len(self.nodes) for _ in range(len(self.nodes))]
 		for v, l in adj_list.items():
@@ -438,6 +503,9 @@ class LayeredGraph:
 		return new_matrix
 
 	def add_anchors(self):
+		"""
+		:return: None. Removes all long edges spanning more than one layer, replacing them with additional anchor nodes and edges for each layer in between
+		"""
 		to_remove = []
 		to_add = []
 		for edge in self.edges:
@@ -461,6 +529,10 @@ class LayeredGraph:
 		return f"Max height: {max(layer_counts)}", f"Layer counts: {layer_counts}"
 
 	def create_double_adj_list(self, forward_only=False):
+		"""
+		:param forward_only: Boolean, interpret edges as directed and create a normal adjacency list. Default False
+		:return: Adjacency list structure mapping node ID -> [[adjacent node IDs in previous layer], [adjacent node IDs in next layer]]. Also stored in g.double_adj_list
+		"""
 		for node in self.nodes:
 			if forward_only:
 				self.double_adj_list[node.id] = []
@@ -475,6 +547,9 @@ class LayeredGraph:
 		return self.double_adj_list
 
 	def create_normal_adj_list(self):
+		"""
+		:return: Adjacency list mapping node ID -> list of node IDs connected to it by an edge. Also stored in g.adj_list
+		"""
 		for node in self.nodes:
 			self.adj_list[node.id] = []
 		for edge in self.edges:
@@ -482,8 +557,11 @@ class LayeredGraph:
 			self.adj_list[edge.n2.id].append(edge.n1.id)
 		return self.adj_list
 
-	# Clean up graph by removing empty layers and making sure the first layer has label 1.
 	def relayer(self, remove_sl=True):
+		"""
+		:param remove_sl: Boolean, permanently remove same-layer edges from graph. Default True
+		:return: None. Cleans up graph by removing empty layers and makes sure the layer IDs are indexed from 0.
+		"""
 		n_removals = min((n.layer for n in self.nodes))
 		levels = sorted(list(self.layers.keys()))
 		if n_removals > 0:
@@ -521,46 +599,49 @@ class LayeredGraph:
 		self.invalidate_data()
 
 	def y_val_setup(self):
+		"""
+		:return: None. Indexes y-values of all nodes as integers starting from 1, and sorts each layer accordingly
+		"""
 		for level in self.layers:
 			self.layers[level].sort(key=lambda x: x.y)
 			for i, node in enumerate(self.layers[level]):
 				node.y = i + 1
 
-	def barycentric_reordering(self, n_iter):  # DEPRECATED: Use heuristics.py
-		adjacency = self.get_adj_list()
-		min_y = min((n.y for n in self.nodes))
-		for node_list in self.layers.values():
-			min_l_y = min((n.y for n in node_list))
-			if min_l_y > min_y:
-				for n in node_list:
-					n.y -= min_l_y + min_y
-		max_n_nodes = max((len(lay) for lay in self.layers.values()))
-		for node_list in self.layers.values():
-			for n in node_list:
-				n.y += (max_n_nodes - len(node_list)) // 2
-		# print(max(round(((max_n_nodes // 3) + 1) * (math.log10(n_iter)/2)), 1))
-		for node in self.nodes:
-			# node.y *= max(round(((max_n_nodes // 2) + 1) * (math.log(n_iter)/2)), 1)
-			node.y *= 3
-		# self.relayer()
-		# self.y_val_setup()
-		for level in self.layers:
-			self.layers[level].sort(key=lambda x: -len(adjacency[x.id]))
-		for i in range(n_iter):
-			for j in range(len(self.layers)):
-				averages = [sum((self.node_ids[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
-				taken = set()
-				for k, node in enumerate(self.layers[j]):
-					insert_at = find_closest(averages[k], taken)
-					taken.add(insert_at)
-					node.y = insert_at
-			for j in range(len(self.layers)-1, -1, -1):
-				averages = [sum((self.node_ids[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
-				taken = set()
-				for k, node in enumerate(self.layers[j]):
-					insert_at = find_closest(averages[k], taken)
-					taken.add(insert_at)
-					node.y = insert_at
+	# def barycentric_reordering(self, n_iter):  # DEPRECATED: Use heuristics.py
+	# 	adjacency = self.get_adj_list()
+	# 	min_y = min((n.y for n in self.nodes))
+	# 	for node_list in self.layers.values():
+	# 		min_l_y = min((n.y for n in node_list))
+	# 		if min_l_y > min_y:
+	# 			for n in node_list:
+	# 				n.y -= min_l_y + min_y
+	# 	max_n_nodes = max((len(lay) for lay in self.layers.values()))
+	# 	for node_list in self.layers.values():
+	# 		for n in node_list:
+	# 			n.y += (max_n_nodes - len(node_list)) // 2
+	# 	# print(max(round(((max_n_nodes // 3) + 1) * (math.log10(n_iter)/2)), 1))
+	# 	for node in self.nodes:
+	# 		# node.y *= max(round(((max_n_nodes // 2) + 1) * (math.log(n_iter)/2)), 1)
+	# 		node.y *= 3
+	# 	# self.relayer()
+	# 	# self.y_val_setup()
+	# 	for level in self.layers:
+	# 		self.layers[level].sort(key=lambda x: -len(adjacency[x.id]))
+	# 	for i in range(n_iter):
+	# 		for j in range(len(self.layers)):
+	# 			averages = [sum((self.node_ids[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
+	# 			taken = set()
+	# 			for k, node in enumerate(self.layers[j]):
+	# 				insert_at = find_closest(averages[k], taken)
+	# 				taken.add(insert_at)
+	# 				node.y = insert_at
+	# 		for j in range(len(self.layers)-1, -1, -1):
+	# 			averages = [sum((self.node_ids[m].y for m in adjacency[n.id])) / len(adjacency[n.id]) for n in self.layers[j]]
+	# 			taken = set()
+	# 			for k, node in enumerate(self.layers[j]):
+	# 				insert_at = find_closest(averages[k], taken)
+	# 				taken.add(insert_at)
+	# 				node.y = insert_at
 
 	def num_edge_crossings(self):
 		e_b_l = self.get_edges_by_layer()
@@ -599,6 +680,9 @@ class LayeredGraph:
 				self[x_var[val]].y += 1
 
 	def check_position_validity(self):
+		"""
+		checks if nodes have unique positions, i.e. (layer, y-value) pairs
+		"""
 		checks_out = True
 		for lay in self.layers.values():
 			xl = sorted([(nd.id, nd.y) for nd in lay], key=lambda x: x[1])
@@ -608,6 +692,7 @@ class LayeredGraph:
 					checks_out = False
 		if checks_out:
 			print("Nodes have valid positions.")
+		return checks_out
 
 	def calculate_connectedness(self):
 		max_connectedness = 0
@@ -630,11 +715,18 @@ class LayeredGraph:
 						visited[nd_adj] = True
 		return all(visited)
 
+	def is_proper(self):
+		"""
+		:return: True if G is a proper layered network, i.e. L(u) + 1 = L(v) for all edges (u,v), otherwise False
+		"""
+		return all(e.n1.layer + 1 == e.n2.layer for e in self.edges)
+
 	def calculate_stratisfimal_objective(self, gamma_1, gamma_2):
 		n_cr = self.num_edge_crossings()
 		n_bends = 0
 		for ed in self.edges:
 			n_bends += abs(ed.n1.y - ed.n2.y)
+		print(f"Crossing: {n_cr}\tBends: {n_bends}")
 		return gamma_1 * n_cr + gamma_2 * n_bends
 
 	def collapse_ap_cases(self, leaves_only=False):
@@ -804,6 +896,9 @@ class LayeredGraph:
 		return False, 0
 
 	def vertex_exchange_graph(self):
+		"""
+		:return: Vertex-exchange graph of G in adjacency list format. The second returned value is the list of vertex-exchange graph nodes, and the third is a mapping of vertex-exchange edges to their sign (0 or 1). This technique is described by Healy and Kuusik, 'The Vertex-Exchange Graph: A New Concept for Multi-level Crossing Minimisation'
+		"""
 		veg = {}  # vertex exchange graph as adj list
 		nd_set = {}  #
 		nd_list = []
@@ -853,6 +948,10 @@ class LayeredGraph:
 	# 			relevant_x_vars[node, n_other.id] = get_x_var(x_vars, node, n_other.id)
 
 	def get_networkx_graph(self, update=False):
+		"""
+		:param update: Optional boolean, if True will recalculate the NetworkX graph even if previously created. Default False
+		:return: Copy of G in NetworkX format. Also stored in g.nx_graph
+		"""
 		try:
 			if self.nx_graph is None or update:
 				self.nx_graph = nx.DiGraph()
@@ -872,6 +971,10 @@ class LayeredGraph:
 		return c_count
 
 	def write_out(self, path):
+		"""
+		:param path: Required string, path where graph will be stored
+		:return: None. Writes G directly to memory using Python's pickle module. Can be loaded again with src.read_data.read()
+		"""
 		with open(path, 'wb') as bfd:
 			pickle.dump(self, bfd)
 
@@ -899,7 +1002,8 @@ class CollapsedGraph(LayeredGraph):
 	def create_layered_graphs_from_subgraphs(self):
 		subgraph_lgs = []
 		old_adj = self.old_g.get_adj_list()
-		subgs = [[idx for idx, v in enumerate(self.subgraphs) if v == i] for i in range(max(self.subgraphs) + 1)]
+		# subgs = [[idx for idx, v in enumerate(self.subgraphs) if v == i] for i in range(max(self.subgraphs) + 1)]
+		subgs = self.subgraphs
 		for sid, subg in enumerate(subgs):
 			subg_obj = LayeredGraph()
 			seen_nds = set()

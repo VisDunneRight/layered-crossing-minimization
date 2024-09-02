@@ -440,10 +440,6 @@ def barycenter_split(g: graph.LayeredGraph, n_iter=12):
 	return split(g, n_iter=n_iter)
 
 
-def tabu_search(g: graph.LayeredGraph, max_iter=50):
-	""" Tabu Search of Laguna, Marti, and Valls, 1997 """
-
-
 def neighborhood_sift(g: graph.LayeredGraph, sift_vertices, n_ops):
 	""" Neighborhood sifting, C. Wilson """
 

@@ -264,13 +264,70 @@ def create_raw_results_json(folder):
                             "crossings": crossins,
                             "nodeMovement": json.loads(move_lines[idx][6])
                         })
-                        if idx % 50 == 49:
+                        if idx % n_repeats == n_repeats - 1:
                             gsize_idx += 1
 
     with open(f"{folder}/nbhd+cand_results.json", 'w') as fdR:
         json.dump(json_object, fdR)
     # js1 = {"r1.5k18n12": json_object["r1.5k18n12"], "r1.5k24n16": json_object["r1.5k24n16"], "r1.5k30n20": json_object["r1.5k30n20"]}
     # js2 = {"r1.5k36n24": json_object["r1.5k36n24"], "r1.5k42n28": json_object["r1.5k42n28"]}
+
+
+def create_raw_mobility_results_json(folder):
+    n_repeats = 20
+    nbhds = ["bfs", "degree_ratio", "vertical_re", "random"]
+    gsizes = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
+    gs_bigl = ["r1.5k12n8", "r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24"]
+    datas = ["ratio_d3", "big_layer", "triangle"]
+    restricts = [1, 0.75, 0.5]
+    nsizes = [10, 50, 100]
+    json_objects = [{}, {}, {}]
+    for i, data in enumerate(datas):
+        js_obj = json_objects[i]
+        if data == "big_layer":
+            cur_gs = gs_bigl
+        else:
+            cur_gs = gsizes
+        for kv in cur_gs:
+            js_obj[kv] = {rest: {} for rest in nsizes}
+            for kv2 in js_obj[kv]:
+                js_obj[kv][kv2] = {ns: {} for ns in restricts}
+                # for kv3 in js_obj[kv][kv2]:
+                #     js_obj[kv][kv2][kv3] = {}
+        for nsize in nsizes:
+            for restr in restricts:
+                for nbhd in nbhds:
+                    rstrid = "" if restr == 1 else f"+{restr}"
+                    ncid = f"{nbhd}+{restr}"
+                    for kv in js_obj:
+                        js_obj[kv][nsize][restr][nbhd] = []
+                    print(data, ncid, restr, rstrid)
+                    with open(f"{folder}/{data}/results/{nbhd}+random+{nsize}{rstrid}.csv", 'r') as fd1:
+                        rdr = csv.reader(fd1)
+                        next(rdr)
+                        gsize_idx = 0
+                        last_sz = -1
+                        for ln in rdr:
+                            if last_sz == int(ln[2]):
+                                continue
+                            idx = int(ln[0])
+                            crossins = [int(ln[v]) for v in range(5, len(ln), 2)]
+                            if crossins[-1] == 0:
+                                crossins[-1] = crossins[-2]
+                            js_obj[cur_gs[gsize_idx]][nsize][restr][nbhd].append({
+                                "gid": idx % n_repeats,
+                                "sizeCalc": int(ln[2]),
+                                "crInit": int(ln[5]),
+                                "crFinal": int(ln[4]),
+                                "timesteps": [float(ln[v]) for v in range(6, len(ln), 2)],
+                                "crossings": crossins,
+                            })
+                            if idx % n_repeats == n_repeats - 1:
+                                gsize_idx += 1
+                                last_sz = int(ln[2])
+
+        with open(f"{folder}/{data}/{data}_restriction_results.json", 'w') as fdR:
+            json.dump(js_obj, fdR)
 
 
 def print_exp_optcounts(results_folder_path):
@@ -477,11 +534,12 @@ def run_experiment(neighborhood_fn, candidate_fn, nbhd_size, initial_layout_fn, 
 if __name__ == '__main__':
     # sandbox()
     # draw_line_charts("random graphs/ratio_d3/results")
-    # create_raw_results_json("random graphs/temporary rd3 storage copy")
+    # create_raw_results_json("random graphs/ratio_d3/results")
     # print_exp_optcounts("./random graphs/ratio_d3/results")
     # print_binsearch_results("random graphs/big_layer/bounds_results", restriction=0.5)
     # add_cvar_to_csv()
     # merge_csvs(movement=True)
+    # create_raw_mobility_results_json("random graphs")
 
     dataset_path = "random graphs/ratio_d3"
     subdirectories = ["r1.5k18n12", "r1.5k24n16", "r1.5k30n20", "r1.5k36n24", "r1.5k42n28"]
