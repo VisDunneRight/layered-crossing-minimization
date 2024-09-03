@@ -4,12 +4,13 @@ from copy import deepcopy
 import numpy as np
 
 
-def tabu(g: LayeredGraph, nonimp=50, maxiter=-1, timelimit=-1):
+def tabu(g: LayeredGraph, nonimp=50, maxiter=-1, timelimit=-1, improvement_data=False):
     """
     :param g: required, LayeredGraph object to perform tabu search on
     :param nonimp: Number of non-improving iterations before program terminates, default 50
     :param maxiter: Number of second-level diversification swaps each iteration, if left as -1 will use 25*|V|
     :param timelimit: If set, will instead run until the specified time in seconds has elapsed
+    :param improvement_data: If set, will record and return the best solution values and the time of improvement
     :return: None. positions of nodes of g will be updated according to the method of Laguna et al. in the 1997 article, 'Arc Crossing Minimization in Heirarchical Digraphs with Tabu Search'
     """
     assert g.is_proper(), "graph is not properly layered, try calling g.add_anchors() and then g.relayer()"
@@ -27,6 +28,9 @@ def tabu(g: LayeredGraph, nonimp=50, maxiter=-1, timelimit=-1):
     rng = np.random.default_rng()
     best_cr_val = g.num_edge_crossings()
     start_time = time.time()
+    if improvement_data:
+        time_values = [0]
+        crossing_values = [best_cr_val]
 
     # begin tabu search loop
     while lastimp < nonimp or time.time() - start_time < timelimit:
@@ -45,10 +49,14 @@ def tabu(g: LayeredGraph, nonimp=50, maxiter=-1, timelimit=-1):
 
         # 2. inner while loop, use first-level diversification and intensify accordingly
         next_layer = tabu_diversify_l1(tabu_list, attractiveness)
+        inner_iter = 1
         while next_layer != -1:
             crossings_improved = intensify_layer(g, cur_solution_pi, cur_solution_phi, next_layer, d_adj)
             if crossings_improved:
-                reduced_this_iter = True
+                tabu_list[next_layer] = inner_iter
+            else:
+                tabu_list[next_layer] = -inner_iter
+            inner_iter += 1
             next_layer = tabu_diversify_l1(tabu_list, attractiveness)
 
         # 3. check if solution is improved
@@ -61,6 +69,9 @@ def tabu(g: LayeredGraph, nonimp=50, maxiter=-1, timelimit=-1):
             best_solution_pi = deepcopy(cur_solution_pi)
             lastimp = 0
             best_cr_val = cur_crossings
+            if improvement_data:
+                time_values.append(time.time() - start_time)
+                crossing_values.append(best_cr_val)
         else:
             lastimp += 1
 
@@ -72,6 +83,9 @@ def tabu(g: LayeredGraph, nonimp=50, maxiter=-1, timelimit=-1):
     for nd, rk in enumerate(best_solution_pi):
         g[nd].y = rk
     print(f"\n... cut off solve after {nonimp} non-improving iterations" if timelimit == -1 else f"... cut off at {timelimit} seconds")
+
+    if improvement_data:
+        return crossing_values, time_values
 
 
 def intensify_layer(g: LayeredGraph, cur_ranking, cur_phi, layer_id, d_adj):
@@ -188,8 +202,8 @@ def insert_at_position(node_id, target_pos, ranking, phi_layer) -> None:
 
 def tabu_diversify_l1(tabu_list, attractiveness):
     unnormalized_probs = np.array([attractiveness[i] if
-                                   ((i < len(tabu_list) - 1 and tabu_list[i + 1] > abs(tabu_list[i])) or
-                                    (i > 0 and tabu_list[i - 1] > abs(tabu_list[i])))
+                                   ((i < len(tabu_list) - 1 and tabu_list[i + 1] >= abs(tabu_list[i])) or
+                                    (i > 0 and tabu_list[i - 1] >= abs(tabu_list[i])))
                                    else 0
                                    for i in range(len(tabu_list))
                                    ])

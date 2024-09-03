@@ -3,7 +3,13 @@ from src import graph
 import math
 import altair as alt
 import os
-import cairosvg
+try:
+    import cairo
+    import cairosvg
+except OSError:
+    print("Need Cairo installed on machine in order to draw graphs")
+except ModuleNotFoundError:
+    print("Need Cairo installed on machine in order to draw graphs")
 import shutil
 # from altair_saver import save
 
