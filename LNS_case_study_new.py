@@ -17,7 +17,7 @@ def write_to_csv(fpath, values):
 
 if __name__ == '__main__':
     c1, c2 = 3, 1
-    ctrlflow_files = ["head", "csplit", "ls"]
+    ctrlflow_files = ["head", "csplit", "ls", "uniq", "b2sum", "od", "cksum", "dd", "dir", "du", "ptx", "split", "tr"]
 
     # Crossings Only
     for control_flow_graph in ctrlflow_files:
@@ -40,9 +40,13 @@ if __name__ == '__main__':
         # 3. ILP
         gr3 = read(flname)
         optim = LayeredOptimizer(gr3, symmetry_breaking=True, cutoff_time=900, record_solution_data_over_time=True)
-        crossings, times = optim.optimize_layout()
-        optim.g.write_out(f"LNS_case_study/ILP_cr_{control_flow_graph}.lgbin")
-        write_to_csv("LNS_case_study/results.csv", ["CR", control_flow_graph, "ILP", optim.g.num_edge_crossings(), crossings, times])
+        try:
+            crossings, times = optim.optimize_layout()
+            optim.g.write_out(f"LNS_case_study/ILP_cr_{control_flow_graph}.lgbin")
+            write_to_csv("LNS_case_study/results.csv", ["CR", control_flow_graph, "ILP", optim.g.num_edge_crossings(), crossings, times])
+        except ValueError:
+            write_to_csv("LNS_case_study/results.csv", ["CR", control_flow_graph, "ILP", "---", [], []])
+
 
     # Crossings + Edge Bends
     for control_flow_graph in ctrlflow_files:
@@ -66,6 +70,9 @@ if __name__ == '__main__':
         # 3. ILP
         gr3 = read(flname)
         optim2 = LayeredOptimizer(gr3, vertical_transitivity=True, bendiness_reduction=True, sequential_bendiness=False, symmetry_breaking=True, gamma_1=c1, gamma_2=c2, cutoff_time=900, record_solution_data_over_time=True)
-        crossings, times = optim2.optimize_layout()
-        optim2.g.write_out(f"LNS_case_study/ILP_cr+br_{control_flow_graph}.lgbin")
-        write_to_csv("LNS_case_study/results.csv", ["CR+BR", control_flow_graph, "ILP", optim2.g.calculate_stratisfimal_objective(c1, c2), crossings, times])
+        try:
+            crossings, times = optim2.optimize_layout()
+            optim2.g.write_out(f"LNS_case_study/ILP_cr+br_{control_flow_graph}.lgbin")
+            write_to_csv("LNS_case_study/results.csv", ["CR+BR", control_flow_graph, "ILP", optim2.g.calculate_stratisfimal_objective(c1, c2), crossings, times])
+        except ValueError:
+            write_to_csv("LNS_case_study/results.csv", ["CR+BR", control_flow_graph, "ILP", "---", [], []])
