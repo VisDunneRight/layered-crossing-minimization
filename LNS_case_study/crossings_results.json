@@ -1,0 +1,197 @@
+[
+  {
+    "heuristic": "LNS",
+    "obj": 45,
+    "graph": "head"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 526,
+    "graph": "head"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 27,
+    "graph": "head"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 159,
+    "graph": "csplit"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 757,
+    "graph": "csplit"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 506,
+    "graph": "csplit"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 84,
+    "graph": "ls"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 838,
+    "graph": "ls"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 2643,
+    "graph": "ls"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 48,
+    "graph": "uniq"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 286,
+    "graph": "uniq"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 31,
+    "graph": "uniq"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 55,
+    "graph": "b2sum"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 769,
+    "graph": "b2sum"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 34,
+    "graph": "b2sum"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 99,
+    "graph": "od"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 491,
+    "graph": "od"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 52,
+    "graph": "od"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 92,
+    "graph": "cksum"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 780,
+    "graph": "cksum"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 48,
+    "graph": "cksum"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 80,
+    "graph": "dd"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 939,
+    "graph": "dd"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 136,
+    "graph": "dd"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 89,
+    "graph": "dir"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 903,
+    "graph": "dir"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 2643,
+    "graph": "dir"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 68,
+    "graph": "du"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 672,
+    "graph": "du"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 728,
+    "graph": "du"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 290,
+    "graph": "ptx"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 2099,
+    "graph": "ptx"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 5243,
+    "graph": "ptx"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 514,
+    "graph": "split"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 1356,
+    "graph": "split"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 5720,
+    "graph": "split"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 141,
+    "graph": "tr"
+  },
+  {
+    "heuristic": "TABU",
+    "obj": 639,
+    "graph": "tr"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 593,
+    "graph": "tr"
+  }
+]

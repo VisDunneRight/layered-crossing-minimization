@@ -1,7 +1,6 @@
-import cairo
 from src import graph
 import math
-import altair as alt
+# import altair as alt
 import os
 try:
     import cairo
@@ -14,7 +13,7 @@ import shutil
 # from altair_saver import save
 
 
-def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, emphasize_nodes=None, emphasize_edges=None, gravity=False, edge_thickness=False, label_nodes=True, as_png=False, color_scale=None, copies=1):
+def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, emphasize_nodes=None, emphasize_edges=None, gravity=False, edge_thickness=False, label_nodes=True, as_png=False, color_scale=None, copies=1, fix_height=-1, remove_witespace=True):
     if nested:
         if "Images" not in os.listdir(".."):
             os.mkdir("../Images")
@@ -28,7 +27,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     palette = [(v[0]/256, v[1]/256, v[2]/256) for v in palette]
     width = (g.n_layers - 1) * node_x_distance + offset * 2
     min_l = min((n.layer for n in g.nodes)) - 1
-    min_y = min((n.y for n in g.nodes))
+    min_y = min((n.y for n in g.nodes)) if remove_witespace else 0
     for n in g.nodes:
         n.y -= min_y
     if gravity:
@@ -42,7 +41,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
         for node_list in g.layers.values():
             for n in node_list:
                 n.y += (max_n_nodes - len(node_list)) / 2
-    height = max((n.y for n in g.nodes)) * node_y_distance + offset * 2
+    height = max((n.y for n in g.nodes)) * node_y_distance + offset * 2 if fix_height == -1 else fix_height
     if nested:
         # if as_png:
         #     surface = cairo.ImageSurface(f"../Images/{svg_name}.svg", width, height)
@@ -77,7 +76,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     ctx.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
     ctx.set_font_size(font_size)
     for i, node in enumerate(g.nodes):  # ctx.arc(2, 1, 0.5, 0, 2 * math.pi), pos (2,1) radius 0.5
-        if not node.is_anchor_node or groups is not None:
+        if not node.is_anchor_node or groups is not None or "groups" in g.node_data:
             if node.stacked or node.fix != 0:
                 ctx.set_source_rgb(222/256, 23/256, 56/256)
             elif color_scale is not None:
@@ -86,6 +85,9 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
                 # ctx.set_source_rgb(color_scale[i] / max_moves, 20 / 256, 120 / 256)
             elif groups is not None:
                 ctx.set_source_rgb(palette[groups[i]][0], palette[groups[i]][1], palette[groups[i]][2])
+            elif "groups" in g.node_data:
+                gp_v = g.node_data["groups"][node.id] + 1 if node.id in g.node_data["groups"] else 0
+                ctx.set_source_rgb(palette[gp_v][0], palette[gp_v][1], palette[gp_v][2])
             else:
                 ctx.set_source_rgb(163/256, 185/256, 182/256)  # light gray-cyan
             if node.is_anchor_node:

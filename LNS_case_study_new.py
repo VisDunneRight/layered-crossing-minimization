@@ -5,12 +5,22 @@ from src.neighborhood import degree_ratio_neighborhood, random_candidate
 from src.heuristics import barycenter, weighted_median
 from src.tabu import tabu
 from src.read_data import read
+from src.vis import draw_graph
 
 
 def write_to_csv(fpath, values):
     with open(fpath, 'a', newline='') as csvfd:
         wrt = csv.writer(csvfd)
         wrt.writerow(values)
+
+
+def visualize_cfg(path, do_bend_postprocess=False):
+    gr = read(path)
+    print(gr.num_edge_crossings())
+    if do_bend_postprocess:
+        optimizer = LayeredOptimizer(gr)
+        optimizer.just_bendiness_reduction()
+    draw_graph(gr, path.split("/")[-1].replace(".lgbin", ""))
 
 
 if __name__ == '__main__':
@@ -44,7 +54,6 @@ if __name__ == '__main__':
             write_to_csv("LNS_case_study/results.csv", ["CR", control_flow_graph, "ILP", optim.g.num_edge_crossings(), crossings, times])
         except ValueError:
             write_to_csv("LNS_case_study/results.csv", ["CR", control_flow_graph, "ILP", "---", [], []])
-
 
     # Crossings + Edge Bends
     for control_flow_graph in ctrlflow_files:

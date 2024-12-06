@@ -1,0 +1,197 @@
+[
+  {
+    "heuristic": "LNS",
+    "obj": 628,
+    "graph": "head"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 958,
+    "graph": "head"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 506,
+    "graph": "head"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 1311,
+    "graph": "csplit"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 1826,
+    "graph": "csplit"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 3635,
+    "graph": "csplit"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 3103,
+    "graph": "ls"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 3682,
+    "graph": "ls"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": "---",
+    "graph": "ls"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 556,
+    "graph": "uniq"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 1096,
+    "graph": "uniq"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 610,
+    "graph": "uniq"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 1304,
+    "graph": "b2sum"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 1958,
+    "graph": "b2sum"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 912,
+    "graph": "b2sum"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 1303,
+    "graph": "od"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 2793,
+    "graph": "od"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 1764,
+    "graph": "od"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 1383,
+    "graph": "cksum"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 2621,
+    "graph": "cksum"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 1740,
+    "graph": "cksum"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 893,
+    "graph": "dd"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 1537,
+    "graph": "dd"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 3537,
+    "graph": "dd"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 3112,
+    "graph": "dir"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 3682,
+    "graph": "dir"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": "---",
+    "graph": "dir"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 1156,
+    "graph": "du"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 1948,
+    "graph": "du"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 3434,
+    "graph": "du"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 3863,
+    "graph": "ptx"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 5049,
+    "graph": "ptx"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 43121,
+    "graph": "ptx"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 3987,
+    "graph": "split"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 5033,
+    "graph": "split"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 17273,
+    "graph": "split"
+  },
+  {
+    "heuristic": "LNS",
+    "obj": 1002,
+    "graph": "tr"
+  },
+  {
+    "heuristic": "WM",
+    "obj": 1359,
+    "graph": "tr"
+  },
+  {
+    "heuristic": "ILP",
+    "obj": 3430,
+    "graph": "tr"
+  }
+]

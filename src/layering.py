@@ -51,7 +51,7 @@ def create_layered_graph(rome_file):  # DEPRECATED
         return create_bfs_layered_graph(simple_g)
 
 
-def create_better_layered_graph(rome_file, w, c):
+def create_better_layered_graph(rome_file, w, c, remove_sl=True):
     with open(rome_file) as f:
         simple_g = {}
         n_e = True
@@ -75,13 +75,13 @@ def create_better_layered_graph(rome_file, w, c):
         for edge in g.edges:
             edge.update()
         g.add_anchors()
-        g.relayer()
+        g.relayer(remove_sl=remove_sl)
         g.y_val_setup()
         # vis.draw_graph(g, "example3")
         return g, tvert
 
 
-def create_edge_list_layered_graph(filepath, w, c):
+def create_edge_list_layered_graph(filepath, w, c, remove_sl=True):
     with open(filepath) as f:
         simple_g = {}
         for line in f.readlines():
@@ -106,7 +106,7 @@ def create_edge_list_layered_graph(filepath, w, c):
     for edge in g.edges:
         edge.update()
     g.add_anchors()
-    g.relayer()
+    g.relayer(remove_sl=remove_sl)
     g.y_val_setup()
     # vis.draw_graph(g, "example3")
     return g, tvert
@@ -171,7 +171,7 @@ def run_good_graph_tests(s_g):
     return [i for i in range(len(s_g)) if not seen[i]]
 
 
-def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
+def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c, remove_sl=True):
     simple_g = {}
     names = {nname: i for i, nname in enumerate(nxg)}
     for node in nxg:
@@ -194,7 +194,7 @@ def create_layered_graph_from_directed_nx_graph(nxg: nx.Graph, w, c):
     for edge in g.edges:
         edge.update()
     g.add_anchors()
-    g.relayer()
+    g.relayer(remove_sl=remove_sl)
     g.y_val_setup()
     return g
 

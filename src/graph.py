@@ -281,6 +281,43 @@ class LayeredGraph:
 		self.invalidate_data()
 		return e
 
+	def add_groups(self, groups):
+		"""
+		:param groups: dictionary mapping node name or ID -> group ID (integer, or list if nested groups), or list of lists of groups nodes
+		:return: None
+		"""
+		if type(groups) == dict:
+			for nd, gp_val in groups.items():
+				if not isinstance(gp_val, int):
+					raise TypeError("Invalid format for group values")
+				self.node_data["groups"][self.__getitem__(nd).id] = gp_val
+		elif type(groups) == list:
+			self.node_data["groups"] = {}
+			for gp_id, gp in enumerate(groups):
+				for nd in gp:
+					nd_id = self.__getitem__(nd).id
+					if nd_id in self.node_data["groups"] and type(self.node_data["groups"][nd_id]) == int:
+						self.node_data["groups"][nd_id] = [self.node_data["groups"][nd_id], gp_id]
+					elif nd_id in self.node_data["groups"]:
+						self.node_data["groups"][nd_id].append(gp_id)
+					else:
+						self.node_data["groups"][nd_id] = gp_id
+		else:
+			raise TypeError("Invalid format")
+
+	def add_node_emphasis(self, emphasis):
+		"""
+		:param emphasis: dictionary mapping node name or ID -> emphasis value (real number >= 1)
+		:return: None
+		"""
+		if type(emphasis) == dict:
+			for nd, e_val in emphasis.items():
+				if not isinstance(e_val, (int, float)) or e_val < 1:
+					raise TypeError("Invalid format for emphasis values")
+				self.node_data["emphasis"][self.__getitem__(nd).id] = e_val
+		else:
+			raise TypeError("Invalid format for emphasis")
+
 	def add_graph_by_edges(self, edge_list):
 		"""
 		:param edge_list: Required, list of node ID pairs [(u1, v1), (u2, v2), ...] to be added as edges. Node IDs which do not exist will be added as well
@@ -653,12 +690,15 @@ class LayeredGraph:
 						u1, w1, u2, w2 = e1.n1.y, e1.n2.y, e2.n1.y, e2.n2.y
 						if (u1 > u2 > w1 > w2) or (u1 > w2 > w1 > u2) or (w1 > u2 > u1 > w2) or (w1 > w2 > u1 > u2) or (u2 > u1 > w2 > w1) or (u2 > w1 > w2 > u1) or (w2 > u1 > u2 > w1) or (w2 > w1 > u2 > u1):
 							n_ec += 1
-					elif e1.same_layer_edge and ((e1.n1.y > e2.n1.y > e1.n1.y) or (e1.n2.y > e2.n1.y > e1.n1.y)):
-						n_ec += 1
-					elif e2.same_layer_edge and ((e2.n1.y > e1.n1.y > e2.n2.y) or (e2.n2.y > e1.n1.y > e2.n1.y)):
-						n_ec += 1
+					elif e1.same_layer_edge:
+						if (e1.n1.y > e2.n1.y > e1.n1.y) or (e1.n2.y > e2.n1.y > e1.n1.y):
+							n_ec += 1
+					elif e2.same_layer_edge:
+						if (e2.n1.y > e1.n1.y > e2.n2.y) or (e2.n2.y > e1.n1.y > e2.n1.y):
+							n_ec += 1
 					elif (e1.n1.y > e2.n1.y and e1.n2.y < e2.n2.y) or (e1.n1.y < e2.n1.y and e1.n2.y > e2.n2.y):
 						n_ec += 1
+						# print(f"({e1.n1}, {e1.n2}), ({e2.n1}, {e2.n2})")
 		return n_ec
 
 	def num_edge_crossings_from_xvars_no_sl(self, x_vars):
