@@ -102,7 +102,7 @@ def expand_cut(subg_nodes, contacts, normal_adjacency, allotted_n):
                 subg_nodes.append()
 
 
-def get_groups(g: graph.LayeredGraph, rectangular_groups=True):
+def get_groups(g: graph.LayeredGraph):
     if "groups" not in g.node_data:
         print("Need to add group assignments on nodes, use g.add_groups. Proceeding without groups.")
         return [], []
@@ -119,6 +119,7 @@ def get_groups(g: graph.LayeredGraph, rectangular_groups=True):
     sl_groups = [gp for i, gp in enumerate(all_groups) if is_sl_group[i]]
     ml_groups = [gp for i, gp in enumerate(all_groups) if not is_sl_group[i]]
     if not has_nested_groups:
+        ml_idx = 0
         for i, gp in enumerate(all_groups):
             gp_id = groups[gp[0]]
             gp_layers = sorted(set(g[nd].layer for nd in gp))
@@ -126,27 +127,31 @@ def get_groups(g: graph.LayeredGraph, rectangular_groups=True):
                 print("Some groups are not continuous across layers. Proceeding without groups.")
                 return [], []
             gp_by_layer = [[nd for nd in gp if g[nd].layer == lid] for lid in gp_layers]
-            if rectangular_groups and not is_sl_group[i]:
+            if not is_sl_group[i]:
                 max_gp_layer_sz = max(len(lay) for lay in gp_by_layer)
                 for layer_subgp in gp_by_layer:
                     lay_id = g[layer_subgp[0]].layer
                     for _ in range(max_gp_layer_sz - len(layer_subgp)):
-                        g.add_node(lay_id, data={"groups": gp_id, "filler": True})
+                        new_nd = g.add_node(lay_id, data={"groups": gp_id, "filler": True})
+                        ml_groups[ml_idx].append(new_nd.id)
+                ml_idx += 1
 
         # filler nodes for dir. trans. ver.
         layers_with_ml_gps = set(g[nd].layer for gp in ml_groups for nd in gp)
-        max_graph_layer_sz = max(len(g.layers[lay]) for lay in layers_with_ml_gps)
-        for lid in layers_with_ml_gps:
-            for _ in range(max_graph_layer_sz - len(g.layers[lid])):
-                g.add_node(lid, data={"filler": True})
+        if layers_with_ml_gps:
+            max_graph_layer_sz = max(len(g.layers[lay]) for lay in layers_with_ml_gps)
+            for lid in layers_with_ml_gps:
+                for _ in range(max_graph_layer_sz - len(g.layers[lid])):
+                    g.add_node(lid, data={"filler": True})
     else:
         print("Multiple group membership not yet supported. Proceeding without groups")
     return sl_groups, ml_groups
 
 
 def remove_filler_nodes(g: graph.LayeredGraph, x_vars):
+    if "filler" not in g.node_data:
+        return
     n_removed = 0
-    g.assign_y_vals_given_x_vars(x_vars)
     n_b_l = g.get_ids_by_layer()
     for i in range(g.n_nodes - 1, -1, -1):
         nid = g.nodes[i].id
@@ -166,6 +171,8 @@ def remove_filler_nodes(g: graph.LayeredGraph, x_vars):
 
 
 def remove_filler_group_nodes(g: graph.LayeredGraph, x_vars):
+    if "filler" not in g.node_data:
+        return
     n_removed = 0
     n_b_l = g.get_ids_by_layer()
     for i in range(g.n_nodes - 1, -1, -1):

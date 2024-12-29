@@ -1,4 +1,6 @@
 import math
+import warnings
+import inspect
 
 
 def get_x_var(x_vars_dict, u1, u2):
@@ -42,3 +44,25 @@ def inv_opt_time_estimate(runtime):
 def calc_time_taken_for_partition_size(n_p, n_cv, cv_total):
 	assert n_p * n_cv <= cv_total
 	return n_p * optimization_time_estimate(n_cv / n_p) + optimization_time_estimate(cv_total - n_p * n_cv)
+
+
+def require(require_true: dict, require_false: dict = None, warn_true: dict = None, warn_false: dict = None, warning_message: str = None):
+	if warn_true:
+		for k, v in warn_true.items():
+			if not v:
+				warnings.warn(f"{inspect.stack()[1].function} should be using {k}")
+				if warning_message:
+					print(warning_message)
+	if warn_false:
+		for k, v in warn_false.items():
+			if v:
+				warnings.warn(f"{inspect.stack()[1].function} should be using {k}=False")
+				if warning_message:
+					print(warning_message)
+	for k, v in require_true.items():
+		if not v:
+			raise Exception(f"{inspect.stack()[1].function} requires {k}")
+	if require_false:
+		for k, v in require_false.items():
+			if v:
+				raise Exception(f"{inspect.stack()[1].function} requires {k}=False")

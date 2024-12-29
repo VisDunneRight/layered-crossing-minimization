@@ -3,7 +3,7 @@ import random
 import time
 import itertools
 import gurobipy as gp
-import multiprocessing as mp
+# import multiprocessing as mp
 from gurobipy import GRB
 # from sklearn.cluster import SpectralClustering
 from src import vis, reductions, motifs, type_conversions, read_data
@@ -53,6 +53,12 @@ class LayeredOptimizer:
 		self.polyhedral_constraints = kwargs.get("polyhedral_constraints", False)
 		self.grouping_constraints = kwargs.get("grouping_constraints", False)
 		self.sequential_grouping_constraints = kwargs.get("sequential_grouping_constraints", True)
+		self.node_emphasis = kwargs.get("node_emphasis", False)
+		self.angular_resolution = kwargs.get("angular_resolution", False)
+		self.min_max_crossings = kwargs.get("min_max_crossings", False)
+		self.only_min_max_crossings = kwargs.get("only_min_max_crossings", False)
+		self.edge_bundling = kwargs.get("edge_bundling", False)
+		self.gamma_bundle = kwargs.get("gamma_bundle", 1)
 		self.return_experiment_data = kwargs.get("return_experiment_data", False)
 		self.create_video = kwargs.get("create_video", False)
 		self.constrain_straight_long_arcs = kwargs.get("constrain_straight_long_arcs", False)
@@ -89,13 +95,15 @@ class LayeredOptimizer:
 			else:
 				num_crossings, t2 = self.__optimize_crossing_reduction_model(m, g, env, x_vars=x_vars)
 
+			# g.assign_y_vals_given_x_vars(self.x_var_assign)
+			# vis.draw_graph(g, "interim")
+
 			""" Adjust objects if leaves were collapsed/filler nodes added """
 			if self.grouping_constraints:
+				g.assign_y_vals_given_x_vars(self.x_var_assign)
 				reductions.remove_filler_nodes(g, self.x_var_assign)
 			if self.collapse_leaves:
 				g = g.old_g
-
-			# vis.draw_graph(g, "interim")
 
 			""" Sequential bendiness reduction """
 			if self.bendiness_reduction and self.sequential_bendiness:
@@ -104,7 +112,7 @@ class LayeredOptimizer:
 				t3 = time.time() - t3
 			else:
 				t3 = 0
-				if self.direct_transitivity:
+				if self.direct_transitivity and not self.grouping_constraints:
 					g.assign_y_vals_given_x_vars(self.x_var_assign)
 				else:
 					for v in m.getVars():
@@ -134,7 +142,7 @@ class LayeredOptimizer:
 			if self.record_solution_data_over_time:
 				return ncr_list, ntimes_list
 
-			return round(t1 + t2 + t3, 3), num_crossings
+			return round(t1 + t2 + t3, 3), num_crossings  # TODO: Improve return val, e.g. named tuple with better naming conventions
 
 	def __crossing_reduction_model(self, m: gp.Model, g: LayeredGraph, fix_x_vars=None, start_x_vars=None, groups=None):
 		if self.polyhedral_constraints:
@@ -143,6 +151,8 @@ class LayeredOptimizer:
 			self.direct_transitivity = True
 		if self.constrain_straight_long_arcs and not self.vertical_transitivity:
 			print("Using vertical transitivity instead to constrain long arcs")
+			self.vertical_transitivity, self.direct_transitivity = True, False
+		if self.bendiness_reduction and self.direct_transitivity and not self.sequential_bendiness:
 			self.vertical_transitivity, self.direct_transitivity = True, False
 
 		nodes_by_layer = g.get_ids_by_layer()
@@ -165,10 +175,11 @@ class LayeredOptimizer:
 		else:
 			z = None
 		c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars)
+		c_vars_orig, nc_consts = None, None
 		if self.mirror_vars:
 			c_vars_orig, nc_consts = reductions.normal_c_vars(g, edges_by_layer, False)
 		c = m.addVars(c_vars, vtype=relax_type, name="c")
-		# if self.grouping_constraints:
+		# if self.grouping_constraints:  # THIS IS FOR Y-VALUE BASED GROUP CONSTRAINTS
 		# 	sl_groups, ml_groups = groups[0], groups[1]
 		# 	grp_lb, grp_ub = [], []
 		# 	if ml_groups:
@@ -178,11 +189,19 @@ class LayeredOptimizer:
 		# 	if len(ml_groups) > 0 and not self.vertical_transitivity:
 		# 		print("There are multilayer groups—swapping to vertical transitivity.")
 		# 		self.vertical_transitivity, self.direct_transitivity = True, False
-		if self.vertical_transitivity or self.stratisfimal_y_vars:
-			y_vars = [n.id for n in g]
-			y = m.addVars(y_vars, vtype=relax_type, lb=0, ub=self.m_val, name="y")
-		else:
-			y = None
+		y = None
+		if self.vertical_transitivity or (self.bendiness_reduction and not self.sequential_bendiness):
+			y = m.addVars([n.id for n in g], vtype=relax_type, lb=0, ub=self.m_val, name="y")
+		b, b_vars = None, None
+		if not self.sequential_bendiness and self.bendiness_reduction:
+			b_vars = list(g.edge_ids.keys())
+			b = m.addVars(b_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="b")
+		alpha, alpha_vars, a_aux_diff, bundle = None, None, None, None
+		if self.edge_bundling:
+			alpha_vars = [(a1, a2) for lid in g.layers for ix, a1 in enumerate(nodes_by_layer[lid]) if g[a1].is_anchor_node for a2 in nodes_by_layer[lid][ix+1:] if g[a2].is_anchor_node]
+			alpha = m.addVars(alpha_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="alpha")
+			a_aux_diff = m.addVars(alpha_vars, vtype=GRB.INTEGER, lb=-self.m_val, ub=self.m_val, name="a_aux_diff")
+			bundle = m.addVar(vtype=GRB.INTEGER, lb=0, name="bundle")
 		m.update()
 
 		""" Fix variables/set starting assignments """
@@ -228,25 +247,8 @@ class LayeredOptimizer:
 		butterfly_c_pairs = self.get_butterfly_cvars(g, c_vars)
 
 		""" Set model objective function """
-		if not self.sequential_bendiness:
-			if self.bendiness_reduction:
-				b_vars = list(g.edge_ids.keys())
-				b = m.addVars(b_vars, vtype=GRB.INTEGER, lb=0, ub=self.m_val, name="b")
-				m.setObjective(self.gamma_1 * c.sum() + self.gamma_2 * b.sum(), GRB.MINIMIZE)
-			else:
-				opt = gp.LinExpr()
-				for i, c_var in enumerate(c_vars):
-					opt += c_consts[i] * c[c_var]
-				m.setObjective(opt, GRB.MINIMIZE)
-		else:
-			opt = gp.LinExpr()
-			if self.mirror_vars and self.symmetry_constraints:
-				for i, c_var in enumerate(c_vars_orig):
-					opt += nc_consts[i] * c[c_var]
-			else:
-				for i, c_var in enumerate(c_vars):
-					opt += c_consts[i] * c[c_var]
-			m.setObjective(opt, GRB.MINIMIZE)
+		opt_func = self.__optimization_function(c, c_vars, c_vars_orig, b, c_consts, nc_consts, bundle)
+		m.setObjective(opt_func, GRB.MINIMIZE)
 
 		""" Transitivity constraints """
 		self.__transitivity(m, nodes_by_layer, x_vars, x, y, z)
@@ -273,9 +275,11 @@ class LayeredOptimizer:
 		self.__long_edge_constraints(m, g, y)
 
 		""" Group constraints """
-		if self.grouping_constraints:
-			# self.__add_group_constraints(m, g, x_vars, x, y, sl_groups, ml_groups, grp_lb, grp_ub, nodes_by_layer)
-			self.__add_group_constraints(m, g, x_vars, x, y, groups[0], groups[1], [], [], nodes_by_layer)
+		# self.__add_group_constraints(m, g, x_vars, x, y, sl_groups, ml_groups, grp_lb, grp_ub, nodes_by_layer)
+		self.__add_group_constraints(m, g, x_vars, x, groups, nodes_by_layer)
+
+		""" Edge bundling constraints """
+		self.__edge_bundling(m, g, alpha, a_aux_diff, alpha_vars, bundle, x, x_vars, nodes_by_layer)
 
 		""" Non-sequential bendiness reduction, original Stratisfimal version"""
 		if not self.sequential_bendiness and self.bendiness_reduction:
@@ -319,8 +323,8 @@ class LayeredOptimizer:
 				set_x_var(self.x_var_assign, xv1, xv2, round(v.x))
 			# elif v.varName[:1] == "c" and round(v.x) != 0:
 			# 	print(v.varName, v.x)
-			elif v.varName[:1] == "u" or v.varName[0] == "l":
-				print(v.varName, v.x)
+			# elif v.varName[0] == "b" or v.varName[0] == "y":
+			# 	print(v.varName, v.x)
 		num_crossings = round(m.objVal)
 
 		""" Optimize and merge collapsed subgraphs """
@@ -330,6 +334,19 @@ class LayeredOptimizer:
 			return num_crossings, t2, crossing_values, time_values
 		else:
 			return num_crossings, t2
+
+	def __optimization_function(self, c, c_vars, c_vars_orig, b, c_consts, nc_consts, bundle):
+		opt = gp.LinExpr()
+		c_mult, b_mult = self.gamma_1, self.gamma_2
+		c_to_iter = c_vars_orig if self.mirror_vars and self.symmetry_constraints else c_vars
+		use_consts = nc_consts if self.mirror_vars and self.symmetry_constraints else c_consts
+		for i, c_var in enumerate(c_to_iter):
+			opt += c_mult * use_consts[i] * c[c_var]
+		if not self.sequential_bendiness and self.bendiness_reduction:
+			opt += b_mult * b.sum()
+		if self.edge_bundling:
+			opt += self.gamma_bundle * bundle
+		return opt
 
 	def __sequential_br(self, graph_arg=None, substitute_x_vars=None, env=None, streamline=True, groups=None):
 		g = self.g if graph_arg is None else graph_arg
@@ -619,10 +636,11 @@ class LayeredOptimizer:
 
 	def __heuristic_start(self, model: gp.Model, graph: LayeredGraph):
 		if self.heuristic_start:
-			g_igraph = type_conversions.layered_graph_to_igraph(graph)
-			heuristic_layout = g_igraph.layout_sugiyama(layers=g_igraph.vs["layer"])
-			for i, coord in enumerate(heuristic_layout.coords[:graph.n_nodes]):
-				graph.nodes[i].y = coord[0]
+			improved_sifting(graph)
+			# g_igraph = type_conversions.layered_graph_to_igraph(graph)
+			# heuristic_layout = g_igraph.layout_sugiyama(layers=g_igraph.vs["layer"])
+			# for i, coord in enumerate(heuristic_layout.coords[:graph.n_nodes]):
+			# 	graph.nodes[i].y = coord[0]
 			for lay in graph.layers:
 				graph.layers[lay].sort(key=lambda nd1: nd1.y)
 				l_offset = 0
@@ -859,8 +877,24 @@ class LayeredOptimizer:
 					m.addConstr(klc * x[kl1, kl2] - 2 * kmc * x[km1, km2] + lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] + (1 - klc)//2 - (1 - kmc) + (1 - lmc)//2 <= 0)
 					m.addConstr(-klc * x[kl1, kl2] + 2 * kmc * x[km1, km2] - lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] - (1 - klc)//2 + (1 - kmc) - (1 - lmc)//2 <= 0)
 
-	def __add_group_constraints(self, m: gp.Model, g: LayeredGraph, xvars, x, y, sl_groups, ml_groups, lbx, ubx, n_b_l):
+	def __edge_bundling(self, m: gp.Model, g: LayeredGraph, a, a_aux_diff, a_vars, bundle, x, x_vars, n_b_l):
+		if self.edge_bundling:
+			for a1, a2 in a_vars:
+				lid = g[a1].layer
+				a1_xsum, a2_xsum = gp.LinExpr(), gp.LinExpr()
+				for nd in n_b_l[lid]:
+					if not g[nd].is_anchor_node:
+						x_r, u1, u2 = get_x_var_consts(x_vars, a1, nd)
+						x_r2, v1, v2 = get_x_var_consts(x_vars, a2, nd)
+						a1_xsum += x_r * x[u1, u2] + (1 - x_r) // 2
+						a2_xsum += x_r2 * x[v1, v2] + (1 - x_r2) // 2
+				m.addConstr(a_aux_diff[a1, a2] == a2_xsum - a1_xsum)
+				m.addGenConstrAbs(a[a1, a2], a_aux_diff[a1, a2])
+			m.addGenConstrNorm(bundle, a, 0)
+
+	def __add_group_constraints(self, m: gp.Model, g: LayeredGraph, xvars, x, groups, n_b_l):
 		if self.grouping_constraints:
+			sl_groups, ml_groups = groups[0], groups[1]
 			for group in sl_groups:
 				lid = g[group[0]].layer
 				for nd1 in group:
