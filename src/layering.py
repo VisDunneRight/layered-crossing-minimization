@@ -83,18 +83,30 @@ def create_better_layered_graph(rome_file, w, c, remove_sl=True):
 
 def create_edge_list_layered_graph(filepath, w, c, remove_sl=True):
     with open(filepath) as f:
-        simple_g = {}
+        seen_ids = set()
+        edges = []
         for line in f.readlines():
             if line == '\n':
                 continue
             e = re.split('[ ,\n]', line)
-            e = [entry for entry in e if entry.isnumeric()]
+            e = [int(entry) for entry in e if entry.isnumeric()]
             assert len(e) == 2, "file format incorrect. Each line should be integers of the form: u, v"
-            if int(e[0]) not in simple_g:
-                simple_g[int(e[0])] = []
-            if int(e[1]) not in simple_g:
-                simple_g[int(e[1])] = []
-            simple_g[int(e[0])].append(int(e[1]))
+            edges.append(e)
+            seen_ids.add(e[0])
+            seen_ids.add(e[1])
+    if len(seen_ids) < max(seen_ids) + 1:
+        missing_nds = [v for v in range(max(seen_ids) + 1) if v not in seen_ids]
+        print(f"removing {len(missing_nds)} disconnected nodes and reindexing")
+        for ed in edges:
+            ed[0] -= sum(1 for v in missing_nds if v < ed[0])
+            ed[1] -= sum(1 for v in missing_nds if v < ed[1])
+    simple_g = {}
+    for e in edges:
+        if int(e[0]) not in simple_g:
+            simple_g[int(e[0])] = []
+        if int(e[1]) not in simple_g:
+            simple_g[int(e[1])] = []
+        simple_g[int(e[0])].append(int(e[1]))
     # print("s_g", simple_g)
     to_remove = cycle_removal(simple_g)
     for edge in to_remove:

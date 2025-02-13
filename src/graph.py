@@ -16,6 +16,7 @@ class LayeredNode:
 		self.name = node_id if name is None else name
 		self.fix = fix
 		self.energy = 0
+		self.weight = 1
 		self.tabu = False
 
 	def __str__(self):
@@ -191,6 +192,19 @@ class LayeredGraph:
 			self.create_double_adj_list()
 		return self.double_adj_list
 
+	def get_long_edges(self):
+		long_edges = []
+		d_adj = self.get_double_adj_list()
+		for u1, u2 in self.edge_ids:
+			if self.__getitem__(u2).is_anchor_node and not self.__getitem__(u1).is_anchor_node:
+				cur = u2
+				long_edges.append([u1])
+				while self.__getitem__(cur).is_anchor_node:
+					long_edges[-1].append(cur)
+					cur = d_adj[cur][1][0]
+				long_edges[-1].append(cur)
+		return long_edges
+
 	def invalidate_data(self):
 		"""
 		:return: None. Internal method to wipe stored data if the graph's structure is modified
@@ -287,6 +301,7 @@ class LayeredGraph:
 		:return: None
 		"""
 		if type(groups) == dict:
+			self.node_data["groups"] = {}
 			for nd, gp_val in groups.items():
 				if not isinstance(gp_val, int):
 					raise TypeError("Invalid format for group values")
@@ -305,18 +320,88 @@ class LayeredGraph:
 		else:
 			raise TypeError("Invalid format")
 
-	def add_node_emphasis(self, emphasis):
+	def add_fairness_values(self, fairness_vals):
 		"""
-		:param emphasis: dictionary mapping node name or ID -> emphasis value (real number >= 1)
+		:param fairness_vals: dictionary mapping node name or ID -> fairness ID (0 or 1), or list of lists of nodes in each fairness group
 		:return: None
 		"""
-		if type(emphasis) == dict:
-			for nd, e_val in emphasis.items():
-				if not isinstance(e_val, (int, float)) or e_val < 1:
-					raise TypeError("Invalid format for emphasis values")
-				self.node_data["emphasis"][self.__getitem__(nd).id] = e_val
+		if type(fairness_vals) == dict:
+			f_set = set(fairness_vals.values())
+			assert len(f_set) == 2, f"Fairness is only supported between 2 groups, you specify {len(f_set)} groups"
+			self.node_data["fairness"] = {}
+			f_v_1 = f_set.pop()
+			for nd, f_val in fairness_vals.items():
+				if f_val == f_v_1:
+					self.node_data["fairness"][self.__getitem__(nd).id] = 0
+				else:
+					self.node_data["fairness"][self.__getitem__(nd).id] = 1
+		elif type(fairness_vals) == list:
+			assert len(fairness_vals) == 2, "Fairness is only supported between 2 groups"
+			self.node_data["fairness"] = {}
+			for nd in fairness_vals[0]:
+				self.node_data["fairness"][self.__getitem__(nd).id] = 0
+			for nd in fairness_vals[1]:
+				self.node_data["fairness"][self.__getitem__(nd).id] = 1
+		else:
+			raise TypeError("Invalid format")
+
+	def add_node_emphasis(self, emphasis):
+		"""
+		:param emphasis: list of nodes to emphasize
+		:return: None
+		"""
+		if type(emphasis) == list:
+			for nd in emphasis:
+				self.__getitem__(nd)
+			self.node_data["emphasis"] = emphasis
 		else:
 			raise TypeError("Invalid format for emphasis")
+
+	def add_node_weights(self, weights):
+		"""
+		:param weights: dictionary mapping node name or ID -> node weight (real number, default 1), or list
+		:return: None
+		"""
+		if type(weights) == dict:
+			for ndid, e_val in weights.items():
+				if not isinstance(e_val, (int, float)):
+					raise Exception("Invalid format for weight values")
+				self.__getitem__(ndid).weight = e_val
+		elif type(weights) == list:
+			if len(weights) != self.n_nodes:
+				raise Exception(f"Num weights={len(weights)} does not match num nodes={self.n_nodes}")
+			for ndid, e_val in enumerate(weights):
+				if not isinstance(e_val, (int, float)):
+					raise Exception("Invalid format for weight values")
+				self.__getitem__(ndid).weight = e_val
+		else:
+			raise TypeError("Invalid format for weights")
+
+	def add_edge_weights(self, weights):
+		"""
+		:param weights: dictionary mapping (node 1 ID, node 2 ID) -> edge weight (real number, default 1)
+		:return: None
+		"""
+		if type(weights) == dict:
+			for eid, w_val in weights.items():
+				if not isinstance(w_val, (int, float)):
+					raise Exception("Invalid format for weight values")
+				self.get_edge(eid[0], eid[1]).weight = w_val
+		else:
+			raise TypeError("Invalid format for weight values")
+
+	def add_node_fix(self, node_ids, fix_loc):
+		"""
+		:param node_ids: list of node ids to fix
+		:param fix_loc: string corresponding to relative location to fix nodes. One of 'top', 'middle', 'bottom'
+		:return: None
+		"""
+		if fix_loc not in ("top", "middle", "bottom"):
+			raise Exception("fix_loc must be one of: 'top', 'middle', 'bottom'")
+		if "fix_nodes" not in self.node_data:
+			self.node_data["fix_nodes"] = {}
+		for nid in node_ids:
+			self.node_data["fix_nodes"][nid] = fix_loc
 
 	def add_graph_by_edges(self, edge_list):
 		"""
@@ -685,7 +770,7 @@ class LayeredGraph:
 		n_ec = 0
 		for edge_list in e_b_l.values():
 			for e1, e2 in itertools.combinations(edge_list, 2):
-				if len({e1.n1, e1.n2, e2.n1, e2.n2}) == 4:
+				if len({e1.n1.id, e1.n2.id, e2.n1.id, e2.n2.id}) == 4:
 					if e1.same_layer_edge and e2.same_layer_edge:
 						u1, w1, u2, w2 = e1.n1.y, e1.n2.y, e2.n1.y, e2.n2.y
 						if (u1 > u2 > w1 > w2) or (u1 > w2 > w1 > u2) or (w1 > u2 > u1 > w2) or (w1 > w2 > u1 > u2) or (u2 > u1 > w2 > w1) or (u2 > w1 > w2 > u1) or (w2 > u1 > u2 > w1) or (w2 > w1 > u2 > u1):
@@ -698,8 +783,27 @@ class LayeredGraph:
 							n_ec += 1
 					elif (e1.n1.y > e2.n1.y and e1.n2.y < e2.n2.y) or (e1.n1.y < e2.n1.y and e1.n2.y > e2.n2.y):
 						n_ec += 1
-						# print(f"({e1.n1}, {e1.n2}), ({e2.n1}, {e2.n2})")
 		return n_ec
+
+	def edge_crossing_edges(self):
+		e_b_l = self.get_edges_by_layer()
+		edge_pairs = []
+		for edge_list in e_b_l.values():
+			for e1, e2 in itertools.combinations(edge_list, 2):
+				if len({e1.n1.id, e1.n2.id, e2.n1.id, e2.n2.id}) == 4:
+					if e1.same_layer_edge and e2.same_layer_edge:
+						u1, w1, u2, w2 = e1.n1.y, e1.n2.y, e2.n1.y, e2.n2.y
+						if (u1 > u2 > w1 > w2) or (u1 > w2 > w1 > u2) or (w1 > u2 > u1 > w2) or (w1 > w2 > u1 > u2) or (u2 > u1 > w2 > w1) or (u2 > w1 > w2 > u1) or (w2 > u1 > u2 > w1) or (w2 > w1 > u2 > u1):
+							edge_pairs.append(((e1.n1.id, e1.n2.id), (e2.n1.id, e2.n2.id)))
+					elif e1.same_layer_edge:
+						if (e1.n1.y > e2.n1.y > e1.n1.y) or (e1.n2.y > e2.n1.y > e1.n1.y):
+							edge_pairs.append(((e1.n1.id, e1.n2.id), (e2.n1.id, e2.n2.id)))
+					elif e2.same_layer_edge:
+						if (e2.n1.y > e1.n1.y > e2.n2.y) or (e2.n2.y > e1.n1.y > e2.n1.y):
+							edge_pairs.append(((e1.n1.id, e1.n2.id), (e2.n1.id, e2.n2.id)))
+					elif (e1.n1.y > e2.n1.y and e1.n2.y < e2.n2.y) or (e1.n1.y < e2.n1.y and e1.n2.y > e2.n2.y):
+						edge_pairs.append(((e1.n1.id, e1.n2.id), (e2.n1.id, e2.n2.id)))
+		return edge_pairs
 
 	def num_edge_crossings_from_xvars_no_sl(self, x_vars):
 		e_b_l = self.get_edges_by_layer()
@@ -766,7 +870,7 @@ class LayeredGraph:
 		n_bends = 0
 		for ed in self.edges:
 			n_bends += abs(ed.n1.y - ed.n2.y)
-		print(f"Crossing: {n_cr}\tBends: {n_bends}")
+		print(f"Crossings: {n_cr}\tBends: {n_bends}")
 		return gamma_1 * n_cr + gamma_2 * n_bends
 
 	def collapse_ap_cases(self, leaves_only=False):

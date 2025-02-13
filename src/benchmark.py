@@ -9,7 +9,7 @@ from natsort import natsorted
 def generate_benchmark(conditions, condition_map, run_function, path_to_data, name="my_benchmark", in_conds=None, nested_data=-1, exclude_files=None, exclude_dirs=None, allowed_filetypes=None, csv_header=None, dependencies=None, local_dependencies=None, class_dependencies=None, project_root=None):
     """
     :param conditions: List of conditions as strings
-    :param condition_map: Dictionary mapping all conditions to a list of values for that condition. Values may be any static type
+    :param condition_map: Dictionary mapping all conditions to a list of values for that condition. Values may be any hashable type
     :param run_function: Run function for the benchmark experiemnt. Must take as input:
             A value for each condition. Parameter name must match name of condition
             Path to a data file. Parameter name must be 'data_path'
@@ -103,7 +103,7 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
 
     # build python executable
     tab = ' ' * 4
-    build_code = ["import sys", "import csv"]
+    build_code = ["import sys", "import csv", "import os"]
 
     # import all dependencies
     if dependencies is not None:
@@ -113,9 +113,6 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
             build_code.append(f"import {dependencies}")
         else:
             raise TypeError("Dependencies is not a list or string")
-    if project_root is not None:
-        assert type(project_root) == str
-        build_code.append(f"\nsys.path.append('{project_root}')\n")
     if local_dependencies is not None:
         if project_root is None:
             raise Exception("Need to specify project root")
@@ -134,6 +131,9 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
             build_code.append(f"from {'.'.join(class_dependencies.replace('.py', '').split('.')[0].split('/'))} import {class_dependencies.replace('.py', '').split('.')[1]}")
         else:
             raise TypeError("Class dependencies is not a list or string")
+    if project_root is not None:
+        assert type(project_root) == str
+        build_code.append(f"\nsys.path.append('{project_root}')")
 
     # build helper functions
     build_code += [
@@ -174,7 +174,7 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
     build_code.append(f"{tab * (len(conditions) + 3)}if idx == ct:")
     i_tab = tab * (len(conditions) + 4)
     build_code.append(f"{i_tab}print(len(files) if idx % len(files) == 0 else idx % len(files), '/', len(files))")
-    build_code.append(f"{i_tab}out = {run_function.__name__}({'_iter, '.join([str(cond) + '=' + cond for cond in conditions])}_iter, data_path=prefix+file)")
+    build_code.append(f"{i_tab}out = {run_function.__name__}({'_iter, '.join([str(cond) + '=' + cond for cond in conditions])}{'_iter, ' if len(conditions) >= 1 else ''}data_path=prefix+file)")
     build_code.append(f"{i_tab}insert_one(csvpath, [idx, file] + cur_conds + list(out))")
     build_code.append(f"{i_tab}idx += 1")
     build_code.append(f"{tab * (len(conditions) + 3)}ct += 1")
@@ -212,7 +212,7 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
         f"{tab * (len(in_conds) + 2)}for file in files:",
         f"{tab * (len(in_conds) + 3)}if idx == ct:",
         f"{i_tab}print(len(files) if idx % len(files) == 0 else idx % len(files), '/', len(files))",
-        f"{i_tab}out = {run_function.__name__}({'_val, '.join([str(cond) + '=' + cond for cond in conditions])}_val, data_path=prefix+file)",
+        f"{i_tab}out = {run_function.__name__}({'_val, '.join([str(cond) + '=' + cond for cond in conditions])}{'_val, ' if len(conditions) >= 1 else ''}data_path=prefix+file)",
         f"{i_tab}insert_one(csvpath, [idx, file] + [{', '.join(all_c_var_names)}] + list(out))",
         f"{i_tab}idx += 1",
         f"{tab * (len(in_conds) + 3)}ct += 1"
@@ -231,8 +231,8 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
         "# SBATCH --time 12:00:00           # Request 12 hours of compute time",
         "# SBATCH --mem=8G           # Request 8GB memory",
         "# SBATCH --constraint=broadwell           # Run job on the broadwell hardware cluster",
-        "# SBATCH -o outputs/partition_%A_%a.txt       # Standard output file",
-        "# SBATCH -e errors/partition_%A_%a.txt        # Standard error file",
+        f"# SBATCH -o outputs/{name}_%A_%a.txt       # Standard output file",
+        f"# SBATCH -e errors/{name}_%A_%a.txt        # Standard error file",
         "",
         "srun python benchmark_exec.py $SLURM_ARRAY_TASK_ID"
     ]

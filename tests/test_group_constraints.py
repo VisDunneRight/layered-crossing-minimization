@@ -15,28 +15,30 @@ class TestOptimizationWithGroups(unittest.TestCase):
         self.g4 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
 
     def test_sl_groups(self):
-        opt = optimization.LayeredOptimizer(self.g1, symmetry_breaking=True, grouping_constraints=True)
-        opt.optimize_layout()
+        opt = optimization.LayeredOptimizer(self.g1)
+        opt.optimize_layout(grouping_constraints=True, crossing_minimization=True)
         vis.draw_graph(self.g1, "GRP_TEST")
 
     def test_ml_groups(self):
-        opt = optimization.LayeredOptimizer(self.g2, symmetry_breaking=True, grouping_constraints=True)
-        opt.optimize_layout()
+        opt = optimization.LayeredOptimizer(self.g2)
+        opt.optimize_layout(grouping_constraints=True, crossing_minimization=True)
         vis.draw_graph(self.g2, "GRP_TEST_2")
 
     def test_all_groups_hard(self):
-        opt = optimization.LayeredOptimizer(self.g3, symmetry_breaking=True, grouping_constraints=True)
-        opt.optimize_layout()
+        opt = optimization.LayeredOptimizer(self.g3)
+        opt.optimize_layout(grouping_constraints=True, crossing_minimization=True)
         vis.draw_graph(self.g3, "GRP_TEST_3")
 
     def test_all_groups_hard_with_bendiness(self):
-        opt = optimization.LayeredOptimizer(self.g3, symmetry_breaking=True, grouping_constraints=True, sequential_bendiness=True, bendiness_reduction=True, sequential_grouping_constraints=True)
-        opt.optimize_layout()
-        vis.draw_graph(self.g3, "GRP_TEST_3bend")
+        opt = optimization.LayeredOptimizer(self.g3)
+        opt.optimize_layout(grouping_constraints=True, crossing_minimization=True)
+        vis.draw_graph(self.g3, "GRP_TEST_3bendA")
+        opt.optimize_layout(bendiness_reduction=True, grouping_constraints=True, sequential_grouping_constraints=True, fix_x_vars=True)
+        vis.draw_graph(self.g3, "GRP_TEST_3bendB")
 
     def test_group_correctness(self):
-        opt = optimization.LayeredOptimizer(self.g4, symmetry_breaking=True)
-        res1 = opt.optimize_layout()
+        opt = optimization.LayeredOptimizer(self.g4)
+        res1 = opt.optimize_layout(crossing_minimization=True)
         vis.draw_graph(self.g4, "GRP_TEST_4a")
         grouped = set()
         groups = []
@@ -54,7 +56,7 @@ class TestOptimizationWithGroups(unittest.TestCase):
                                 grouped.add(nd.id)
                                 continue
         self.g4.add_groups(groups)
-        opt2 = optimization.LayeredOptimizer(self.g4, symmetry_breaking=True, grouping_constraints=True)
-        res2 = opt2.optimize_layout()
+        opt2 = optimization.LayeredOptimizer(self.g4)
+        res2 = opt2.optimize_layout(grouping_constraints=True, crossing_minimization=True)
         vis.draw_graph(self.g4, "GRP_TEST_4b")
-        self.assertEqual(res1[1], res2[1])
+        self.assertEqual(res1.objval, res2.objval)

@@ -1,10 +1,10 @@
 import time
-
 import src.read_data
 import src.vis
 from src import graph
 import random
 import os
+import networkx
 
 
 def true_random_connected_layered_graph(k, n, d):
@@ -575,6 +575,18 @@ def generate_ratio_graphs_degree_3(seed=22201):
 	# 			ng.write_out(f"../random graphs/ratio_d3/r3k{k}n{n}/graph{i}.lgbin")
 
 
+def generate_nx_random_graph_dataset():
+	for n in range(5, 101, 5):
+		gid = 0
+		for d, ngraphs in [(1, 163), (1.5, 50), (2, 25), (2.5, 12)]:
+			for i in range(ngraphs):
+				gr = networkx.gnm_random_graph(n, round(n * (d + i / (2 * ngraphs))))
+				with open(f"../random graphs/networkx/graph_{n}_{gid}", 'w') as fd:
+					for ed in gr.edges:
+						fd.write(f"{ed[0]},{ed[1]}\n")
+				gid += 1
+
+
 if __name__ == '__main__':
 	# generate_gange_dataset(seed=22)
 	# generate_random_density_set(seed=49)
@@ -585,7 +597,8 @@ if __name__ == '__main__':
 	# generate_ratio_graphs()
 	# generate_ratio_graphs_degree_3()
 	# generate_ratio1dot5_graphs_d3_with_big_layers()
-	generate_ratio1dot5_graphs_d3_triangle()
+	# generate_ratio1dot5_graphs_d3_triangle()
+	generate_nx_random_graph_dataset()
 
 	# gr = src.read_data.read("../random graphs/big_layer/k36n24/graph1.lgbin")
 	# gr = src.read_data.read("../random graphs/ratio_d3/r1.5k24n16/graph44.lgbin")

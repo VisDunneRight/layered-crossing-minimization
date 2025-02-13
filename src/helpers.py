@@ -1,6 +1,7 @@
 import math
 import warnings
 import inspect
+from gurobipy import LinExpr
 
 
 def get_x_var(x_vars_dict, u1, u2):
@@ -66,3 +67,23 @@ def require(require_true: dict, require_false: dict = None, warn_true: dict = No
 		for k, v in require_false.items():
 			if v:
 				raise Exception(f"{inspect.stack()[1].function} requires {k}=False")
+
+
+def require_graph_props(g, require_node_data: list = None, warn_node_data: list = None):
+	if require_node_data:
+		for req in require_node_data:
+			if req not in g.node_data or g.node_data[req] is None:
+				raise Exception(f"{inspect.stack()[1].function} requires graph property [{req}]")
+	if warn_node_data:
+		for req in warn_node_data:
+			if req not in g.node_data or g.node_data[req] is None:
+				warnings.warn(f"{inspect.stack()[1].function} recommends graph property [{req}]")
+
+
+def calc_x_var_sum(nd, layer_nodes, x_v_set, x):
+	xsum = LinExpr()
+	for nd_ot in layer_nodes:
+		if nd_ot != nd:
+			x_r, u1, u2 = get_x_var_consts(x_v_set, nd, nd_ot)
+			xsum += x_r * x[u1, u2] + (1 - x_r) // 2
+	return xsum

@@ -11,7 +11,10 @@ def read(filepath, w=4, c=2, layer_assignments=None, remove_sl=True):
 	collection = ""
 	if '/' in filepath:
 		if filepath[:2] == "..":
-			collection = filepath[filepath.index('/') + 1:filepath.index('/', 3)]
+			idx = 2
+			while filepath[idx + 1:idx + 3] == "..":
+				idx += 3
+			collection = filepath[filepath.index('/', idx) + 1:filepath.index('/', idx + 1)]
 		else:
 			collection = filepath[:filepath.index('/')]
 	if collection == "Rome-Lib":
@@ -41,7 +44,7 @@ def read(filepath, w=4, c=2, layer_assignments=None, remove_sl=True):
 			if layer_assignments is not None:
 				g = layering.create_edge_list_layered_graph_given_layering(filepath, layer_assignments)
 			else:
-				g = layering.create_edge_list_layered_graph(filepath, w, c, remove_sl=remove_sl)
+				g, _ = layering.create_edge_list_layered_graph(filepath, w, c, remove_sl=remove_sl)
 		if min(g.layers) != 0:
 			g.relayer()
 		print("done")
