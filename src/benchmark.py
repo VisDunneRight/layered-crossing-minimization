@@ -223,16 +223,16 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
 
     # build bash file for running slurm job in parallel
     build_script = [
-        "# !/bin/bash",
-        f"# SBATCH -J {name}               # Job name",
-        "# SBATCH --partition=short        # Use short partition (24hrs max)",
-        "# SBATCH -N 1                   # Number of nodes",
-        "# SBATCH -n 1                  # Number of tasks",
-        "# SBATCH --time 12:00:00           # Request 12 hours of compute time",
-        "# SBATCH --mem=8G           # Request 8GB memory",
-        "# SBATCH --constraint=broadwell           # Run job on the broadwell hardware cluster",
-        f"# SBATCH -o outputs/{name}_%A_%a.txt       # Standard output file",
-        f"# SBATCH -e errors/{name}_%A_%a.txt        # Standard error file",
+        "#!/bin/bash",
+        f"#SBATCH -J {name}               # Job name",
+        "#SBATCH --partition=short        # Use short partition (24hrs max)",
+        "#SBATCH -N 1                   # Number of nodes",
+        "#SBATCH -n 1                  # Number of tasks",
+        "#SBATCH --time 12:00:00           # Request 12 hours of compute time",
+        "#SBATCH --mem=8G           # Request 8GB memory",
+        "#SBATCH --constraint=broadwell           # Run job on the broadwell hardware cluster",
+        f"#SBATCH -o outputs/{name}_%A_%a.txt       # Standard output file",
+        f"#SBATCH -e errors/{name}_%A_%a.txt        # Standard error file",
         "",
         "srun python benchmark_exec.py $SLURM_ARRAY_TASK_ID"
     ]
