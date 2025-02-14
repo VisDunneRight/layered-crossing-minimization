@@ -684,24 +684,46 @@ class LayeredGraph:
 		:param remove_sl: Boolean, permanently remove same-layer edges from graph. Default True
 		:return: None. Cleans up graph by removing empty layers and makes sure the layer IDs are indexed from 0.
 		"""
-		n_removals = min((n.layer for n in self.nodes))
-		levels = sorted(list(self.layers.keys()))
-		if n_removals > 0:
-			for level in levels:
+		for node in self.nodes:
+			if node.layer not in self.layers or node not in self.layers[node.layer]:
+				for level in list(self.layers.keys()):
+					if node in self.layers[level]:
+						self.layers[level].remove(node)
+						if not self.layers[level]:
+							del self.layers[level]
+				if node.layer not in self.layers:
+					self.layers[node.layer] = []
+				self.layers[node.layer].append(node)
+		# n_removals = min((n.layer for n in self.nodes))
+		max_layer = max((n.layer for n in self.nodes))
+		n_removals = 0
+		# levels = sorted(list(self.layers.keys()))
+		for level in range(max_layer + 1):
+			if level not in self.layers:
+				n_removals += 1
+			elif n_removals > 0:
 				self.layers[level - n_removals] = self.layers[level]
 				for v in self.layers[level - n_removals]:
 					v.layer -= n_removals
 				del self.layers[level]
-		for node in self.nodes:
-			if node.layer not in self.layers or node not in self.layers[node.layer]:
-				for level in levels:
-					if level - n_removals in self.layers and node in self.layers[level - n_removals]:
-						self.layers[level - n_removals].remove(node)
-						if not self.layers[level - n_removals]:
-							del self.layers[level - n_removals]
-				if node.layer not in self.layers:
-					self.layers[node.layer] = []
-				self.layers[node.layer].append(node)
+		# n_removals = min((n.layer for n in self.nodes))
+		# levels = sorted(list(self.layers.keys()))
+		# if n_removals > 0:
+		# 	for level in levels:
+		# 		self.layers[level - n_removals] = self.layers[level]
+		# 		for v in self.layers[level - n_removals]:
+		# 			v.layer -= n_removals
+		# 		del self.layers[level]
+		# for node in self.nodes:
+		# 	if node.layer not in self.layers or node not in self.layers[node.layer]:
+		# 		for level in levels:
+		# 			if level - n_removals in self.layers and node in self.layers[level - n_removals]:
+		# 				self.layers[level - n_removals].remove(node)
+		# 				if not self.layers[level - n_removals]:
+		# 					del self.layers[level - n_removals]
+		# 		if node.layer not in self.layers:
+		# 			self.layers[node.layer] = []
+		# 		self.layers[node.layer].append(node)
 		removals = []
 		for edge in self.edges:
 			edge.update()
@@ -712,10 +734,6 @@ class LayeredGraph:
 				del self.edge_ids[to_remove.n1.id, to_remove.n2.id]
 				self.edges.remove(to_remove)
 				print(f"Same-layer edge {to_remove} removed")
-		# print(self.nodes)
-		# for i in range(1, len(self.layers) + 1):  # change ids to 0 index
-		# 	self.layers[i - 1] = self.layers[i]
-		# 	del self.layers[i]
 		self.n_layers = len(self.layers)
 		self.nodes.sort(key=lambda x: x.id)
 		self.invalidate_data()
