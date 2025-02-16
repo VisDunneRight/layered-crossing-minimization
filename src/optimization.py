@@ -1092,7 +1092,10 @@ class LayeredOptimizer:
 			else:
 				raise Exception(f"'{self.fairness_metric}' not supported with fairness optimization.\nAllowed metrics: 'crossings', 'bends'\nProceeding without fairness.")
 			f1_csum = f1_csum * total_zeros / total_ones
-			m.addConstr(fair_aux == f0_csum - f1_csum)
+			if f0_csum.size() > 0:
+				m.addConstr(fair_aux == f0_csum - f1_csum)
+			elif f1_csum.size() > 0:
+				m.addConstr(fair_aux == f1_csum - f0_csum)
 			m.addGenConstrAbs(fair_var, fair_aux)
 
 	def __emphasis_constraints(self, m: gp.Model, g: LayeredGraph, x_vars, x, e_vars, e, y, b, n_b_l):

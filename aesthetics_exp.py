@@ -1,6 +1,7 @@
 import sys
 import csv
 import os
+import random
 from src.optimization import LayeredOptimizer
 from src.heuristics import improved_sifting
 
@@ -53,8 +54,18 @@ def run_func(combo_idx, data_path):
     elif combo_idx == 2:  # Angle
         res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True)
     elif combo_idx == 3:  # CR Fair
+        fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        while 0 not in fair_vals or 1 not in fair_vals:
+            fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
+        opt.g.add_fairness_values(fair_nds)
         res = opt.optimize_layout(cutoff_time=tlimit, fairness_constraints=True, fairness_metric="crossings")
     elif combo_idx == 4:  # Bend Fair
+        fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        while 0 not in fair_vals or 1 not in fair_vals:
+            fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
+        opt.g.add_fairness_values(fair_nds)
         res = opt.optimize_layout(cutoff_time=tlimit, fairness_constraints=True, fairness_metric="bends")
     elif combo_idx == 5:  # SymN
         res = opt.optimize_layout(cutoff_time=tlimit, symmetry_maximization=True, symmetry_maximization_edges=False)
@@ -69,8 +80,18 @@ def run_func(combo_idx, data_path):
     elif combo_idx == 10:  # CR+Angle
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, angular_resolution=True)
     elif combo_idx == 11:  # CR+CRFair
+        fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        while 0 not in fair_vals or 1 not in fair_vals:
+            fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
+        opt.g.add_fairness_values(fair_nds)
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, fairness_constraints=True, fairness_metric="crossings", gamma_fair=5)
     elif combo_idx == 12:  # CR+FairBend
+        fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        while 0 not in fair_vals or 1 not in fair_vals:
+            fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
+        opt.g.add_fairness_values(fair_nds)
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, fairness_constraints=True, fairness_metric="bends", gamma_fair=5)
     elif combo_idx == 13:  # CR+SymN
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, symmetry_maximization=True, symmetry_maximization_edges=False)
@@ -85,6 +106,11 @@ def run_func(combo_idx, data_path):
         res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, angular_resolution=True)
     elif combo_idx == 18:  # FairBend (fixed x)
         improved_sifting(opt.g)
+        fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        while 0 not in fair_vals or 1 not in fair_vals:
+            fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
+        opt.g.add_fairness_values(fair_nds)
         res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, fairness_constraints=True, fairness_metric="bends")
     elif combo_idx == 19:  # SymN (fixed x)
         improved_sifting(opt.g)
@@ -97,6 +123,11 @@ def run_func(combo_idx, data_path):
         res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True, angular_resolution=True)
     elif combo_idx == 22:  # FairBend (fixed x) + Bend
         improved_sifting(opt.g)
+        fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        while 0 not in fair_vals or 1 not in fair_vals:
+            fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
+        opt.g.add_fairness_values(fair_nds)
         res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True, fairness_constraints=True, fairness_metric="bends")
     elif combo_idx == 23:  # SymN (fixed x) + Bend
         improved_sifting(opt.g)
