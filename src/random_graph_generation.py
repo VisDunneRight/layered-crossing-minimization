@@ -1,4 +1,7 @@
 import time
+
+import networkx as nx
+
 import src.read_data
 import src.vis
 from src import graph
@@ -576,15 +579,17 @@ def generate_ratio_graphs_degree_3(seed=22201):
 
 
 def generate_nx_random_graph_dataset():
-	for n in range(5, 101, 5):
+	for n in range(5, 101):
 		gid = 0
-		for d, ngraphs in [(1, 163), (1.5, 50), (2, 25), (2.5, 12)]:
-			for i in range(ngraphs):
-				gr = networkx.gnm_random_graph(n, round(n * (d + i / (2 * ngraphs))))
-				with open(f"../random graphs/networkx/graph_{n}_{gid}", 'w') as fd:
-					for ed in gr.edges:
-						fd.write(f"{ed[0]},{ed[1]}\n")
-				gid += 1
+		ngraphs = 100
+		foldername = "../random graphs/networkx2"
+		print(f"N = {n}")
+		for i in range(ngraphs):
+			gr = networkx.gnm_random_graph(n, round(n * (1 + i / ngraphs)))  # uniform, |E| in [|V|, 2|V|)
+			with open(f"{foldername}/graph_{n}_{gid}", 'w') as fd:
+				for ed in gr.edges:
+					fd.write(f"{ed[0]},{ed[1]}\n")
+			gid += 1
 
 
 if __name__ == '__main__':
