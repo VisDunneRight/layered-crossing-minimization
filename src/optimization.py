@@ -502,7 +502,7 @@ class LayeredOptimizer:
 					m.addConstr(y[b_var[0]] - y[b_var[1]] <= b[b_var], f"1bend{b_var}")
 					m.addConstr(y[b_var[1]] - y[b_var[0]] <= b[b_var], f"2bend{b_var}")
 				else:
-					m.addConstr(b_aux[b_var] == y[b_var[0]] - y[b_var[1]])
+					m.addConstr(b_aux[b_var] == y[b_var[0]] - y[b_var[1]], f"bend{b_var}")
 					m.addGenConstrAbs(b[b_var], b_aux[b_var])
 
 	def __transitivity(self, model: gp.Model, g: LayeredGraph, names_by_layer, x_vars, x, y, z):
@@ -1069,7 +1069,7 @@ class LayeredOptimizer:
 				# 	m.addGenConstrAbs(a[a1, a2], a_aux_diff[a1, a2])
 				# m.addGenConstrNorm(bundle, a, 0)
 
-	def __fairness_constraints(self, m: gp.Model, g: LayeredGraph, c_vars, c, b_vars, b, fair_var, fair_aux):
+	def __fairness_constraints(self, m: gp.Model, g: LayeredGraph, c_vars, c, b_vars, b, fair_var):
 		if self.fairness_constraints or any(ele[0] == "crossing_fairness" or ele[0] == "bend_fairness" for ele in self.hybrid_constraints):
 			if "fairness" not in g.node_data:
 				raise Exception("Need to add fairness assignments on nodes, use g.add_fairness_values().")
@@ -1092,11 +1092,8 @@ class LayeredOptimizer:
 			else:
 				raise Exception(f"'{self.fairness_metric}' not supported with fairness optimization.\nAllowed metrics: 'crossings', 'bends'\nProceeding without fairness.")
 			f1_csum = f1_csum * total_zeros / total_ones
-			if f0_csum.size() > 0:
-				m.addConstr(fair_aux == f0_csum - f1_csum)
-			elif f1_csum.size() > 0:
-				m.addConstr(fair_aux == f1_csum - f0_csum)
-			m.addGenConstrAbs(fair_var, fair_aux)
+			m.addConstr(fair_var >= f0_csum - f1_csum)
+			m.addConstr(fair_var >= f1_csum - f0_csum)
 
 	def __emphasis_constraints(self, m: gp.Model, g: LayeredGraph, x_vars, x, e_vars, e, y, b, n_b_l):
 		if self.node_emphasis:
@@ -1249,7 +1246,6 @@ class LayeredOptimizer:
 									m.addConstr(x13_r * x[u131, u132] - x23_r * x[u231, u232] + (1 - x13_r)//2 - (1 - x23_r)//2 == 0)  # Eq. 8
 				ml_gp_to_layers = [set(g[nd].layer for nd in grp) for grp in ml_groups]
 				ml_grps_layerids = [[] for _ in range(g.n_layers)]
-				ml_grp_pairs_seen = []
 				for i, group in enumerate(ml_groups):
 					for lid in ml_gp_to_layers[i]:
 						ml_grps_layerids[lid].append(i)
@@ -1452,10 +1448,9 @@ class LayeredOptimizer:
 			cp_vars = [(e.n1.id, e.n2.id) for e in g.edges]
 			cp = m.addVars(cp_vars, vtype=GRB.INTEGER, lb=0, name="cp")
 			big_c = m.addVar(lb=0, vtype=GRB.INTEGER, name="C")
-		fair_var, fair_aux, b_aux = None, None, None
+		fair_var, b_aux = None, None
 		if self.fairness_constraints or any(ele[0] == "crossing_fairness" or ele[0] == "bend_fairness" for ele in self.hybrid_constraints):
 			fair_var = m.addVar(lb=0, vtype=GRB.CONTINUOUS, name="fair")
-			fair_aux = m.addVar(vtype=GRB.CONTINUOUS, name="fair_aux")
 			if self.fairness_metric == "bends" or any(ele[0] == "bend_fairness" for ele in self.hybrid_constraints):
 				b_aux = m.addVars(b_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val, ub=self.m_val, name="b_aux")
 		ysum_vars, ysum, sym_n, sym_e_vars, sym_e = None, None, None, None, None
@@ -1561,7 +1556,7 @@ class LayeredOptimizer:
 		self.__min_max_crossing_constraints(m, g, c_vars, c, cp_vars, cp, big_c, edges_by_layer)
 
 		""" Fairness constraints """
-		self.__fairness_constraints(m, g, c_vars, c, b_vars, b, fair_var, fair_aux)
+		self.__fairness_constraints(m, g, c_vars, c, b_vars, b, fair_var)
 
 		""" Symmetry (aesthetic metric) constraints """
 		self.__add_symmetry_maximization_constraints(m, y, ysum, ysum_vars, sym_n, sym_e, sym_e_vars)

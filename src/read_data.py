@@ -44,7 +44,7 @@ def read(filepath, w=4, c=2, layer_assignments=None, remove_sl=True):
 			if layer_assignments is not None:
 				g = layering.create_edge_list_layered_graph_given_layering(filepath, layer_assignments)
 			else:
-				g, _ = layering.create_edge_list_layered_graph(filepath, w, c, remove_sl=remove_sl)
+				g, _ = layering.create_edge_list_layered_graph(filepath, w, c, remove_sl=remove_sl, remove_disconnected_nodes="networkx" not in filepath)
 		if min(g.layers) != 0:
 			g.relayer()
 		print("done")

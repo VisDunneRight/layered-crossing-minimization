@@ -81,7 +81,7 @@ def create_better_layered_graph(rome_file, w, c, remove_sl=True):
         return g, tvert
 
 
-def create_edge_list_layered_graph(filepath, w, c, remove_sl=True):
+def create_edge_list_layered_graph(filepath, w, c, remove_sl=True, remove_disconnected_nodes=True):
     with open(filepath) as f:
         seen_ids = set()
         edges = []
@@ -94,13 +94,17 @@ def create_edge_list_layered_graph(filepath, w, c, remove_sl=True):
             edges.append(e)
             seen_ids.add(e[0])
             seen_ids.add(e[1])
+    simple_g = {}
     if len(seen_ids) < max(seen_ids) + 1:
         missing_nds = [v for v in range(max(seen_ids) + 1) if v not in seen_ids]
-        print(f"removing {len(missing_nds)} disconnected nodes and reindexing")
-        for ed in edges:
-            ed[0] -= sum(1 for v in missing_nds if v < ed[0])
-            ed[1] -= sum(1 for v in missing_nds if v < ed[1])
-    simple_g = {}
+        if remove_disconnected_nodes:
+            print(f"removing {len(missing_nds)} disconnected nodes and reindexing")
+            for ed in edges:
+                ed[0] -= sum(1 for v in missing_nds if v < ed[0])
+                ed[1] -= sum(1 for v in missing_nds if v < ed[1])
+        else:
+            for v in missing_nds:
+                simple_g[v] = []
     for e in edges:
         if int(e[0]) not in simple_g:
             simple_g[int(e[0])] = []
