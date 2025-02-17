@@ -1573,8 +1573,8 @@ if __name__ == '__main__':
         for file in files:
             nnds = int(file.split('_')[1])
             if last_nnds != nnds:  # calculate if cutoff
-                cratio = calculate_cutoff(csvpath, last_nnds, 250)
-                if cratio >= 0.25:
+                cratio = calculate_cutoff(csvpath, last_nnds, 100)
+                if cratio > 0.25:
                     print(f"Cut off at bucket N={last_nnds}, completed {100 - cratio * 100}% of graphs.")
                     break
                 else:
