@@ -146,4 +146,4 @@ def calculate_cutoff(csv_file, num_nodes, files_per_bucket):
     return n_cutoff / nfls
 
 
-generate_benchmark(["combo_idx"], {"combo_idx": list(range(11))}, run_func, "../random graphs/networkx2", name="design_constraints", csv_header=["Nodes", "TotalNodes", "ObjVal", "Crossings", "EdgeLength", "Runtime", "Status"], class_dependencies=["src/optimization.LayeredOptimizer"], project_root="/Users/connorwilson/PycharmProjects/stratisfimal-python")
+generate_benchmark(["combo_idx"], {"combo_idx": list(range(12))}, run_func, "../random graphs/networkx2", name="design_constraints", csv_header=["Nodes", "TotalNodes", "ObjVal", "Crossings", "EdgeLength", "Runtime", "Status"], class_dependencies=["src/optimization.LayeredOptimizer"], project_root="/Users/connorwilson/PycharmProjects/stratisfimal-python")

@@ -1448,7 +1448,7 @@ class LayeredOptimizer:
 		e, e_vars = None, None
 		if self.node_emphasis:
 			require_graph_props(g, require_node_data=["emphasis"])
-			e_vars = [(nd, nd_adj) if g[nd].layer < g[nd_adj].layer else (nd_adj, nd) for nd in g.node_data["emphasis"] for nd_adj in g.get_adj_list()[nd]]
+			e_vars = list(set([(nd, nd_adj) if g[nd].layer < g[nd_adj].layer else (nd_adj, nd) for nd in g.node_data["emphasis"] for nd_adj in g.get_adj_list()[nd]]))
 			e = m.addVars(e_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="e")
 		ste = None
 		if self.constrain_straight_long_arcs:
