@@ -3,7 +3,7 @@ import itertools
 from src import graph
 
 
-def normal_c_vars(g: graph.LayeredGraph, edges_by_layer, mirror_vars):
+def normal_c_vars(g: graph.LayeredGraph, edges_by_layer, mirror_vars, use_e_weights=False):
     c_vars = []
     constants = []
     for i, edge_list in edges_by_layer.items():
@@ -11,12 +11,12 @@ def normal_c_vars(g: graph.LayeredGraph, edges_by_layer, mirror_vars):
             for pr in itertools.permutations(edge_list, 2):
                 if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
                     c_vars.append(pr)
-                    constants.append(g.edge_ids[pr[0]].weight * g.edge_ids[pr[1]].weight)
+                    constants.append(g.edge_ids[pr[0]].weight * g.edge_ids[pr[1]].weight if use_e_weights else 1)
         else:
             for pr in itertools.combinations(edge_list, 2):
                 if pr[0][0] != pr[1][0] and pr[0][1] != pr[1][1] and pr[0][0] != pr[1][1] and pr[0][1] != pr[1][0]:
                     c_vars.append(pr)
-                    constants.append(g.edge_ids[pr[0]].weight * g.edge_ids[pr[1]].weight)
+                    constants.append(g.edge_ids[pr[0]].weight * g.edge_ids[pr[1]].weight if use_e_weights else 1)
     return c_vars, constants
 
 
@@ -122,6 +122,9 @@ def get_groups(g: graph.LayeredGraph, add_fillers):
         if "filler_save_group" in g.node_data:
             recovered_nodes = True
             for nd_saved in g.node_data["filler_save_group"]:
+                for gpidx in range(len(ml_groups)):  # Find group this node belongs to
+                    if g.node_data["groups"][ml_groups[gpidx][0]] == nd_saved.energy:
+                        ml_groups[gpidx].append(nd_saved.id)
                 g.add_node(nd_saved.layer, idx=nd_saved.id, data={"groups": nd_saved.energy, "filler": True})
                 g[nd_saved.id].y = nd_saved.y
         else:
@@ -145,7 +148,7 @@ def get_groups(g: graph.LayeredGraph, add_fillers):
         if add_fillers:
             add_filler_nodes(g, layers_to_add=list(set(g[nd].layer for gp in ml_groups for nd in gp)))
     else:
-        print("Multiple group membership not yet supported. Proceeding without groups")
+        raise Exception("Multiple group membership not yet supported. Proceeding without groups")
     return sl_groups, ml_groups, recovered_nodes
 
 

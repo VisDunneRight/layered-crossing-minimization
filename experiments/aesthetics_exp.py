@@ -1,5 +1,5 @@
 import csv
-
+import random
 from src.benchmark import generate_benchmark
 from src.optimization import LayeredOptimizer
 from src.heuristics import improved_sifting
@@ -15,6 +15,11 @@ def run_func(combo_idx, data_path):
     elif combo_idx == 2:  # Angle
         res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True)
     elif combo_idx == 3:  # CR Fair
+        fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        while 0 not in fair_vals or 1 not in fair_vals:
+            fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
+        fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
+        opt.g.add_fairness_values(fair_nds)
         res = opt.optimize_layout(cutoff_time=tlimit, fairness_constraints=True, fairness_metric="crossings")
     elif combo_idx == 4:  # Bend Fair
         res = opt.optimize_layout(cutoff_time=tlimit, fairness_constraints=True, fairness_metric="bends")
@@ -89,4 +94,14 @@ def calculate_cutoff(csv_file, num_nodes, files_per_bucket):
     return n_cutoff / nfls
 
 
-generate_benchmark(["combo_idx"], {"combo_idx": list(range(25))}, run_func, "../random graphs/networkx", name="aesthetics", csv_header=["ComboIdx", "Nodes", "TotalNodes", "ObjVal", "Crossings", "EdgeLength", "Runtime", "Status"], class_dependencies=["src/optimization.LayeredOptimizer"], project_root="/Users/connorwilson/PycharmProjects/stratisfimal-python")
+def get_prev_result_if_exists(file_path, graph_name):
+    with open(file_path, 'r') as fd:
+        for line in fd:
+            if line.split(',')[1] == graph_name:
+                if line.split(',')[11] == "2":
+                    return line
+                else:
+                    return []
+
+
+generate_benchmark(["combo_idx"], {"combo_idx": list(range(25))}, run_func, "../random graphs/networkx2", name="aesthetics", csv_header=["Nodes", "TotalNodes", "ObjVal", "Crossings", "EdgeLength", "Runtime", "Status"], class_dependencies=["src/optimization.LayeredOptimizer"], project_root="/Users/connorwilson/PycharmProjects/stratisfimal-python")

@@ -30,69 +30,50 @@ def insert_one(filename, entry):
 def run_func(combo_idx, data_path):
     opt = LayeredOptimizer(data_path)
     tlimit = 300
-    if combo_idx == 0:  # CR
+    if combo_idx == 0:  # Node weight spacing for CR
+        nweights = [random.randint(1, 10) for _ in range(opt.g.n_nodes)]
+        opt.g.add_node_weights(nweights)
+        opt.m_val *= 2
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, apply_node_weight_spacing=True)
+    elif combo_idx == 1:  # Edge weight mult on BR
+        improved_sifting(opt.g)
+        eweights = {ed: random.randint(1, 10) for ed in opt.g.edge_ids}
+        opt.g.add_edge_weights(eweights)
+        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, apply_edge_weight=True, fix_x_vars=True)
+    elif combo_idx == 2:  # Node Emphasis + CR
+        enodes = random.sample(list(opt.g.node_ids.keys()), max(round(0.05 * opt.g.n_nodes), 1))
+        opt.g.add_node_emphasis(enodes)
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, node_emphasis=True)
+    elif combo_idx == 3:  # Node Emphasis + BR
+        improved_sifting(opt.g)
+        enodes = random.sample(list(opt.g.node_ids.keys()), max(round(0.05 * opt.g.n_nodes), 1))
+        opt.g.add_node_emphasis(enodes)
+        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, fix_x_vars=True, node_emphasis=True)
+    elif combo_idx == 4:  # Same Layer Edges + CR
+        add_sl_edges(opt.g)
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
-    elif combo_idx == 1:  # Bend
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True)
-    elif combo_idx == 2:  # Angle
-        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True)
-    elif combo_idx == 3:  # CR Fair
-        fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
-        while 0 not in fair_vals or 1 not in fair_vals:
-            fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
-        fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
-        opt.g.add_fairness_values(fair_nds)
-        res = opt.optimize_layout(cutoff_time=tlimit, fairness_constraints=True, fairness_metric="crossings")
-    elif combo_idx == 4:  # Bend Fair
-        res = opt.optimize_layout(cutoff_time=tlimit, fairness_constraints=True, fairness_metric="bends")
-    elif combo_idx == 5:  # SymN
-        res = opt.optimize_layout(cutoff_time=tlimit, symmetry_maximization=True, symmetry_maximization_edges=False)
-    elif combo_idx == 6:  # SymN+E
-        res = opt.optimize_layout(cutoff_time=tlimit, symmetry_maximization=True, symmetry_maximization_edges=True)
-    elif combo_idx == 7:  # Bundle
-        res = opt.optimize_layout(cutoff_time=tlimit, edge_bundling=True)
-    elif combo_idx == 8:  # MinMax
-        res = opt.optimize_layout(cutoff_time=tlimit, min_max_crossings=True)
-    elif combo_idx == 9:  # CR+Bend
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, bendiness_reduction=True)
-    elif combo_idx == 10:  # CR+Angle
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, angular_resolution=True)
-    elif combo_idx == 11:  # CR+CRFair
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, fairness_constraints=True, fairness_metric="crossings", gamma_fair=5)
-    elif combo_idx == 12:  # CR+FairBend
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, fairness_constraints=True, fairness_metric="bends", gamma_fair=5)
-    elif combo_idx == 13:  # CR+SymN
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, symmetry_maximization=True, symmetry_maximization_edges=False)
-    elif combo_idx == 14:  # CR+SymN+E
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, symmetry_maximization=True, symmetry_maximization_edges=True)
-    elif combo_idx == 15:  # CR+Bundle
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, edge_bundling=True)
-    elif combo_idx == 16:  # CR+MinMax
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, min_max_crossings=True, gamma_min_max=5)
-    elif combo_idx == 17:  # Angle (fixed x)
+    elif combo_idx == 5:  # Same layer edges + BR
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, angular_resolution=True)
-    elif combo_idx == 18:  # FairBend (fixed x)
+        add_sl_edges(opt.g)
+        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, fix_x_vars=True)
+    elif combo_idx == 6:  # Straight edges + BR
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, fairness_constraints=True, fairness_metric="bends")
-    elif combo_idx == 19:  # SymN (fixed x)
+        res = opt.optimize_layout(cutoff_time=tlimit, constrain_straight_long_arcs=True, bendiness_reduction=True, fix_x_vars=True)
+    elif combo_idx == 7:  # Streamlining + BR
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, symmetry_maximization=True, symmetry_maximization_edges=False)
-    elif combo_idx == 20:  # SymN+E (fixed x)
-        improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, symmetry_maximization=True, symmetry_maximization_edges=True)
-    elif combo_idx == 21:  # Angle (fixed x) + Bend
-        improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True, angular_resolution=True)
-    elif combo_idx == 22:  # FairBend (fixed x) + Bend
-        improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True, fairness_constraints=True, fairness_metric="bends")
-    elif combo_idx == 23:  # SymN (fixed x) + Bend
-        improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True, symmetry_maximization=True, symmetry_maximization_edges=False)
-    elif combo_idx == 24:  # SymN+E (fixed x) + Bend
-        improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True, symmetry_maximization=True, symmetry_maximization_edges=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, streamline=True, bendiness_reduction=True, fix_x_vars=True)
+    elif combo_idx == 8:  # Groups + CR + BR
+        add_groups(opt.g)
+        res = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, crossing_minimization=True, bendiness_reduction=True)
+    elif combo_idx == 9:  # Groups + CR then Groups + BR
+        add_groups(opt.g)
+        res1 = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, crossing_minimization=True)
+        res2 = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, bendiness_reduction=True, y_based_group_constraints=True, fix_x_vars=True)
+        retval = collections.namedtuple("retval", "runtime objval status")
+        res = retval(res1.runtime + res2.runtime, res1.objval + res2.objval, 2 if res1.status == res2.status == 2 else 9)
+    elif combo_idx == 10:  # Fixed nodes + CR
+        fix_nds = random.sample(list(opt.g.node_ids.keys()), max(round(0.2 * opt.g.n_nodes), 2))
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, fix_xvars=fix_nds)
 
     gcr = opt.g.num_edge_crossings()
     bnds = sum(abs(e.n1.y - e.n2.y) for e in opt.g.edges)
@@ -104,7 +85,7 @@ if __name__ == '__main__':
     prefix = '../../random graphs/networkx2/'
     conditions = ['combo_idx']
     csv_header = ['Index', 'Data'] + conditions + ['Nodes', 'TotalNodes', 'ObjVal', 'Crossings', 'EdgeLength', 'Runtime', 'Status']
-    condition_map = {'combo_idx': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]}
+    condition_map = {'combo_idx': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
 
     if len(sys.argv) != 2:
         for combo_idx_iter in condition_map['combo_idx']:

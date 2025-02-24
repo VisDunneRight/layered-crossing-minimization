@@ -357,7 +357,7 @@ class LayeredGraph:
 		else:
 			raise TypeError("Invalid format for emphasis")
 
-	def add_node_weights(self, weights):
+	def add_node_weights(self, weights: list | dict):
 		"""
 		:param weights: dictionary mapping node name or ID -> node weight (real number, default 1), or list
 		:return: None
@@ -377,16 +377,26 @@ class LayeredGraph:
 		else:
 			raise TypeError("Invalid format for weights")
 
-	def add_edge_weights(self, weights):
+	def add_edge_weights(self, weights: dict):
 		"""
 		:param weights: dictionary mapping (node 1 ID, node 2 ID) -> edge weight (real number, default 1)
 		:return: None
 		"""
 		if type(weights) == dict:
+			l_e = self.get_long_edges()
 			for eid, w_val in weights.items():
 				if not isinstance(w_val, (int, float)):
 					raise Exception("Invalid format for weight values")
-				self.get_edge(eid[0], eid[1]).weight = w_val
+				the_edge = self.get_edge(eid[0], eid[1])
+				if the_edge:
+					the_edge.weight = w_val
+				else:
+					cand_es = [ed for ed in l_e if (ed[0] == eid[0] and ed[-1] == eid[1]) or (ed[0] == eid[1] and ed[-1] == eid[0])]
+					if cand_es:
+						for i, nd in enumerate(cand_es[0][:-1]):
+							self.get_edge(nd, cand_es[0][i + 1]).weight = w_val
+					else:
+						raise Exception(f"Edge {eid} does not exist")
 		else:
 			raise TypeError("Invalid format for weight values")
 
@@ -396,7 +406,7 @@ class LayeredGraph:
 		:param fix_loc: string corresponding to relative location to fix nodes. One of 'top', 'middle', 'bottom'
 		:return: None
 		"""
-		if fix_loc not in ("top", "middle", "bottom"):
+		if fix_loc not in ["top", "middle", "bottom"]:
 			raise Exception("fix_loc must be one of: 'top', 'middle', 'bottom'")
 		if "fix_nodes" not in self.node_data:
 			self.node_data["fix_nodes"] = {}

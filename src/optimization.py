@@ -55,7 +55,7 @@ class LayeredOptimizer:
 		self.dome_path_constraints = kwargs.get("dome_path_constraints", False)
 		self.polyhedral_constraints = kwargs.get("polyhedral_constraints", False)
 		self.grouping_constraints = kwargs.get("grouping_constraints", False)
-		self.sequential_grouping_constraints = kwargs.get("sequential_grouping_constraints", False)
+		self.y_based_group_constraints = kwargs.get("y_based_group_constraints", False)
 		self.node_emphasis = kwargs.get("node_emphasis", False)
 		self.emphasis_cr_weight = kwargs.get("emphasis_cr_weight", 3)
 		self.emphasis_br_weight = kwargs.get("emphasis_br_weight", 1)
@@ -433,7 +433,7 @@ class LayeredOptimizer:
 		y_vars = list(g.node_ids)
 		m2 = gp.Model(env=env) if env is not None else gp.Model()
 		y = m2.addVars(y_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="y")
-		if self.grouping_constraints and self.sequential_grouping_constraints:
+		if self.grouping_constraints and self.y_based_group_constraints:
 			grp_vars = list(range(len(groups[0]) + len(groups[1])))
 			y_t = m2.addVars(grp_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="t")
 			y_b = m2.addVars(grp_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="b")
@@ -463,7 +463,7 @@ class LayeredOptimizer:
 			m2.addConstr(y[b_var[0]] - y[b_var[1]] <= b[b_var], f"1bend{b_var}")
 			m2.addConstr(y[b_var[1]] - y[b_var[0]] <= b[b_var], f"2bend{b_var}")
 
-		if self.grouping_constraints and self.sequential_grouping_constraints:
+		if self.grouping_constraints and self.y_based_group_constraints:
 			for i, grp in enumerate(groups[0] + groups[1]):
 				grp_layers = {}
 				for nd in grp:
@@ -522,15 +522,15 @@ class LayeredOptimizer:
 		""" Vertical position, implication version """
 		# Uses big-M method: https://support.gurobi.com/hc/en-us/articles/4414392016529-How-do-I-model-conditional-statements-in-Gurobi-
 		if self.vertical_transitivity:
-			gap, gap_scale = 1, 1
+			gap, gap_scale, max_gap = 1, 1, 3
 			if self.apply_node_weight_spacing:
 				max_wt = max((nd.weight for nd in g))
 				if max_wt > 1:
-					gap_scale = min(max_wt, 2)
+					gap_scale = (max_gap - 1) / (max_wt - 1)
 			if self.fix_x_vars:
 				for var, val in self.x_var_assign.items():
 					if self.apply_node_weight_spacing:
-						gap = (g[int(var[0])].weight / gap_scale + g[int(var[1])].weight / gap_scale) / 2
+						gap = gap_scale * (g[int(var[0])].weight + g[int(var[1])].weight) / 2 - gap_scale + 1
 					if val == 0:
 						if self.streamline and (g[int(var[0])].is_anchor_node and g[int(var[1])].is_anchor_node):
 							model.addConstr(y[var[0]] >= (self.anchor_proximity / 2) * gap + y[var[1]], f"vert{var}")
@@ -548,7 +548,7 @@ class LayeredOptimizer:
 			else:
 				for x_var in x_vars:
 					if self.apply_node_weight_spacing:
-						gap = (g[int(x_var[0])].weight / gap_scale + g[int(x_var[1])].weight / gap_scale) / 2
+						gap = gap_scale * (g[int(x_var[0])].weight + g[int(x_var[1])].weight) / 2 - gap_scale + 1
 					if self.streamline and (g[int(x_var[0])].is_anchor_node and g[int(x_var[1])].is_anchor_node):
 						model.addGenConstrIndicator(x[x_var], True, y[x_var[0]] + (self.anchor_proximity / 2) * gap <= y[x_var[1]])
 						model.addGenConstrIndicator(x[x_var], False, y[x_var[0]] >= (self.anchor_proximity / 2) * gap + y[x_var[1]])
@@ -1047,7 +1047,7 @@ class LayeredOptimizer:
 					m.addConstr(klc * x[kl1, kl2] - 2 * kmc * x[km1, km2] + lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] + (1 - klc)//2 - (1 - kmc) + (1 - lmc)//2 <= 0)
 					m.addConstr(-klc * x[kl1, kl2] + 2 * kmc * x[km1, km2] - lmc * x[lm1, lm2] - c[cikjl1, cikjl2] - c[ciljm1, ciljm2] - (1 - klc)//2 + (1 - kmc) - (1 - lmc)//2 <= 0)
 
-	def __edge_bundling(self, m: gp.Model, g: LayeredGraph, a, a_aux_diff, a_vars, bundle, x, x_vars, y, n_b_l):
+	def __edge_bundling(self, m: gp.Model, g: LayeredGraph, a, a_vars, x, x_vars, y, n_b_l):
 		if self.edge_bundling or any(ele[0] == "edge_bundles" for ele in self.hybrid_constraints):
 			if self.__we_need_y_vars():
 				for a1, a2 in a_vars:
@@ -1147,18 +1147,18 @@ class LayeredOptimizer:
 					for nd_ot in n_b_l[g[nid].layer]:
 						if nd_ot not in g.node_data["fix_nodes"] or g.node_data["fix_nodes"][nd_ot] != loc:
 							self.__fix_x_var(m, (nid, nd_ot), fx_val)
-				else:  # loc == 'middle'
-					sum_ot = sum(v for v in n_b_l[g[nid].layer] if v not in g.node_data["fix_nodes"] or g.node_data["fix_nodes"][v] != "middle")
-					xsum = LinExpr()
-					for nd_ot in n_b_l[g[nid].layer]:
-						if nd_ot != nid and (nd_ot not in g.node_data["fix_nodes"] or g.node_data["fix_nodes"][nd_ot] != "middle"):
-							x_r, u1, u2 = get_x_var_consts(self.x_var_assign, nid, nd_ot)
-							xsum += x_r * x[u1, u2] + (1 - x_r) // 2
-					if sum_ot % 2 == 0:
-						m.addConstr(xsum == sum_ot // 2)
-					else:
-						m.addConstr(xsum >= sum_ot // 2)
-						m.addConstr(xsum <= sum_ot // 2 + 1)
+				# else:  # loc == 'middle'
+				# 	sum_ot = sum(1 for v in n_b_l[g[nid].layer] if v not in g.node_data["fix_nodes"] or g.node_data["fix_nodes"][v] != "middle")
+				# 	xsum = LinExpr()
+				# 	for nd_ot in n_b_l[g[nid].layer]:
+				# 		if nd_ot != nid and (nd_ot not in g.node_data["fix_nodes"] or g.node_data["fix_nodes"][nd_ot] != "middle"):
+				# 			x_r, u1, u2 = get_x_var_consts(self.x_var_assign, nid, nd_ot)
+				# 			xsum += x_r * x[u1, u2] + (1 - x_r) // 2
+				# 	if sum_ot % 2 == 0:
+				# 		m.addConstr(xsum == sum_ot // 2)
+				# 	else:
+				# 		m.addConstr(xsum >= sum_ot // 2)
+				# 		m.addConstr(xsum <= sum_ot // 2 + 1)
 
 	def __min_max_crossing_constraints(self, m: gp.Model, g: LayeredGraph, c_vars, c, cp_vars, cp, big_c_var, e_b_l):
 		if self.min_max_crossings or any(ele[0] == "min_max_crossings" for ele in self.hybrid_constraints):
@@ -1209,7 +1209,7 @@ class LayeredOptimizer:
 	def __add_group_constraints(self, m: gp.Model, g: LayeredGraph, xvars, x, y, y_top, y_bottom, groups, n_b_l):
 		if self.grouping_constraints:
 			sl_groups, ml_groups = groups[0], groups[1]
-			if self.sequential_grouping_constraints:
+			if self.y_based_group_constraints:
 				for i, grp in enumerate(groups[0] + groups[1]):
 					grp_layers = {}
 					for nd in grp:
@@ -1218,22 +1218,33 @@ class LayeredOptimizer:
 						if g[nd].layer not in grp_layers:
 							grp_layers[g[nd].layer] = []
 						grp_layers[g[nd].layer].append(nd)
-					grpmax = max((len(lylist) for lylist in grp_layers.values()))
-					m.addConstr(y_top[i] - y_bottom[i] + 1 == grpmax)  # enforce close groups
-					for lid in grp_layers:  # find the closest node above & below group for each layer
-						gp_lay_yv = g[grp_layers[lid][0]].y
-						closest_below, closest_below_nd = -1, -1
-						closest_above, closest_above_nd = self.m_val, -1
-						for nd_ot in g.layers[lid]:
-							if nd_ot.id not in grp_layers[lid]:
-								if gp_lay_yv > nd_ot.y > closest_below:
-									closest_below, closest_below_nd = nd_ot.y, nd_ot.id
-								elif gp_lay_yv < nd_ot.y < closest_above:
-									closest_above, closest_above_nd = nd_ot.y, nd_ot.id
-						if closest_below_nd != -1:
-							m.addConstr(y_bottom[i] >= y[closest_below_nd] + 0.5)  # highest node below grp must be below lower bound, add buffer of 0.5
-						if closest_above_nd != -1:
-							m.addConstr(y_top[i] <= y[closest_above_nd] - 0.5)  # lowest node above grp must be above upper bound, add buffer of 0.5
+					# grpmax = max((len(lylist) for lylist in grp_layers.values()))
+					# m.addConstr(y_top[i] - y_bottom[i] + 1 == grpmax)  # enforce close groups
+					if self.fix_x_vars:
+						grpmax = max((len(lylist) for lylist in grp_layers.values()))
+						m.addConstr(y_top[i] - y_bottom[i] + 1 == grpmax)
+						for lid in grp_layers:  # find the closest node above & below group for each layer
+							gp_lay_yv = g[grp_layers[lid][0]].y
+							closest_below, closest_below_nd = -1, -1
+							closest_above, closest_above_nd = self.m_val, -1
+							for nd_ot in g.layers[lid]:
+								if nd_ot.id not in grp_layers[lid]:
+									if gp_lay_yv > nd_ot.y > closest_below:
+										closest_below, closest_below_nd = nd_ot.y, nd_ot.id
+									elif gp_lay_yv < nd_ot.y < closest_above:
+										closest_above, closest_above_nd = nd_ot.y, nd_ot.id
+							if closest_below_nd != -1:
+								m.addConstr(y_bottom[i] >= y[closest_below_nd] + 0.5)  # highest node below grp must be below lower bound, add buffer of 0.5
+							if closest_above_nd != -1:
+								m.addConstr(y_top[i] <= y[closest_above_nd] - 0.5)  # lowest node above grp must be above upper bound, add buffer of 0.5
+					else:
+						for lid in grp_layers:
+							gp_lay_eg = grp_layers[lid][0]
+							for nd in g.layers[lid]:
+								if nd.id not in grp_layers[lid]:
+									x12_r, u1, u2 = get_x_var_consts(xvars, gp_lay_eg, nd.id)
+									m.addConstr(y[nd.id] - self.m_val * x12_r * x[u1, u2] - self.m_val * (1 - x12_r) // 2 + 1 <= y_bottom[i])
+									m.addConstr(-y[nd.id] + self.m_val * x12_r * x[u1, u2] + self.m_val * (1 - x12_r) // 2 + 1 <= self.m_val - y_top[i])
 			else:
 				for group in sl_groups:
 					lid = g[group[0]].layer
@@ -1341,7 +1352,7 @@ class LayeredOptimizer:
 					m.addConstr(combo[c_var] == m_v[c_var[0]] * m_v[c_var[1]] + 1)
 					m.addGenConstrAbs(final[c_var], combo[c_var])
 
-	def __add_hybrid_constraints(self, m: gp.Model, c, c_vars, c_consts, b, bundle, big_c, fair_var, n_sym, e_sym, ang):
+	def __add_hybrid_constraints(self, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, n_sym, e_sym, ang, ang_vars):
 		if self.hybrid_constraints:
 			for metric, bound in self.hybrid_constraints:
 				if metric == "crossings":
@@ -1352,7 +1363,7 @@ class LayeredOptimizer:
 				elif metric == "bends":
 					m.addConstr(self.gamma_2 * b.sum() <= int(bound))
 				elif metric == "edge_bundles":
-					m.addConstr(self.gamma_bundle * bundle <= int(bound))
+					m.addConstr(self.gamma_bundle * alpha.sum() <= int(bound))
 				elif metric == "min_max_crossings":
 					m.addConstr(big_c <= int(bound))
 				elif metric == "crossing_fairness" or metric == "bend_fairness":
@@ -1362,7 +1373,7 @@ class LayeredOptimizer:
 				elif metric == "edge_symmetry":
 					m.addConstr(e_sym.sum() <= int(bound))
 				elif metric == "angular_resolution":
-					m.addConstr(ang.sum() <= int(bound))
+					m.addConstr(sum((ang[cv] * c[cv] for cv in ang_vars)) <= int(bound))
 				else:
 					raise Exception(f"No metric with name {metric}.\nAllowed metrics: [crossings, bends, edge_bundles, min_max_crossings, crossing_fairness, bend_fairness, node_symmetry, node+edge_symmetry, angular_resolution]")
 
@@ -1372,7 +1383,7 @@ class LayeredOptimizer:
 		return False
 
 	def __we_need_y_vars(self):
-		if self.vertical_transitivity or (self.fairness_constraints and self.fairness_metric == "bends") or self.bendiness_reduction or self.streamline or self.stratisfimal_y_vars or self.symmetry_maximization or self.angular_resolution or any(ele[0] == "bends" or ele[0] == "edge_bundles" or ele[0] == "angular_resolution" or ele[0] == "bend_fairness" or ele[0] == "node_symmetry" or ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
+		if self.vertical_transitivity or (self.fairness_constraints and self.fairness_metric == "bends") or self.bendiness_reduction or self.streamline or self.stratisfimal_y_vars or self.symmetry_maximization or self.angular_resolution or self.apply_node_weight_spacing or self.node_emphasis or (self.grouping_constraints and self.y_based_group_constraints) or any(ele[0] == "bends" or ele[0] == "edge_bundles" or ele[0] == "angular_resolution" or ele[0] == "bend_fairness" or ele[0] == "node_symmetry" or ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
 			return True
 		return False
 
@@ -1403,7 +1414,7 @@ class LayeredOptimizer:
 			z = m.addVars(z_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="z")
 		c_vars, c_consts, c = None, None, None
 		if self.__we_need_c_vars():
-			c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars)
+			c_vars, c_consts = reductions.normal_c_vars(g, edges_by_layer, self.mirror_vars, use_e_weights=self.apply_edge_weight)
 			c = m.addVars(c_vars, vtype=GRB.BINARY, name="c")
 		# if self.grouping_constraints:  # THIS IS FOR Y-VALUE BASED GROUP CONSTRAINTS
 		# 	sl_groups, ml_groups = groups[0], groups[1]
@@ -1416,7 +1427,7 @@ class LayeredOptimizer:
 		# 		print("There are multilayer groups—swapping to vertical transitivity.")
 		# 		self.vertical_transitivity, self.direct_transitivity = True, False
 		y_t, y_b = None, None
-		if self.grouping_constraints and self.sequential_grouping_constraints:
+		if self.grouping_constraints and self.y_based_group_constraints:
 			grp_vars = list(range(len(groups[0]) + len(groups[1])))
 			y_t = m.addVars(grp_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="y_t")
 			y_b = m.addVars(grp_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="y_b")
@@ -1427,7 +1438,7 @@ class LayeredOptimizer:
 		if self.__we_need_b_vars():
 			b_vars = list(g.edge_ids.keys())
 			b = m.addVars(b_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="b")
-		alpha, alpha_vars, a_aux_diff, bundle = None, None, None, None
+		alpha, alpha_vars = None, None
 		if self.edge_bundling or any(ele[0] == "edge_bundles" for ele in self.hybrid_constraints):
 			alpha_vars = [(a1, a2) for lid in g.layers for ix, a1 in enumerate(nodes_by_layer[lid]) if g[a1].is_anchor_node for a2 in nodes_by_layer[lid][ix + 1:] if g[a2].is_anchor_node]
 			alpha = m.addVars(alpha_vars, vtype=GRB.BINARY, name="alpha")
@@ -1462,7 +1473,7 @@ class LayeredOptimizer:
 				sym_e_vars = [v for elist in edges_by_layer.values() for v in itertools.combinations(elist, 2)]
 				sym_e = m.addVars(sym_e_vars, vtype=GRB.BINARY, name="sym_e")
 		ang_m_vars, ang_m, ang_combo_vars, ang_combo, ang_final = None, None, None, None, None
-		if self.angular_resolution:
+		if self.angular_resolution or any(ele[0] == "angular_resolution" for ele in self.hybrid_constraints):
 			if self.fix_x_vars:
 				ang_combo_vars = g.edge_crossing_edges()
 				ang_m_vars = list(set([v[0] for v in ang_combo_vars] + [v[1] for v in ang_combo_vars]))
@@ -1479,6 +1490,25 @@ class LayeredOptimizer:
 		m.update()  # required after adding variables in order to use them in constraints
 
 		""" Fix variables/set starting assignments """
+		if self.start_xy_vars:
+			for v in m.getVars():
+				if v.varName[:2] == "x[":
+					xv1 = int(v.varName[2:v.varName.index(',')])
+					xv2 = int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])
+					v.Start = get_x_var(self.x_var_assign, xv1, xv2)
+				elif v.varName[:2] == "y[":
+					v.Start = g[int(v.varName[2:v.varName.index(']')])].y
+		if self.fix_x_vars:
+			if any(v == 2 for v in self.x_var_assign.values()):  # use current rel positions if no prior optimization
+				self.__assign_x_given_y()
+			for k, v in self.x_var_assign.items():
+				if v == 0 or v == 1:
+					a1 = m.getVarByName(f"x[{k[0]},{k[1]}]")
+					if a1:
+						a1.lb, a1.ub = v, v
+					else:
+						a2 = m.getVarByName(f"x[{k[1]},{k[0]}]")
+						a2.lb, a2.ub = 1 - v, 1 - v
 		if fix_x_vars:
 			for k, v in fix_x_vars.items():
 				a1 = m.getVarByName(f"x[{k[0]},{k[1]}]")
@@ -1490,25 +1520,6 @@ class LayeredOptimizer:
 		if start_x_vars:
 			for v in m.getVars():
 				v.Start = start_x_vars[v.varName]
-		if self.start_xy_vars:
-			for v in m.getVars():
-				if v.varName[:2] == "x[":
-					xv1 = int(v.varName[2:v.varName.index(',')])
-					xv2 = int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])
-					v.Start = get_x_var(self.x_var_assign, xv1, xv2)
-				elif v.varName[:2] == "y[":
-					v.Start = g[int(v.varName[2:v.varName.index(']')])].y
-		if self.fix_x_vars:
-			if any(v == 2 for v in self.x_var_assign.values()):
-				self.__assign_x_given_y()
-			for k, v in self.x_var_assign.items():
-				if v == 0 or v == 1:
-					a1 = m.getVarByName(f"x[{k[0]},{k[1]}]")
-					if a1:
-						a1.lb, a1.ub = v, v
-					else:
-						a2 = m.getVarByName(f"x[{k[1]},{k[0]}]")
-						a2.lb, a2.ub = 1 - v, 1 - v
 
 		""" Set higher priority for branching on x-vars """
 		if self.xvar_branch_priority:
@@ -1550,7 +1561,7 @@ class LayeredOptimizer:
 		self.__fix_specific_nodes(m, g, x, nodes_by_layer)
 
 		""" Edge bundling constraints """
-		self.__edge_bundling(m, g, alpha, a_aux_diff, alpha_vars, bundle, x, x_vars, y, nodes_by_layer)
+		self.__edge_bundling(m, g, alpha, alpha_vars, x, x_vars, y, nodes_by_layer)
 
 		""" Min-max edge crossing constraints """
 		self.__min_max_crossing_constraints(m, g, c_vars, c, cp_vars, cp, big_c, edges_by_layer)
@@ -1565,7 +1576,7 @@ class LayeredOptimizer:
 		self.__add_angular_resolution_constraints(m, ang_m_vars, ang_m, y, ang_combo_vars, ang_combo, ang_final)
 
 		""" Hybrid model bounding constraints """
-		self.__add_hybrid_constraints(m, c, c_vars, c_consts, b, bundle, big_c, fair_var, sym_n, sym_e, ang_final)
+		self.__add_hybrid_constraints(m, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n, sym_e, ang_final, ang_combo_vars)
 
 		return x_vars, c_vars
 
@@ -2170,7 +2181,7 @@ class LayeredOptimizer:
 		self.bendiness_reduction = kwargs.get("bendiness_reduction", False)
 		self.gamma_1 = kwargs.get("gamma_1", 1)
 		self.gamma_2 = kwargs.get("gamma_2", 1)
-		self.m_val = kwargs.get("m_val", round(1.5 * max(len(lr) for lr in self.g.layers.values())))
+		# self.m_val = kwargs.get("m_val", round(1.5 * max(len(lr) for lr in self.g.layers.values())))
 		self.sequential_bendiness = kwargs.get("sequential_bendiness", False)
 		self.local_opt = kwargs.get("local_opt", False)
 		self.local_opt_heuristic = kwargs.get("local_opt_heuristic", "incremental")
@@ -2198,7 +2209,7 @@ class LayeredOptimizer:
 		self.dome_path_constraints = kwargs.get("dome_path_constraints", False)
 		self.polyhedral_constraints = kwargs.get("polyhedral_constraints", False)
 		self.grouping_constraints = kwargs.get("grouping_constraints", False)
-		self.sequential_grouping_constraints = kwargs.get("sequential_grouping_constraints", False)
+		self.y_based_group_constraints = kwargs.get("y_based_group_constraints", False)
 		self.node_emphasis = kwargs.get("node_emphasis", False)
 		self.emphasis_cr_weight = kwargs.get("emphasis_cr_weight", 3)
 		self.emphasis_br_weight = kwargs.get("emphasis_br_weight", 1)
