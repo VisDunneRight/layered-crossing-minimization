@@ -28,6 +28,7 @@ class LayeredOptimizer:
 		self.gamma_1 = kwargs.get("gamma_1", 1)
 		self.gamma_2 = kwargs.get("gamma_2", 1)
 		self.m_val = kwargs.get("m_val", round(1.5 * max(len(lr) for lr in self.g.layers.values())))
+		self.node_gap = kwargs.get("node_gap", 1)
 		self.sequential_bendiness = kwargs.get("sequential_bendiness", False)
 		self.local_opt = kwargs.get("local_opt", False)
 		self.local_opt_heuristic = kwargs.get("local_opt_heuristic", "incremental")
@@ -66,6 +67,7 @@ class LayeredOptimizer:
 		self.symmetry_maximization_edges = kwargs.get("symmetry_maximization_edges", False)
 		self.min_max_crossings = kwargs.get("min_max_crossings", False)
 		self.gamma_min_max = kwargs.get("gamma_min_max", 1)
+		self.min_edges_with_crossings = kwargs.get("min_edges_with_crossings", False)
 		self.streamline = kwargs.get("streamline", False)
 		self.anchor_proximity = kwargs.get("anchor_proximity", 0.3)
 		self.fix_x_vars = kwargs.get("fix_x_vars", False)
@@ -74,6 +76,7 @@ class LayeredOptimizer:
 		# self.only_min_max_crossings = kwargs.get("only_min_max_crossings", False)
 		self.edge_bundling = kwargs.get("edge_bundling", False)
 		self.gamma_bundle = kwargs.get("gamma_bundle", 1)
+		self.edge_bundling_pos_restrict = kwargs.get("edge_bundling_pos_restrict", False)
 		self.fairness_constraints = kwargs.get("fairness_constraints", False)
 		self.fairness_metric = kwargs.get("fairness_metric", "crossings")
 		self.gamma_fair = kwargs.get("gamma_fair", 1)
@@ -392,7 +395,7 @@ class LayeredOptimizer:
 		else:
 			return model_objval, t2
 
-	def __optimization_function(self, g, c, c_vars, c_vars_orig, b, b_vars, c_consts, nc_consts, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n, sym_e, ang, ang_vars):
+	def __optimization_function(self, g, c, c_vars, c_vars_orig, b, b_vars, c_consts, nc_consts, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n, sym_e, ang, ang_vars, d):
 		opt = gp.LinExpr()
 		c_mult, b_mult = self.gamma_1, self.gamma_2
 		c_to_iter = c_vars_orig if self.mirror_vars and self.symmetry_constraints else c_vars
@@ -417,6 +420,8 @@ class LayeredOptimizer:
 				opt += e_consts[e_var] * e[e_var]
 		if self.min_max_crossings:
 			opt += self.gamma_min_max * big_c
+		if self.min_edges_with_crossings:
+			opt += d.sum()
 		if self.fairness_constraints:
 			opt += self.gamma_fair * fair_var
 		if self.symmetry_maximization:
@@ -522,7 +527,7 @@ class LayeredOptimizer:
 		""" Vertical position, implication version """
 		# Uses big-M method: https://support.gurobi.com/hc/en-us/articles/4414392016529-How-do-I-model-conditional-statements-in-Gurobi-
 		if self.vertical_transitivity:
-			gap, gap_scale, max_gap = 1, 1, 3
+			gap, gap_scale, max_gap = self.node_gap, 1, 3
 			if self.apply_node_weight_spacing:
 				max_wt = max((nd.weight for nd in g))
 				if max_wt > 1:
@@ -1050,9 +1055,17 @@ class LayeredOptimizer:
 	def __edge_bundling(self, m: gp.Model, g: LayeredGraph, a, a_vars, x, x_vars, y, n_b_l):
 		if self.edge_bundling or any(ele[0] == "edge_bundles" for ele in self.hybrid_constraints):
 			if self.__we_need_y_vars():
-				for a1, a2 in a_vars:
-					m.addConstr(self.m_val * a[a1, a2] + y[a1] - y[a2] + self.anchor_proximity / 2 >= 0)
-					m.addConstr(self.m_val * a[a1, a2] - y[a1] + y[a2] + self.anchor_proximity / 2 >= 0)
+				if self.fix_x_vars:
+					for a1, a2 in a_vars:
+						xv = get_x_var(self.x_var_assign, a1, a2)
+						if xv == 0 and not any(g[a1].y > g[nd].y > g[a2].y for nd in n_b_l[g[a1].layer]):
+							m.addConstr(y[a1] - y[a2] <= self.anchor_proximity / 2)
+						elif xv == 1 and not any(g[a1].y < g[nd].y < g[a2].y for nd in n_b_l[g[a1].layer]):
+							m.addConstr(y[a2] - y[a1] <= self.anchor_proximity / 2)
+				else:
+					for a1, a2 in a_vars:
+						m.addConstr(self.m_val * a[a1, a2] + y[a1] - y[a2] + self.anchor_proximity / 2 >= 0)
+						m.addConstr(self.m_val * a[a1, a2] - y[a1] + y[a2] + self.anchor_proximity / 2 >= 0)
 			else:
 				for a1, a2 in a_vars:
 					lid = g[a1].layer
@@ -1065,8 +1078,8 @@ class LayeredOptimizer:
 							a2_xsum += x_r2 * x[v1, v2] + (1 - x_r2) // 2
 					m.addConstr(self.m_val * a[a1, a2] >= a2_xsum - a1_xsum)
 					m.addConstr(self.m_val * a[a1, a2] >= a1_xsum - a2_xsum)
-				# 	m.addConstr(a_aux_diff[a1, a2] == a2_xsum - a1_xsum)
-				# 	m.addGenConstrAbs(a[a1, a2], a_aux_diff[a1, a2])
+					# m.addConstr(a_aux_diff[a1, a2] == a2_xsum - a1_xsum)
+					# m.addGenConstrAbs(a[a1, a2], a_aux_diff[a1, a2])
 				# m.addGenConstrNorm(bundle, a, 0)
 
 	def __fairness_constraints(self, m: gp.Model, g: LayeredGraph, c_vars, c, b_vars, b, fair_var):
@@ -1170,8 +1183,33 @@ class LayeredOptimizer:
 					if len({ed_ot[0], ed_ot[1], cp_var[0], cp_var[1]}) == 4:
 						e1, e2 = get_c_var(cvset, cp_var, ed_ot)
 						cp_esum += c[e1, e2]
-				m.addConstr(cp[cp_var] == cp_esum)
+				next_nd = cp_var[1] if g[cp_var[0]].layer < g[cp_var[1]].layer else cp_var[0]
+				while g[next_nd].is_anchor_node:  # add all c-vars along long edge
+					cur_nd = next_nd
+					next_nd = g.get_double_adj_list()[cur_nd][1][0]
+					for ed_ot in e_b_l[g[cur_nd].layer]:
+						if len({ed_ot[0], ed_ot[1], cur_nd, next_nd}) == 4:
+							e1, e2 = get_c_var(cvset, (cur_nd, next_nd), ed_ot)
+							cp_esum += c[e1, e2]
+				m.addConstr(cp[cp_var] >= cp_esum)
 				m.addConstr(cp[cp_var] <= big_c_var)
+
+	def __min_edges_with_crossings_constraints(self, m: gp.Model, g: LayeredGraph, d_vars, d, c_vars, c, e_b_l):
+		if self.min_edges_with_crossings or any(ele[0] == "min_edges_with_crossings" for ele in self.hybrid_constraints):
+			cvset = set(c_vars)
+			for d_var in d_vars:
+				for e_adj in e_b_l[g[d_var[0]].layer]:
+					if len({e_adj[0], e_adj[1], d_var[0], d_var[1]}) == 4:
+						e1, e2 = get_c_var(cvset, d_var, e_adj)
+						m.addConstr(d[d_var] >= c[e1, e2])
+				next_nd = d_var[1]
+				while g[next_nd].is_anchor_node:  # treat long edges as single edge
+					cur_nd = next_nd
+					next_nd = g.get_double_adj_list()[cur_nd][1][0]
+					for e_adj in e_b_l[g[cur_nd].layer]:
+						if len({e_adj[0], e_adj[1], cur_nd, next_nd}) == 4:
+							e1, e2 = get_c_var(cvset, (cur_nd, next_nd), e_adj)
+							m.addConstr(d[d_var] >= c[e1, e2])
 
 	def __setup_filler_nodes(self, g: LayeredGraph):
 		sl_groups, ml_groups = None, None
@@ -1352,7 +1390,7 @@ class LayeredOptimizer:
 					m.addConstr(combo[c_var] == m_v[c_var[0]] * m_v[c_var[1]] + 1)
 					m.addGenConstrAbs(final[c_var], combo[c_var])
 
-	def __add_hybrid_constraints(self, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, n_sym, e_sym, ang, ang_vars):
+	def __add_hybrid_constraints(self, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, n_sym, e_sym, ang, ang_vars, d):
 		if self.hybrid_constraints:
 			for metric, bound in self.hybrid_constraints:
 				if metric == "crossings":
@@ -1374,11 +1412,13 @@ class LayeredOptimizer:
 					m.addConstr(e_sym.sum() <= int(bound))
 				elif metric == "angular_resolution":
 					m.addConstr(sum((ang[cv] * c[cv] for cv in ang_vars)) <= int(bound))
+				elif metric == "min_edges_with_crossings":
+					m.addConstr(d.sum() <= int(bound))
 				else:
-					raise Exception(f"No metric with name {metric}.\nAllowed metrics: [crossings, bends, edge_bundles, min_max_crossings, crossing_fairness, bend_fairness, node_symmetry, node+edge_symmetry, angular_resolution]")
+					raise Exception(f"No metric with name {metric}.\nAllowed metrics: [crossings, bends, edge_bundles, min_max_crossings, crossing_fairness, bend_fairness, node_symmetry, node+edge_symmetry, angular_resolution, min_edges_with_crossings]")
 
 	def __we_need_c_vars(self):
-		if self.crossing_minimization or (self.fairness_constraints and self.fairness_metric == "crossings") or self.min_max_crossings or self.angular_resolution or any(ele[0] == "crossings" or ele[0] == "min_max_crossings" or ele[0] == "angular_resolution" or ele[0] == "crossing_fairness" for ele in self.hybrid_constraints):
+		if self.crossing_minimization or (self.fairness_constraints and self.fairness_metric == "crossings") or self.min_max_crossings or self.angular_resolution or self.min_edges_with_crossings or any(ele[0] == "crossings" or ele[0] == "min_max_crossings" or ele[0] == "angular_resolution" or ele[0] == "crossing_fairness" or ele[0] == "min_edges_with_crossings" for ele in self.hybrid_constraints):
 			return True
 		return False
 
@@ -1456,9 +1496,13 @@ class LayeredOptimizer:
 			ste = m.addVars(ste_vars, vtype=GRB.BINARY, name="st_edge")
 		cp, cp_vars, big_c = None, None, None
 		if self.min_max_crossings or any(ele[0] == "min_max_crossings" for ele in self.hybrid_constraints):
-			cp_vars = [(e.n1.id, e.n2.id) for e in g.edges]
+			cp_vars = [(e.n1.id, e.n2.id) for e in g.edges if not e.n1.is_anchor_node]
 			cp = m.addVars(cp_vars, vtype=GRB.INTEGER, lb=0, name="cp")
 			big_c = m.addVar(lb=0, vtype=GRB.INTEGER, name="C")
+		d_vars, d = None, None
+		if self.min_edges_with_crossings or any(ele[0] == "min_edges_with_crossings" for ele in self.hybrid_constraints):
+			d_vars = [(e.n1.id, e.n2.id) for e in g.edges if not e.n1.is_anchor_node]
+			d = m.addVars(d_vars, vtype=GRB.BINARY, name="d")
 		fair_var, b_aux = None, None
 		if self.fairness_constraints or any(ele[0] == "crossing_fairness" or ele[0] == "bend_fairness" for ele in self.hybrid_constraints):
 			fair_var = m.addVar(lb=0, vtype=GRB.CONTINUOUS, name="fair")
@@ -1536,7 +1580,7 @@ class LayeredOptimizer:
 		e_consts = self.__emphasis_constraints(m, g, self.x_var_assign, x, e_vars, e, y, b, nodes_by_layer)
 
 		""" Set model objective function """
-		opt_func = self.__optimization_function(g, c, c_vars, None, b, b_vars, c_consts, None, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n, sym_e, ang_final, ang_combo_vars)
+		opt_func = self.__optimization_function(g, c, c_vars, None, b, b_vars, c_consts, None, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n, sym_e, ang_final, ang_combo_vars, d)
 		m.setObjective(opt_func, GRB.MINIMIZE)
 
 		""" Transitivity constraints """
@@ -1566,6 +1610,9 @@ class LayeredOptimizer:
 		""" Min-max edge crossing constraints """
 		self.__min_max_crossing_constraints(m, g, c_vars, c, cp_vars, cp, big_c, edges_by_layer)
 
+		""" Minimize #edges with crossings constraints """
+		self.__min_edges_with_crossings_constraints(m, g, d_vars, d, c_vars, c, edges_by_layer)
+
 		""" Fairness constraints """
 		self.__fairness_constraints(m, g, c_vars, c, b_vars, b, fair_var)
 
@@ -1576,7 +1623,7 @@ class LayeredOptimizer:
 		self.__add_angular_resolution_constraints(m, ang_m_vars, ang_m, y, ang_combo_vars, ang_combo, ang_final)
 
 		""" Hybrid model bounding constraints """
-		self.__add_hybrid_constraints(m, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n, sym_e, ang_final, ang_combo_vars)
+		self.__add_hybrid_constraints(m, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n, sym_e, ang_final, ang_combo_vars, d)
 
 		return x_vars, c_vars
 
@@ -2182,6 +2229,7 @@ class LayeredOptimizer:
 		self.gamma_1 = kwargs.get("gamma_1", 1)
 		self.gamma_2 = kwargs.get("gamma_2", 1)
 		# self.m_val = kwargs.get("m_val", round(1.5 * max(len(lr) for lr in self.g.layers.values())))
+		self.node_gap = kwargs.get("node_gap", 1)
 		self.sequential_bendiness = kwargs.get("sequential_bendiness", False)
 		self.local_opt = kwargs.get("local_opt", False)
 		self.local_opt_heuristic = kwargs.get("local_opt_heuristic", "incremental")
@@ -2220,6 +2268,7 @@ class LayeredOptimizer:
 		self.symmetry_maximization_edges = kwargs.get("symmetry_maximization_edges", False)
 		self.min_max_crossings = kwargs.get("min_max_crossings", False)
 		self.gamma_min_max = kwargs.get("gamma_min_max", 1)
+		self.min_edges_with_crossings = kwargs.get("min_edges_with_crossings", False)
 		self.streamline = kwargs.get("streamline", False)
 		self.anchor_proximity = kwargs.get("anchor_proximity", 0.3)
 		self.fix_x_vars = kwargs.get("fix_x_vars", False)
@@ -2227,6 +2276,7 @@ class LayeredOptimizer:
 		self.fix_nodes = kwargs.get("fix_nodes", False)
 		self.edge_bundling = kwargs.get("edge_bundling", False)
 		self.gamma_bundle = kwargs.get("gamma_bundle", 1)
+		self.edge_bundling_pos_restrict = kwargs.get("edge_bundling_pos_restrict", False)
 		self.fairness_constraints = kwargs.get("fairness_constraints", False)
 		self.fairness_metric = kwargs.get("fairness_metric", "crossings")
 		self.gamma_fair = kwargs.get("gamma_fair", 1)

@@ -13,7 +13,7 @@ import shutil
 # from altair_saver import save
 
 
-def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, emphasize_nodes=None, emphasize_edges=None, gravity=False, edge_thickness=False, label_nodes=True, as_png=False, color_scale=None, copies=1, fix_height=-1, remove_witespace=True, straighten_edges=False):
+def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, emphasize_nodes=None, emphasize_edges=None, gravity=False, edge_thickness=False, label_nodes=True, as_png=False, color_scale=None, copies=1, fix_height=-1, remove_witespace=True, straighten_edges=False, node_weight_size=False, dot_group_anchors=False):
     if nested:
         if "Images" not in os.listdir(".."):
             os.mkdir("../Images")
@@ -76,7 +76,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     ctx.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
     ctx.set_font_size(font_size)
     for i, node in enumerate(g.nodes):  # ctx.arc(2, 1, 0.5, 0, 2 * math.pi), pos (2,1) radius 0.5
-        if not node.is_anchor_node or groups is not None or "groups" in g.node_data:
+        if not node.is_anchor_node or ((groups is not None or "groups" in g.node_data) and not dot_group_anchors):
             if node.stacked or node.fix != 0:
                 ctx.set_source_rgb(222/256, 23/256, 56/256)
             elif color_scale is not None:
@@ -91,20 +91,18 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
             else:
                 ctx.set_source_rgb(163/256, 185/256, 182/256)  # light gray-cyan
             if node.is_anchor_node:
-                ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, node_radius//3, 0, 2 * math.pi)
+                node_radius_mult = 1 / 3
+            elif node_weight_size:
+                node_radius_mult = node.weight
             elif emphasize_nodes is not None and emphasize_nodes[node.id]:
-                ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, node_radius * 1.7, 0, 2 * math.pi)
+                node_radius_mult = 1.7
             else:
-                ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, node_radius, 0, 2 * math.pi)
+                node_radius_mult = 1
+            ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, node_radius * node_radius_mult, 0, 2 * math.pi)
             ctx.fill()
             # ctx.set_source_rgb(53 / 256, 83 / 256, 232 / 256)  # blueeeee
             ctx.set_source_rgb(0.1, 0.1, 0.1)
-            if node.is_anchor_node:
-                ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius//3, 0, 2 * math.pi)
-            elif emphasize_nodes is not None and emphasize_nodes[node.id]:
-                ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius * 1.7, 0, 2 * math.pi)
-            else:
-                ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius, 0, 2 * math.pi)
+            ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset, node_radius * node_radius_mult, 0, 2 * math.pi)
             ctx.stroke()
             ctx.set_source_rgb(0.1, 0.1, 0.1)
             if len(str(node.name)) == 1:
@@ -136,7 +134,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     if as_png:
         for i in range(0, copies):
             newname = svg_name.split("_")[0] + "_" + str(int(svg_name.split("_")[1]) + i)
-            cairosvg.svg2png(url=f"Images/{svg_name}.svg", write_to=f"Images/{newname}.png", output_width=width / 3, output_height=height / 3)
+            cairosvg.svg2png(url=f"Images/{svg_name}.svg", write_to=f"Images/{newname}.png", output_width=width / 2, output_height=height / 2)
         os.remove(f"Images/{svg_name}.svg")
         # surface.write_to_png(svg_name + ".png")
 

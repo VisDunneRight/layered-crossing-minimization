@@ -266,6 +266,40 @@ class LayeredGraph:
 		for nl in ids_and_layers:
 			self.add_node(nl[1], idx=nl[0])
 
+	def remove_node(self, n_id):
+		nd = self.__getitem__(n_id)
+		self.nodes.remove(nd)
+		self.node_ids.pop(nd.id)
+		self.layers[nd.layer].remove(nd)
+		if nd.name is not None and nd.name in self.node_names:
+			self.node_names.pop(nd.name)
+		self.n_nodes -= 1
+		self.invalidate_data()
+
+	def reindex_nodes(self) -> None:
+		"""
+		Reindexes nodes by changing their IDs to be indexed from 0, and removes edges missing an endpoint.
+		"""
+		for i in range(len(self.edges) - 1, -1, -1):
+			the_edge = self.edges[i]
+			if the_edge.n1.id not in self.node_ids or the_edge.n2.id not in self.node_ids:
+				self.edges.pop(i)
+				self.edge_ids.pop((the_edge.n1.id, the_edge.n2.id))
+		n_missing_ids = 0
+		missing_ids = set(v for v in range(max(idx for idx in self.node_ids)) if v not in self.node_ids)
+		for i in range(max(idx for idx in self.node_ids) + 1):
+			if i in missing_ids:
+				n_missing_ids += 1
+			elif n_missing_ids > 0:
+				nd = self.node_ids[i]
+				nd.id -= n_missing_ids
+				self.node_ids[i - n_missing_ids] = nd
+				del self.node_ids[i]
+		self.edge_ids = {}
+		for ed in self.edges:
+			self.edge_ids[ed.n1.id, ed.n2.id] = ed
+		self.invalidate_data()
+
 	def add_edge(self, n1_id, n2_id, stacked=False, weight=1, data=None):
 		"""
 		:param n1_id: Required, node 1 ID. Integer in [0, |V|) is recommended
@@ -709,7 +743,7 @@ class LayeredGraph:
 		n_removals = 0
 		# levels = sorted(list(self.layers.keys()))
 		for level in range(max_layer + 1):
-			if level not in self.layers:
+			if level not in self.layers or not self.layers[level]:
 				n_removals += 1
 			elif n_removals > 0:
 				self.layers[level - n_removals] = self.layers[level]

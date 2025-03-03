@@ -14,7 +14,7 @@ To run the benchmark in parallel on your local machine:
 This is recommended for large benchmark experiments with many combinations of conditions. To run the benchmark in parallel on a remote cluster that uses SLURM:
 1. Access the cluster and navigate to the aesthetics directory
 2. If necessary, activate a python virtual environment using as conda or pip with all required packages installed
-3. If necessary, modify `benchmark_slurm.sh` to load any needed modules prior to the `srun` call, e.g. `module load gurobi`4. Run the following: `sbatch --array=0-25 benchmark_slurm.sh`
+3. If necessary, modify `benchmark_slurm.sh` to load any needed modules prior to the `srun` call, e.g. `module load gurobi`4. Run the following: `sbatch --array=0-26 benchmark_slurm.sh`
 
 *If you need to run the benchmark in series using SLURM, use the steps above with the following modifications:
 - delete $SLURM_ARRAY_TASK_ID from benchmark_slurm.sh

@@ -6,7 +6,7 @@ import math
 from natsort import natsorted
 
 
-def generate_benchmark(conditions, condition_map, run_function, path_to_data, name="my_benchmark", in_conds=None, nested_data=-1, exclude_files=None, exclude_dirs=None, allowed_filetypes=None, csv_header=None, dependencies=None, local_dependencies=None, class_dependencies=None, project_root=None):
+def generate_benchmark(conditions, condition_map, run_function, path_to_data, name="my_benchmark", in_conds=None, nested_data=-1, exclude_files=None, exclude_dirs=None, allowed_filetypes=None, csv_header=None, dependencies=None, local_dependencies=None, class_dependencies=None, project_root=None, file_sort_key=None):
     """
     :param conditions: List of conditions as strings
     :param condition_map: Dictionary mapping all conditions to a list of values for that condition. Values may be any hashable type
@@ -25,6 +25,7 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
     :param project_root: String, required only if using local or class dependencies. System absolute path to project root
     :param local_dependencies: Optional, list of strings for local files your run function requires. Specify as path from project root
     :param class_dependencies: Optional, list of strings for local classes your run function requires. Specify as path from project root with the class at the end, e.g. 'src/myfile.MyClass'
+    :param file_sort_key: Optional, dictionary for sorting the dataset files. Otherwise will use natural sort on file names
     :param name: String, name for your benchmark. Will be applied to created files and directories
     :return:
     """
@@ -94,7 +95,13 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
             files_in_dir.sort()
             file_paths += files_in_dir
 
-    file_paths = natsorted(file_paths)
+    if file_sort_key is None:
+        file_paths = natsorted(file_paths)
+    elif data_is_nested:
+        file_paths.sort(key=lambda x: file_sort_key[x[x.rindex('/') + 1:]])
+    else:
+        file_paths.sort(key=lambda x: file_sort_key[x])
+    print("Dataset size:", len(file_paths), "files")
 
     if not os.path.isdir(f"./{name}"):
         os.mkdir(f"./{name}")

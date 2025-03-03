@@ -1,6 +1,6 @@
 # !/bin/bash
 
-for value in {0..25}
+for value in {0..26}
 do
 	python3 benchmark_exec.py $value &
 done

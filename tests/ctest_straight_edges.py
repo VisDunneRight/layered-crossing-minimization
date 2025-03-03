@@ -15,7 +15,7 @@ class TestOptimizationWithStraightLongArcs(unittest.TestCase):
 
         opt = optimization.LayeredOptimizer(self.gsmall2)
         opt.optimize_layout(crossing_minimization=True, constrain_straight_long_arcs=True, vertical_transitivity=True)
-        vis.draw_graph(self.gsmall2, "STRAIGHT_TEST_2")
+        vis.draw_graph(self.gsmall2, "STRAIGHT_TEST_2", label_nodes=False)
 
     def test_straightedge_large(self):
         opt = optimization.LayeredOptimizer(self.glarge)
