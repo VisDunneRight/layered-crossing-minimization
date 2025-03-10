@@ -128,6 +128,15 @@ def add_sl_edges(g):
                 g.add_edge(r_e.n1.id, nd_ot)
 
 
+def print_layer_groups(g, lid, gp_assignments):
+    gps = ["-"] * len(g.layers[lid])
+    nds_sort = sorted([nd.id for nd in g.layers[lid]], key=lambda x: g[x].y)
+    for j, nid in enumerate(nds_sort):
+        if nid in gp_assignments:
+            gps[j] = gp_assignments[nid]
+    print(gps)
+
+
 def find_valid_group_layout_for_br(g):
     get_groups(g, False)
     improved_sifting(g)
@@ -169,18 +178,18 @@ def find_valid_group_layout_for_br(g):
             if nd.y != g[moved_to_pos[gpid, nd.layer][-1]].y + 1:
                 target_y = g[moved_to_pos[gpid, nd.layer][-1]].y + 0.5
                 swap_nodes(nd, target_y)
-            for other_nd in g.layers[nd.layer]:
-                if other_nd in g.node_data["groups"] and g.node_data["groups"][other_nd] != gpid:
-                    ot_gid = g.node_data["groups"][other_nd]
-                    if other_nd.id in moved_to_pos[ot_gid, other_nd.layer]:
-                        if other_nd.y < nd.y and gp_orderkey[ot_gid] > gp_orderkey[gpid]:  # incorrect order
-                            for nd_to_move in moved_to_pos[ot_gid, nd.layer]:
-                                g[nd_to_move].y += 1
-                            nd.y -= len(moved_to_pos[ot_gid, nd.layer])
-                        elif other_nd.y > nd.y and gp_orderkey[ot_gid] < gp_orderkey[gpid]:  # incorrect order
-                            for nd_to_move in moved_to_pos[ot_gid, nd.layer]:
-                                g[nd_to_move].y -= 1
-                            nd.y += len(moved_to_pos[ot_gid, nd.layer])
+            # for other_nd in g.layers[nd.layer]:
+            #     if other_nd in g.node_data["groups"] and g.node_data["groups"][other_nd] != gpid:
+            #         ot_gid = g.node_data["groups"][other_nd]
+            #         if other_nd.id in moved_to_pos[ot_gid, other_nd.layer]:
+            #             if other_nd.y < nd.y and gp_orderkey[ot_gid] > gp_orderkey[gpid]:  # incorrect order
+            #                 for nd_to_move in moved_to_pos[ot_gid, nd.layer]:
+            #                     g[nd_to_move].y += 1
+            #                 nd.y -= len(moved_to_pos[ot_gid, nd.layer])
+            #             elif other_nd.y > nd.y and gp_orderkey[ot_gid] < gp_orderkey[gpid]:  # incorrect order
+            #                 for nd_to_move in moved_to_pos[ot_gid, nd.layer]:
+            #                     g[nd_to_move].y -= 1
+            #                 nd.y += len(moved_to_pos[ot_gid, nd.layer])
             moved_to_pos[gpid, nd.layer].append(nd.id)
         else:
             moved_to_pos[gpid, nd.layer] = [ndid]
@@ -188,24 +197,19 @@ def find_valid_group_layout_for_br(g):
                 target_y = key_y_vals[gpid] + 0.5 if nd.y < key_y_vals[gpid] else key_y_vals[gpid] - 0.5
                 swap_nodes(nd, target_y)
             # then swap to maintain gp_orderkey
-            for other_nd in g.layers[nd.layer]:
-                if other_nd.id in g.node_data["groups"] and g.node_data["groups"][other_nd.id] != gpid:
-                    ot_gid = g.node_data["groups"][other_nd.id]
-                    if (ot_gid, other_nd.layer) in moved_to_pos and other_nd.id in moved_to_pos[ot_gid, other_nd.layer]:
-                        if other_nd.y < nd.y and gp_orderkey[ot_gid] > gp_orderkey[gpid]:  # incorrect order
-                            ct_moves = 0
-                            for nd_to_move in moved_to_pos[ot_gid, nd.layer]:
-                                if g[nd_to_move].y < nd.y:
-                                    g[nd_to_move].y += 1
-                                    ct_moves += 1
-                            nd.y -= ct_moves
-                        elif other_nd.y > nd.y and gp_orderkey[ot_gid] < gp_orderkey[gpid]:  # incorrect order
-                            ct_moves = 0
-                            for nd_to_move in moved_to_pos[ot_gid, nd.layer]:
-                                if g[nd_to_move].y > nd.y:
-                                    g[nd_to_move].y -= 1
-                                    ct_moves += 1
-                            nd.y += ct_moves
+            bds = [0, float('inf')]
+            for tgpid, tlid in moved_to_pos.keys():
+                if tlid == nd.layer:
+                    if gp_orderkey[tgpid] > gp_orderkey[gpid]:
+                        bds[1] = min([bds[1]] + [g[nd].y for nd in moved_to_pos[tgpid, tlid]])
+                    else:
+                        bds[0] = max([bds[0]] + [g[nd].y for nd in moved_to_pos[tgpid, tlid]])
+            if nd.y < bds[0]:
+                swap_nodes(nd, bds[0] + 0.5)
+            elif nd.y > bds[1]:
+                swap_nodes(nd, bds[1] - 0.5)
+    # draw graph?
+    # draw_graph(g, "testing2")
 
 
 def run_func(combo_idx, data_path):
@@ -272,6 +276,7 @@ def run_func(combo_idx, data_path):
     elif combo_choice == "Group+BR":  # Groups + BR
         add_groups(opt.g)
         find_valid_group_layout_for_br(opt.g)
+        opt.m_val *= 2
         res = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, bendiness_reduction=True,y_based_group_constraints=True, fix_x_vars=True)
     elif combo_choice == "Fix+CR":  # Fixed nodes + CR
         fix_nds = random.sample(list(opt.g.node_ids.keys()), max(round(0.2 * opt.g.n_nodes), 2))

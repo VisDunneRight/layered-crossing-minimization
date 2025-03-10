@@ -434,6 +434,16 @@ class LayeredGraph:
 		else:
 			raise TypeError("Invalid format for weight values")
 
+	def add_gansner_edge_weights(self):
+		""" Edge weight schema described by Gansner et al. in  """
+		for edge in self.edges:
+			if edge.n1.is_anchor_node and edge.n2.is_anchor_node:
+				edge.weight = 8
+			elif edge.n1.is_anchor_node or edge.n2.is_anchor_node:
+				edge.weight = 2
+			else:
+				edge.weight = 1
+
 	def add_node_fix(self, node_ids, fix_loc=None):
 		"""
 		:param node_ids: list of node ids to fix, or dictionary mapping node ids -> fix locations
@@ -888,7 +898,7 @@ class LayeredGraph:
 			if x_var[0] in self.node_ids and x_var[1] in self.node_ids and val != 2:
 				self[x_var[val]].y += 1
 
-	def check_position_validity(self):
+	def check_position_validity(self, y_tol=0.0001):
 		"""
 		checks if nodes have unique positions, i.e. (layer, y-value) pairs
 		"""
@@ -896,7 +906,7 @@ class LayeredGraph:
 		for lay in self.layers.values():
 			xl = sorted([(nd.id, nd.y) for nd in lay], key=lambda x: x[1])
 			for i in range(len(xl)-1):
-				if xl[i][1] == xl[i+1][1]:
+				if abs(xl[i][1] - xl[i+1][1]) < y_tol:
 					print(f"Invalid position: node {xl[i][0]} and {xl[i+1][0]} both have position {xl[i][1]}")
 					checks_out = False
 		if checks_out:
