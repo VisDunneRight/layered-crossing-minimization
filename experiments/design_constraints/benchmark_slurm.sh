@@ -10,4 +10,4 @@
 #SBATCH -e errors/design_constraints_%A_%a.txt        # Standard error file
 
 module load gurobi
-srun python benchmark_exec.py $SLURM_ARRAY_TASK_ID
+srun python design_constraint_exp.py $SLURM_ARRAY_TASK_ID
