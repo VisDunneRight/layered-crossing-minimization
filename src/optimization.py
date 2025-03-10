@@ -1160,18 +1160,8 @@ class LayeredOptimizer:
 					for nd_ot in n_b_l[g[nid].layer]:
 						if nd_ot not in g.node_data["fix_nodes"] or g.node_data["fix_nodes"][nd_ot] != loc:
 							self.__fix_x_var(m, (nid, nd_ot), fx_val)
-				# else:  # loc == 'middle'
-				# 	sum_ot = sum(1 for v in n_b_l[g[nid].layer] if v not in g.node_data["fix_nodes"] or g.node_data["fix_nodes"][v] != "middle")
-				# 	xsum = LinExpr()
-				# 	for nd_ot in n_b_l[g[nid].layer]:
-				# 		if nd_ot != nid and (nd_ot not in g.node_data["fix_nodes"] or g.node_data["fix_nodes"][nd_ot] != "middle"):
-				# 			x_r, u1, u2 = get_x_var_consts(self.x_var_assign, nid, nd_ot)
-				# 			xsum += x_r * x[u1, u2] + (1 - x_r) // 2
-				# 	if sum_ot % 2 == 0:
-				# 		m.addConstr(xsum == sum_ot // 2)
-				# 	else:
-				# 		m.addConstr(xsum >= sum_ot // 2)
-				# 		m.addConstr(xsum <= sum_ot // 2 + 1)
+				elif type(loc) == int or type(loc) == float:
+					self.__fix_x_var(m, nid, loc, y_var=True)
 
 	def __min_max_crossing_constraints(self, m: gp.Model, g: LayeredGraph, c_vars, c, cp_vars, cp, big_c_var, e_b_l):
 		if self.min_max_crossings or any(ele[0] == "min_max_crossings" for ele in self.hybrid_constraints):
@@ -1198,10 +1188,12 @@ class LayeredOptimizer:
 		if self.min_edges_with_crossings or any(ele[0] == "min_edges_with_crossings" for ele in self.hybrid_constraints):
 			cvset = set(c_vars)
 			for d_var in d_vars:
+				list_of_c_vars = []
 				for e_adj in e_b_l[g[d_var[0]].layer]:
 					if len({e_adj[0], e_adj[1], d_var[0], d_var[1]}) == 4:
 						e1, e2 = get_c_var(cvset, d_var, e_adj)
-						m.addConstr(d[d_var] >= c[e1, e2])
+						# m.addConstr(d[d_var] >= c[e1, e2])
+						list_of_c_vars.append(c[e1, e2])
 				next_nd = d_var[1]
 				while g[next_nd].is_anchor_node:  # treat long edges as single edge
 					cur_nd = next_nd
@@ -1209,7 +1201,9 @@ class LayeredOptimizer:
 					for e_adj in e_b_l[g[cur_nd].layer]:
 						if len({e_adj[0], e_adj[1], cur_nd, next_nd}) == 4:
 							e1, e2 = get_c_var(cvset, (cur_nd, next_nd), e_adj)
-							m.addConstr(d[d_var] >= c[e1, e2])
+							# m.addConstr(d[d_var] >= c[e1, e2])
+							list_of_c_vars.append(c[e1, e2])
+				m.addGenConstrOr(d[d_var], list_of_c_vars)
 
 	def __setup_filler_nodes(self, g: LayeredGraph):
 		sl_groups, ml_groups = None, None
@@ -1364,9 +1358,9 @@ class LayeredOptimizer:
 	def __add_symmetry_maximization_constraints(self, m: gp.Model, y, ysum, ys_vars, sym_n, sym_e, sym_e_vars):
 		if self.symmetry_maximization or any(ele[0] == "node_symmetry" or ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
 			for ysv in ys_vars:
-				m.addConstr(ysum[ysv] == y[ysv[0]] + y[ysv[1]])
-				m.addConstr(self.m_val * sym_n[ysv] + ysum[ysv] - self.m_val >= 0)
-				m.addConstr(self.m_val * sym_n[ysv] + self.m_val - ysum[ysv] >= 0)
+				# m.addConstr(ysum[ysv] == y[ysv[0]] + y[ysv[1]])
+				m.addConstr(self.m_val * sym_n[ysv] + y[ysv[0]] + y[ysv[1]] - self.m_val >= 0)
+				m.addConstr(self.m_val * sym_n[ysv] + self.m_val - y[ysv[0]] - y[ysv[1]] >= 0)
 			if self.symmetry_maximization_edges or any(ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
 				ys_set = set(ys_vars)
 				for e_v in sym_e_vars:
@@ -1901,11 +1895,11 @@ class LayeredOptimizer:
 	#
 	# 	return self.g.num_edge_crossings()
 
-	def __fix_x_var(self, m: gp.Model, k, v, y_var=False, c_var=False):
+	def __fix_x_var(self, m: gp.Model, k, v, y_var=False, c_var=False, y_tol=0.001):
 		if y_var:
 			a1 = m.getVarByName(f"y[{k}]")
 			if a1:
-				a1.lb, a1.ub = v, v
+				a1.lb, a1.ub = v - y_tol, v + y_tol
 		elif c_var:
 			a1 = m.getVarByName(f"c[({k[0][0]},{k[0][1]}),({k[1][0]},{k[1][1]})]")
 			if a1:

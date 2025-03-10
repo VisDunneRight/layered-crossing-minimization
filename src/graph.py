@@ -434,18 +434,21 @@ class LayeredGraph:
 		else:
 			raise TypeError("Invalid format for weight values")
 
-	def add_node_fix(self, node_ids, fix_loc):
+	def add_node_fix(self, node_ids, fix_loc=None):
 		"""
-		:param node_ids: list of node ids to fix
-		:param fix_loc: string corresponding to relative location to fix nodes. One of 'top', 'middle', 'bottom'
+		:param node_ids: list of node ids to fix, or dictionary mapping node ids -> fix locations
+		:param fix_loc: One of 'top', 'bottom', or None if type(node_ids) == dict
 		:return: None
 		"""
-		if fix_loc not in ["top", "middle", "bottom"]:
-			raise Exception("fix_loc must be one of: 'top', 'middle', 'bottom'")
+		if fix_loc not in ["top", "bottom", None]:
+			raise Exception("fix_loc must be one of 'top', 'bottom', or None")
 		if "fix_nodes" not in self.node_data:
 			self.node_data["fix_nodes"] = {}
 		for nid in node_ids:
-			self.node_data["fix_nodes"][nid] = fix_loc
+			if type(node_ids) == dict:
+				self.node_data["fix_nodes"][nid] = node_ids[nid]
+			else:
+				self.node_data["fix_nodes"][nid] = fix_loc
 
 	def add_graph_by_edges(self, edge_list):
 		"""
