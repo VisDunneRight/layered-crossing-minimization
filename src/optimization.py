@@ -1375,7 +1375,7 @@ class LayeredOptimizer:
 	def __add_angular_resolution_constraints(self, m: gp.Model, m_vars, m_v, y, combo_vars, combo, final):
 		if self.angular_resolution or any(ele[0] == "angular_resolution" for ele in self.hybrid_constraints):
 			for m_var in m_vars:
-				m.addConstr(m_v[m_var] == (y[m_var[0]] - y[m_var[1]]) / 2)
+				m.addConstr(m_v[m_var] == (y[m_var[0]] - y[m_var[1]]) / 1.5)
 			for c_var in combo_vars:
 				if combo is None:
 					m.addConstr(m_v[c_var[0]] * m_v[c_var[1]] + 1 <= final[c_var])
@@ -1504,11 +1504,11 @@ class LayeredOptimizer:
 				b_aux = m.addVars(b_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val, ub=self.m_val, name="b_aux")
 		ysum_vars, ysum, sym_n, sym_e_vars, sym_e = None, None, None, None, None
 		if self.symmetry_maximization or any(ele[0] == "node_symmetry" or ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
-			ysum_vars = [v for nlist in nodes_by_layer.values() for v in itertools.combinations(nlist, 2)] + [(v, v) for v in g.node_ids]
+			ysum_vars = [v for nlist in nodes_by_layer.values() for v in itertools.combinations(nlist, 2) if (g[v[0]].is_anchor_node and g[v[1]].is_anchor_node) or (not g[v[0]].is_anchor_node and not g[v[1]].is_anchor_node)] + [(v, v) for v in g.node_ids]
 			ysum = m.addVars(ysum_vars, vtype=GRB.CONTINUOUS, lb=0, ub=2*self.m_val, name="ysum")
 			sym_n = m.addVars(ysum_vars, vtype=GRB.BINARY, name="sym_n")
 			if self.symmetry_maximization_edges or any(ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
-				sym_e_vars = [v for elist in edges_by_layer.values() for v in itertools.combinations(elist, 2)]
+				sym_e_vars = [v for elist in edges_by_layer.values() for v in itertools.combinations(elist, 2) if (g[v[0][0]].is_anchor_node == g[v[1][0]].is_anchor_node) and (g[v[0][1]].is_anchor_node == g[v[1][1]].is_anchor_node)]
 				sym_e = m.addVars(sym_e_vars, vtype=GRB.BINARY, name="sym_e")
 		ang_m_vars, ang_m, ang_combo_vars, ang_combo, ang_final = None, None, None, None, None
 		if self.angular_resolution or any(ele[0] == "angular_resolution" for ele in self.hybrid_constraints):

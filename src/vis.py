@@ -134,7 +134,7 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     if as_png:
         for i in range(0, copies):
             newname = svg_name.split("_")[0] + "_" + str(int(svg_name.split("_")[1]) + i) if "_" in svg_name else svg_name
-            cairosvg.svg2png(url=f"Images/{svg_name}.svg", write_to=f"Images/{newname}.png", output_width=width / 2, output_height=height / 2)
+            cairosvg.svg2png(url=f"Images/{svg_name}.svg", write_to=f"Images/{newname}.png", output_width=width, output_height=height)
         os.remove(f"Images/{svg_name}.svg")
         # surface.write_to_png(svg_name + ".png")
 
