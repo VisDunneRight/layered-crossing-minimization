@@ -1,8 +1,8 @@
-import csv
 import pandas as pd
 import random
 from aesthetics_exp import run_func
 import os
+import sys
 
 
 def sample_random_rome_graphs(n_graphs):
@@ -37,4 +37,9 @@ def run_all_data_that_completed(exp_id):
 
 
 if __name__ == '__main__':
-    run_all_data_that_completed(0)
+    if len(sys.argv) != 2:
+        for pid in range(28):
+            run_all_data_that_completed(pid)
+    else:
+        pid = int(sys.argv[1])
+        run_all_data_that_completed(pid)

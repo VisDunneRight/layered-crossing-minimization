@@ -65,7 +65,7 @@ def calculate_cutoff_rome(csv_file, num_nodes_b, files_in_bucket):
 def run_func(combo_idx, data_path, drawing_filepath=None):
     opt = LayeredOptimizer(data_path)
     tlimit = 600
-    combo_map = ["CR", "Bend", "Angle", "CRFair", "BendFair", "SymN", "SymNE", "Bundle", "MinMax", "MinEwCr", "CR+Bend", "CR+Angle", "CR+CRFair", "CR+BendFair", "CR+SymN", "CR+SymNE", "CR+Bundle", "CR+MinMax", "CR+MinEwCr", "Bend (fixed x)", "Angle (fixed x)", "BendFair (fixed x)", "SymN (fixed x)", "SymNE (fixed x)", "Angle+Bend (fixed x)", "BendFair+Bend (fixed x)", "SymN+Bend (fixed x)", "SymNE+Bend (fixed x)"]
+    combo_map = ["CR", "Bend", "Angle", "CRFair", "BendFair", "SymN", "SymNE", "Bundle", "MinMax", "MinEwCr", "CR+Bend", "CR+Angle", "CR+CRFair", "CR+BendFair", "CR+SymN", "CR+SymNE", "CR+Bundle", "CR+MinMax", "CR+MinEwCr", "Bend (fixed x)", "Angle (fixed x)", "BendFair (fixed x)", "SymN (fixed x)", "SymNE (fixed x)", "Angle+Bend (fixed x)", "BendFair+Bend (fixed x)", "SymN+Bend (fixed x)", "SymNE+Bend (fixed x)", "Planar", "CR+Planar"]
     combo_choice = combo_map[combo_idx]
     if combo_choice == "CR":  # ID=0
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
@@ -174,6 +174,10 @@ def run_func(combo_idx, data_path, drawing_filepath=None):
         improved_sifting(opt.g)
         res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True,
                                   symmetry_maximization=True, symmetry_maximization_edges=True)
+    elif combo_choice == "Planar":  # ID=28
+        res = opt.optimize_layout(cutoff_time=tlimit, planarization=True)
+    elif combo_choice == "CR+Planar":  # ID=29
+        res = opt.optimize_layout(cutoff_time=tlimit, planarization=True, crossing_minimization=True)
 
     if drawing_filepath is not None:
         if combo_idx in [3, 4, 12, 13, 21, 25]:
@@ -3747,7 +3751,7 @@ if __name__ == '__main__':
     conditions = ['combo_idx']
     csv_header = ['Index', 'Data'] + conditions + ['Nodes', 'Edges', 'TotalNodes', 'TotalEdges', 'ObjVal', 'Crossings', 'EdgeLength', 'Runtime', 'Status']
     condition_map = {
-        'combo_idx': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]}
+        'combo_idx': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]}
 
     if len(sys.argv) != 2:
         for combo_idx_iter in condition_map['combo_idx']:
