@@ -8,7 +8,11 @@ This repository is written and maintained by [Connor Wilson](https://vis.khoury.
 
 It comprises research performed at Northeastern University's [Data Visualization Lab](https://vis.khoury.northeastern.edu) by [Connor Wilson](https://vis.khoury.northeastern.edu/people/Connor-Wilson/), [Eduardo Puerta](https://vis.khoury.northeastern.edu/people/Eduardo-Puerta/), [Tarik Crnovrsanin](https://www.tarikc.net), and [Sara Di Bartolomeo](https://vis.khoury.northeastern.edu/people/Sara-Di-Bartolomeo/), under the advising of [Cody Dunne](https://vis.khoury.northeastern.edu/people/Cody-Dunne/).
 
-A free copy of our paper, *Evaluating and extending speedup techniques for optimal crossing minimization in layered graph drawings*, is available at [https://osf.io/5vq79]().
+A free copy of our paper is available at [https://osf.io/5vq79](https://osf.io/5vq79):
+
+> Evaluating and extending speedup techniques for optimal crossing minimization in layered graph drawings
+> Connor Wilson, Eduardo Puerta, Tarik Crnovrsanin, Sara Di Bartolomeo, and Cody Dunne. IEEE Transactions on Visualization and Computer Graphics—VIS/TVCG. 2024. DOI: [doi.org/10.1109/TVCG.2024.3456349](https://doi.org/10.1109/TVCG.2024.3456349)
+
 
 # Quickstart Guide
 1. A Gurobi license is recommended to run this app, but not required. Visit [Gurobi for Academics and Researchers](https://www.gurobi.com/academia/academic-program-and-licenses/) for instructions on obtaining an individual academic license 
