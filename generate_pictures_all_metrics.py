@@ -68,7 +68,7 @@ def run_all_data_that_completed(exp_id):
     for i, romefl in enumerate(rfiles):
         grname = romefl.split('/')[1].split('.')[0].replace("grafo", "graph")
         if grname + ".png" not in os.listdir(f"Images/DrawingsForWebsite/exp{exp_id}"):
-            run_func(exp_id, "Rome-Lib/" + romefl, drawing_filepath=f"DrawingsForWebsite/exp{exp_id}/{grname}")
+            run_func(exp_id, "Rome-Lib/" + romefl, drawing_filepath=f"DrawingsForWebsite/exp{exp_id}/{grname}", time_limit=200)
 
 
 def run_all_data_that_completed_streamline(exp_id):
@@ -78,7 +78,7 @@ def run_all_data_that_completed_streamline(exp_id):
     for i, romefl in enumerate(rfiles):
         grname = romefl.split('/')[1].split('.')[0].replace("grafo", "graph")
         if grname + ".png" not in os.listdir(f"Images/DrawingsForWebsite/exp{exp_id}stream"):
-            run_func(exp_id, "Rome-Lib/" + romefl, drawing_filepath=f"DrawingsForWebsite/exp{exp_id}stream/{grname}", add_streamline=True)
+            run_func(exp_id, "Rome-Lib/" + romefl, drawing_filepath=f"DrawingsForWebsite/exp{exp_id}stream/{grname}", add_streamline=True, time_limit=200)
 
 
 if __name__ == '__main__':

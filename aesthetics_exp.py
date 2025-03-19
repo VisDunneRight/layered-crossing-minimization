@@ -62,9 +62,9 @@ def calculate_cutoff_rome(csv_file, num_nodes_b, files_in_bucket):
     return n_cutoff / nfls
 
 
-def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False):
+def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False, time_limit=600):
     opt = LayeredOptimizer(data_path)
-    tlimit = 600
+    tlimit = time_limit
     combo_map = ["CR", "Bend", "Angle", "CRFair", "BendFair", "SymN", "SymNE", "Bundle", "MinMax", "MinEwCr", "CR+Bend", "CR+Angle", "CR+CRFair", "CR+BendFair", "CR+SymN", "CR+SymNE", "CR+Bundle", "CR+MinMax", "CR+MinEwCr", "Bend (fixed x)", "Angle (fixed x)", "BendFair (fixed x)", "SymN (fixed x)", "SymNE (fixed x)", "Angle+Bend (fixed x)", "BendFair+Bend (fixed x)", "SymN+Bend (fixed x)", "SymNE+Bend (fixed x)", "Planar", "CR+Planar"]
     combo_choice = combo_map[combo_idx]
     if combo_choice == "CR":  # ID=0
@@ -181,7 +181,7 @@ def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False):
 
     if drawing_filepath is not None:
         if combo_idx in [3, 4, 12, 13, 21, 25]:
-            opt.g.add_groups([[nid for nid, v in fair_vals.items() if v == 1]])
+            opt.g.add_groups([[nid for nid, v in enumerate(fair_vals) if v == 1]])
         if res.status == 2:
             draw_graph(opt.g, drawing_filepath, straighten_edges=True if combo_idx in [2, 11, 20, 24] else False, label_nodes=False, as_png=True)
 
