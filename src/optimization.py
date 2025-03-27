@@ -117,7 +117,7 @@ class LayeredOptimizer:
 			if self.record_solution_data_over_time:
 				obj_val, t2, ncr_list, ntimes_list = self.__optimize_crossing_reduction_model(m, g, env, x_vars=x_vars)
 			else:
-				obj_val, t2 = self.__optimize_crossing_reduction_model(m, g, env, x_vars=x_vars)
+				obj_val, t2, metric_vals = self.__optimize_crossing_reduction_model(m, g, env, x_vars=x_vars)
 
 			# vis.draw_graph(g, "interim")
 
@@ -168,8 +168,8 @@ class LayeredOptimizer:
 			if self.record_solution_data_over_time:
 				return ncr_list, ntimes_list
 
-			retval = collections.namedtuple("retval", "runtime objval status")
-			return retval(t1 + t2 + t3, obj_val, m.status)
+			retval = collections.namedtuple("retval", "runtime objval status metrics")
+			return retval(t1 + t2 + t3, obj_val, m.status, metric_vals)
 
 	def __crossing_reduction_model(self, m: gp.Model, g: LayeredGraph, fix_x_vars=None, start_x_vars=None, groups=None):
 		if self.polyhedral_constraints:
@@ -360,6 +360,7 @@ class LayeredOptimizer:
 			print("otherwise check https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html")
 			return 0, 0, 0, 0, 0, float('inf'), m.status, 0, 0, "INCORRECT STATUS"
 		# gs1, gs2 = 0, 0
+		metric_vals = {}
 		for v in m.getVars():
 			if v.varName[:2] == "x[":
 				xv1 = int(v.varName[2:v.varName.index(',')])
@@ -367,25 +368,48 @@ class LayeredOptimizer:
 				set_x_var(self.x_var_assign, xv1, xv2, round(v.x))
 			elif v.varName[:2] == "y[":
 				g[int(v.varName[2:v.varName.index(']')])].y = v.x
-			# elif v.varName[:3] == "ang":
-			# 	print(v.varName, v.x)
-			# elif v.varName[:2] == "c[":
-			# 	print(v.varName, v.x)
-			# elif v.varName[:3] == "sym":
-			# 	print(v.varName, v.x)
-			# elif v.varName[:2] == "b[":
-			# 	print(v.varName, v.x)
-			# 	xv1 = int(v.varName[2:v.varName.index(',')])
-			# 	xv2 = int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])
-			# 	if g.node_data["fairness"][xv1] == g.node_data["fairness"][xv2] == 0:
-			# 		gs1 += v.x
-			# 	elif g.node_data["fairness"][xv1] == g.node_data["fairness"][xv2] == 1:
-			# 		gs2 += v.x
-			# elif v.varName[:4] == "fair":
-			# 	print(v.varName, v.x)
+			elif v.varName[:3] == "ang":
+				if "ang" not in metric_vals:
+					metric_vals["ang"] = 0
+				metric_vals["ang"] += v.x
+			elif v.varName[:2] == "c[":
+				if "cr" not in metric_vals:
+					metric_vals["cr"] = 0
+				metric_vals["cr"] += v.x
+			elif v.varName[:3] == "sym":
+				if "sym" not in metric_vals:
+					metric_vals["sym"] = 0
+					metric_vals["act_sym"] = 0
+				metric_vals["sym"] += v.x
+				if v.x == 0:
+					metric_vals["act_sym"] += 1
+			elif v.varName[:2] == "b[":
+				if "length" not in metric_vals:
+					metric_vals["length"] = 0
+				metric_vals["length"] += v.x
+				# xv1 = int(v.varName[2:v.varName.index(',')])
+				# xv2 = int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])
+				# if g.node_data["fairness"][xv1] == g.node_data["fairness"][xv2] == 0:
+				# 	gs1 += v.x
+				# elif g.node_data["fairness"][xv1] == g.node_data["fairness"][xv2] == 1:
+				# 	gs2 += v.x
+			elif v.varName[:4] == "fair":
+				metric_vals["fair"] = v.x
+			elif v.varName[:5] == "alpha":
+				if "bundle" not in metric_vals:
+					metric_vals["bundle"] = 0
+				metric_vals["bundle"] += v.x
+			elif v.varName[:2] == "C[":
+				metric_vals["minmax"] = v.x
+			elif v.varName[:2] == "r[":
+				if "planar" not in metric_vals:
+					metric_vals["planar"] = 0
+				metric_vals["planar"] += v.x
 			# elif v.varName[:1] == "c" and round(v.x) != 0:
 			# 	print(v.varName, v.x)
 		# print(gs1, gs2)
+		mtrv = collections.namedtuple("metric_vals", "crossings length angle symmetry fairness bundling minmax planar actual_symmetries")
+		metrics = mtrv(metric_vals["cr"] if "cr" in metric_vals else -1, metric_vals["length"] if "length" in metric_vals else -1, metric_vals["ang"] if "ang" in metric_vals else -1, metric_vals["sym"] if "sym" in metric_vals else -1, metric_vals["fair"] if "fair" in metric_vals else -1, metric_vals["bundle"] if "bundle" in metric_vals else -1, metric_vals["minmax"] if "minmax" in metric_vals else -1, metric_vals["planar"] if "planar" in metric_vals else -1, metric_vals["act_sym"] if "act_sym" in metric_vals else -1)
 		model_objval = m.objVal
 
 		""" Optimize and merge collapsed subgraphs """
@@ -394,7 +418,7 @@ class LayeredOptimizer:
 		if self.record_solution_data_over_time:
 			return model_objval, t2, crossing_values, time_values
 		else:
-			return model_objval, t2
+			return model_objval, t2, metrics
 
 	def __optimization_function(self, g, c, c_vars, c_vars_orig, b, b_vars, c_consts, nc_consts, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n, sym_e, ang, ang_vars, d, r):
 		opt = gp.LinExpr()

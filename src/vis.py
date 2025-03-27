@@ -13,7 +13,7 @@ import shutil
 # from altair_saver import save
 
 
-def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, emphasize_nodes=None, emphasize_edges=None, gravity=False, edge_thickness=False, label_nodes=True, as_png=False, color_scale=None, copies=1, fix_height=-1, remove_witespace=True, straighten_edges=False, node_weight_size=False, dot_group_anchors=False):
+def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, emphasize_nodes=None, emphasize_edges=None, gravity=False, edge_thickness=False, label_nodes=True, as_png=False, color_scale=None, copies=1, fix_height=-1, remove_witespace=True, straighten_edges=False, node_weight_size=False, dot_group_anchors=False, label_anchors=False):
     if nested:
         if "Images" not in os.listdir(".."):
             os.mkdir("../Images")
@@ -113,12 +113,15 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
                 ctx.move_to((node.layer - 1 - min_l) * node_x_distance + offset - 11, node.y * node_y_distance + offset + 4)
             else:
                 ctx.move_to((node.layer - 1 - min_l) * node_x_distance + offset - 11, node.y * node_y_distance + offset + 4 + (2 * (node.layer % 2) - 1) * 25)
-            if not node.is_anchor_node and label_nodes:
+            if (not node.is_anchor_node or label_anchors) and label_nodes:
                 ctx.show_text(str(node.name))
         else:
             ctx.set_source_rgb(0.2, 0.2, 0.2)
             ctx.arc((node.layer - 1 - min_l)*node_x_distance + offset, node.y*node_y_distance + offset, line_width//2, 0, 2 * math.pi)
             ctx.fill()
+            if label_anchors and label_nodes:
+                ctx.move_to((node.layer - 1 - min_l) * node_x_distance + offset + 7, node.y * node_y_distance + offset + 4)
+                ctx.show_text(str(node.name))
 
             # ctx.arc((node.layer - 1 - min_l) * node_x_distance + offset, node.y * node_y_distance + offset,
             #         node_radius // 3, 0, 2 * math.pi)

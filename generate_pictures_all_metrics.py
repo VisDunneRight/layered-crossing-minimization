@@ -4,7 +4,6 @@ from aesthetics_exp import run_func
 import os
 import sys
 import json
-from src import read_data
 
 
 def sample_random_rome_graphs(n_graphs):
@@ -25,19 +24,25 @@ def create_json_object_for_all_files():
     with open("rome_selected.txt") as fd:
         for ln in fd.readlines():
             the_rome_graphs.append(ln.removesuffix('\n'))
-    for expid in range(30):
-        if map_exp_names[expid] != "skip":
-            files_that_completed, tnodes, objvals = get_data_that_completed(expid)
-            for fl in the_rome_graphs:
-                if fl in files_that_completed:
-                    idx = files_that_completed.index(fl)
+    for strval in ["", "stream"]:
+        for expid in range(30):
+            if map_exp_names[expid] != "skip":
+                files_that_completed, tnodes, objvals = get_data_that_completed(expid)
+                for fl in the_rome_graphs:
                     grname = fl.split('/')[1].split('.')[0].replace("grafo", "graph")
-                    full_data_obj.append({"src": f"images/exp{expid}/{grname}.png", "nodes": tnodes[idx], "exp": map_exp_names[expid], "obj": objvals[idx], "alt": f"{grname} / {tnodes[idx]} nodes / {map_exp_names[expid]} / Obj={objvals[idx]}", "stream": False})
-                else:
-                    gr = read_data.read(fl)
-                    grname = fl.split('/')[1].split('.')[0].replace("grafo", "graph")
-                    full_data_obj.append({"src": f"images/incomplete.png", "nodes": gr.n_nodes, "exp": map_exp_names[expid], "obj": -1, "alt": f"{grname} / {gr.n_nodes} nodes / {map_exp_names[expid]}", "stream": False})
-    full_data_obj.sort(key=lambda x: (x["nodes"], map_exp_names.index(x["exp"])))
+                    flname, tnval = fl.split(',')
+                    if f"{grname}.png" in os.listdir(f"Images/DrawingsForWebsite/exp{expid}{strval}"):
+                        if flname in files_that_completed:
+                            idx = files_that_completed.index(flname)
+                            full_data_obj.append({"src": f"images/exp{expid}{strval}/{grname}.png", "nodes": tnodes[idx], "exp": map_exp_names[expid], "obj": round(objvals[idx], 2), "alt": grname, "stream": False if strval == '' else True})
+                        else:
+                            full_data_obj.append(
+                                {"src": f"images/exp{expid}{strval}/{grname}.png", "nodes": int(tnval),
+                                 "exp": map_exp_names[expid], "obj": -1, "alt": grname,
+                                 "stream": False if strval == '' else True})
+                    else:
+                        full_data_obj.append({"src": f"images/incomplete.png", "nodes": int(tnval), "exp": map_exp_names[expid], "obj": -1, "alt": f"{grname}", "stream": False if strval == '' else True})
+    full_data_obj.sort(key=lambda x: (x["nodes"], x["alt"], map_exp_names.index(x["exp"])))
     with open("exp_json_data.json", "w") as fd:
         json.dump(full_data_obj, fd, indent=4)
 
@@ -82,17 +87,17 @@ def run_all_data_that_completed_streamline(exp_id):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        for pid in list(range(9)) + list(range(10, 18)) + list(range(19, 30)):
-            run_all_data_that_completed(pid)
-    else:
-        pid = int(sys.argv[1])
-        if pid < 30:
-            if pid != 9 and pid != 18:
-                run_all_data_that_completed(pid)
-        else:
-            if pid - 30 != 9 and pid - 30 != 18:
-                run_all_data_that_completed_streamline(pid - 30)
-    # create_json_object_for_all_files()
+    # if len(sys.argv) != 2:
+    #     for pid in list(range(9)) + list(range(10, 18)) + list(range(19, 30)):
+    #         run_all_data_that_completed(pid)
+    # else:
+    #     pid = int(sys.argv[1])
+    #     if pid < 30:
+    #         if pid != 9 and pid != 18:
+    #             run_all_data_that_completed(pid)
+    #     else:
+    #         if pid - 30 != 9 and pid - 30 != 18:
+    #             run_all_data_that_completed_streamline(pid - 30)
+    create_json_object_for_all_files()
     # sample_random_rome_graphs(150)
     # x = get_data_that_completed(24, add_cutoff_graphs_up_to_2x=True)
