@@ -352,13 +352,16 @@ class LayeredOptimizer:
 		else:
 			m.optimize()
 		t2 = time.time() - t2
-		if (m.status != 2 and m.status != 9) or m.SolCount == 0:
+		if m.status != 2 and m.status != 9:
 			print("model returned status code:", m.status)
 			print("3: model unsolvable")
-			print(f"4: model never found a feasible solution (#solutions found:{m.SolCount})")
+			print(f"4: model infeasible or unbounded (#solutions found:{m.SolCount})")
 			print("11: solve interrupted")
 			print("otherwise check https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html")
-			return 0, 0, 0, 0, 0, float('inf'), m.status, 0, 0, "INCORRECT STATUS"
+			raise Exception("Invalid model status")
+		elif m.SolCount == 0:
+			print("Model did not find a valid solution before cutoff")
+			return float('inf'), t2, {}
 		# gs1, gs2 = 0, 0
 		metric_vals = {}
 		for v in m.getVars():

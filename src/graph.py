@@ -413,7 +413,7 @@ class LayeredGraph:
 
 	def add_edge_weights(self, weights: dict):
 		"""
-		:param weights: dictionary mapping (node 1 ID, node 2 ID) -> edge weight (real number, default 1)
+		:param weights: dictionary mapping edge (node 1 ID, node 2 ID) -> edge weight (real number, default 1). Also accepts long edges by endpoints, and will apply the weight value to all anchor edges
 		:return: None
 		"""
 		if type(weights) == dict:

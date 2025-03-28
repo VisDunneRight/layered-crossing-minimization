@@ -133,7 +133,7 @@ def get_groups(g: graph.LayeredGraph, add_fillers):
                 gp_id = groups[gp[0]]
                 gp_layers = sorted(set(g[nd].layer for nd in gp))
                 if not all(gp_layers[ix] + 1 == gp_layers[ix + 1] for ix in range(len(gp_layers) - 1)):
-                    raise Exception("Some groups are not continuous across layers.")
+                    raise Exception(f"Group {gp} is not continuous across layers.")
                 gp_by_layer = [[nd for nd in gp if g[nd].layer == lid] for lid in gp_layers]
                 if not is_sl_group[i]:
                     max_gp_layer_sz = max(len(lay) for lay in gp_by_layer)
