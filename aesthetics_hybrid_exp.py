@@ -74,7 +74,7 @@ def get_crossing_optvals(list_of_graphs):
 def run_func(combo_idx, data_path, crossing_optval, time_limit=600):
     opt = LayeredOptimizer(data_path)
     tlimit = time_limit
-    combo_map = ["Sym1", "Sym1.05", "Sym1.1", "Sym1.2", "Sym1.5", "Sym2", "Len1", "Len1.05", "Len1.1", "Len1.2", "Len1.5", "Len2", "Planar1", "Planar1.05", "Planar1.1", "Planar1.2", "Planar1.5", "Planar2", "Minmax1", "Minmax1.05", "Minmax1.1", "Minmax1.2", "Minmax1.5", "Minmax2", "Angle1", "Angle1.05", "Angle1.1", "Angle1.2", "Angle1.5", "Angle2"]
+    combo_map = ["Sym1", "Sym1.05", "Sym1.1", "Sym1.2", "Sym1.5", "Sym2", "Len1", "Len1.05", "Len1.1", "Len1.2", "Len1.5", "Len2", "Planar1", "Planar1.05", "Planar1.1", "Planar1.2", "Planar1.5", "Planar2", "Minmax1", "Minmax1.05", "Minmax1.1", "Minmax1.2", "Minmax1.5", "Minmax2", "Angle1", "Angle1.05", "Angle1.1", "Angle1.2", "Angle1.5", "Angle2", "SymSeq", "LenSeq", "AngleSeq"]
     combo_choice = combo_map[combo_idx]
     if combo_choice == "Sym1":  # ID=0
         res = opt.optimize_layout(cutoff_time=tlimit, symmetry_maximization=True, hybrid_constraints=[("crossings", crossing_optval)])
@@ -136,6 +136,15 @@ def run_func(combo_idx, data_path, crossing_optval, time_limit=600):
         res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, hybrid_constraints=[("crossings", crossing_optval * 1.5)])
     elif combo_choice == "Angle2":  # ID=29
         res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, hybrid_constraints=[("crossings", crossing_optval * 2)])
+    elif combo_choice == "SymSeq":  # ID=30
+        opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, symmetry_maximization=True, fix_x_vars=True)
+    elif combo_choice == "LenSeq":  # ID=31
+        opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, fix_x_vars=True)
+    elif combo_choice == "AngleSeq":  # ID=32
+        opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, fix_x_vars=True)
 
     gcr = opt.g.num_edge_crossings()
     bnds = sum(abs(e.n1.y - e.n2.y) for e in opt.g.edges)
@@ -175,7 +184,7 @@ if __name__ == '__main__':
         if idx == ct:
             print(len(files) if idx % len(files) == 0 else idx % len(files), '/', len(files))
             if file in cr_map:
-                out = run_func(combo_idx=combo_idx_val, data_path=prefix + file, crossing_optval=cr_map[file])
+                out = run_func(combo_idx=combo_idx_val, data_path=prefix + file, crossing_optval=round(cr_map[file]))
             else:
                 out = [-1, -1, tnodes[i], -1, -1, -1, -1, 600.01, 9]
             insert_one(csvpath, [idx, file] + [combo_idx_val] + list(out))
