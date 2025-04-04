@@ -70,7 +70,7 @@ class LayeredOptimizer:
 		self.min_edges_with_crossings = kwargs.get("min_edges_with_crossings", False)
 		self.planarization = kwargs.get("planarization", False)
 		self.streamline = kwargs.get("streamline", False)
-		self.anchor_proximity = kwargs.get("anchor_proximity", 0.3)
+		self.anchor_proximity = kwargs.get("anchor_proximity", 0.4)
 		self.fix_x_vars = kwargs.get("fix_x_vars", False)
 		self.start_xy_vars = kwargs.get("start_xy_vars", False)
 		self.fix_nodes = kwargs.get("fix_nodes", False)
@@ -1399,12 +1399,12 @@ class LayeredOptimizer:
 				# 				m.addConstr(-ubx[grp_ot] + x21_r * self.m_val * x[u2, u1] + lbx[i] + self.m_val * (1 - x21_r) // 2 <= self.m_val)
 
 	def __add_symmetry_maximization_constraints(self, m: gp.Model, y, ysum, ys_vars, sym_n, sym_e, sym_e_vars):
-		if self.symmetry_maximization or any(ele[0] == "node_symmetry" or ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
+		if self.symmetry_maximization or any(ele[0] == "node_symmetry" or ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
 			for ysv in ys_vars:
 				# m.addConstr(ysum[ysv] == y[ysv[0]] + y[ysv[1]])
 				m.addConstr(self.m_val * sym_n[ysv] + y[ysv[0]] + y[ysv[1]] - self.m_val >= 0)
 				m.addConstr(self.m_val * sym_n[ysv] + self.m_val - y[ysv[0]] - y[ysv[1]] >= 0)
-			if self.symmetry_maximization_edges or any(ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
+			if self.symmetry_maximization_edges or any(ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
 				ys_set = set(ys_vars)
 				for e_v in sym_e_vars:
 					sv1 = (e_v[0][0], e_v[1][0])
@@ -1427,7 +1427,7 @@ class LayeredOptimizer:
 					m.addConstr(combo[c_var] == m_v[c_var[0]] * m_v[c_var[1]] + 1)
 					m.addGenConstrAbs(final[c_var], combo[c_var])
 
-	def __add_hybrid_constraints(self, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, n_sym, e_sym, ang, ang_vars, d, r):
+	def __add_hybrid_constraints(self, g: LayeredGraph, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, n_sym, e_sym, ang, ang_vars, d, r):
 		if self.hybrid_constraints:
 			for metric, bound in self.hybrid_constraints:
 				if metric == "crossings":
@@ -1436,7 +1436,10 @@ class LayeredOptimizer:
 						csum += self.gamma_1 * c_consts[i] * c[c_var]
 					m.addConstr(csum <= int(bound))
 				elif metric == "bends":
-					m.addConstr(self.gamma_2 * b.sum() <= int(bound))
+					if self.apply_edge_weight:
+						m.addConstr(sum(g.get_edge(b_v[0], b_v[1]).weight * self.gamma_2 * b[b_v] for b_v in g.edge_ids) <= int(bound))
+					else:
+						m.addConstr(self.gamma_2 * b.sum() <= int(bound))
 				elif metric == "edge_bundles":
 					m.addConstr(self.gamma_bundle * alpha.sum() <= int(bound))
 				elif metric == "min_max_crossings":
@@ -1446,7 +1449,7 @@ class LayeredOptimizer:
 				elif metric == "node_symmetry":
 					m.addConstr(n_sym.sum() <= int(bound))
 				elif metric == "edge_symmetry":
-					m.addConstr(e_sym.sum() <= int(bound))
+					m.addConstr(n_sym.sum() + e_sym.sum() <= int(bound))
 				elif metric == "angular_resolution":
 					m.addConstr(sum((ang[cv] * c[cv] for cv in ang_vars)) <= int(bound))
 				elif metric == "min_edges_with_crossings":
@@ -1454,7 +1457,7 @@ class LayeredOptimizer:
 				elif metric == "planarization":
 					m.addConstr(r.sum() <= int(bound))
 				else:
-					raise Exception(f"No metric with name {metric}.\nAllowed metrics: [crossings, bends, edge_bundles, min_max_crossings, crossing_fairness, bend_fairness, node_symmetry, node+edge_symmetry, angular_resolution, min_edges_with_crossings, planarization]")
+					raise Exception(f"No metric with name {metric}.\nAllowed metrics: [crossings, bends, edge_bundles, min_max_crossings, crossing_fairness, bend_fairness, node_symmetry, edge_symmetry, angular_resolution, min_edges_with_crossings, planarization]")
 
 	def __we_need_c_vars(self):
 		if self.crossing_minimization or (self.fairness_constraints and self.fairness_metric == "crossings") or self.min_max_crossings or self.angular_resolution or self.min_edges_with_crossings or self.planarization or any(ele[0] == "crossings" or ele[0] == "min_max_crossings" or ele[0] == "angular_resolution" or ele[0] == "crossing_fairness" or ele[0] == "min_edges_with_crossings" for ele in self.hybrid_constraints):
@@ -1462,7 +1465,7 @@ class LayeredOptimizer:
 		return False
 
 	def __we_need_y_vars(self):
-		if self.vertical_transitivity or (self.fairness_constraints and self.fairness_metric == "bends") or self.bendiness_reduction or self.streamline or self.stratisfimal_y_vars or self.symmetry_maximization or self.angular_resolution or self.apply_node_weight_spacing or self.node_emphasis or (self.grouping_constraints and self.y_based_group_constraints) or any(ele[0] == "bends" or ele[0] == "edge_bundles" or ele[0] == "angular_resolution" or ele[0] == "bend_fairness" or ele[0] == "node_symmetry" or ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
+		if self.vertical_transitivity or (self.fairness_constraints and self.fairness_metric == "bends") or self.bendiness_reduction or self.streamline or self.stratisfimal_y_vars or self.symmetry_maximization or self.angular_resolution or self.apply_node_weight_spacing or self.node_emphasis or (self.grouping_constraints and self.y_based_group_constraints) or any(ele[0] == "bends" or ele[0] == "edge_bundles" or ele[0] == "angular_resolution" or ele[0] == "bend_fairness" or ele[0] == "node_symmetry" or ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
 			return True
 		return False
 
@@ -1552,11 +1555,11 @@ class LayeredOptimizer:
 			if self.fairness_metric == "bends" or any(ele[0] == "bend_fairness" for ele in self.hybrid_constraints):
 				b_aux = m.addVars(b_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val, ub=self.m_val, name="b_aux")
 		ysum_vars, ysum, sym_n, sym_e_vars, sym_e = None, None, None, None, None
-		if self.symmetry_maximization or any(ele[0] == "node_symmetry" or ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
+		if self.symmetry_maximization or any(ele[0] == "node_symmetry" or ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
 			ysum_vars = [v for nlist in nodes_by_layer.values() for v in itertools.combinations(nlist, 2) if (g[v[0]].is_anchor_node and g[v[1]].is_anchor_node) or (not g[v[0]].is_anchor_node and not g[v[1]].is_anchor_node)] + [(v, v) for v in g.node_ids]
 			ysum = m.addVars(ysum_vars, vtype=GRB.CONTINUOUS, lb=0, ub=2*self.m_val, name="ysum")
 			sym_n = m.addVars(ysum_vars, vtype=GRB.BINARY, name="sym_n")
-			if self.symmetry_maximization_edges or any(ele[0] == "node+edge_symmetry" for ele in self.hybrid_constraints):
+			if self.symmetry_maximization_edges or any(ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
 				sym_e_vars = [v for elist in edges_by_layer.values() for v in itertools.combinations(elist, 2) if (g[v[0][0]].is_anchor_node == g[v[1][0]].is_anchor_node) and (g[v[0][1]].is_anchor_node == g[v[1][1]].is_anchor_node)]
 				sym_e = m.addVars(sym_e_vars, vtype=GRB.BINARY, name="sym_e")
 		ang_m_vars, ang_m, ang_combo_vars, ang_combo, ang_final = None, None, None, None, None
@@ -1583,8 +1586,8 @@ class LayeredOptimizer:
 					xv1 = int(v.varName[2:v.varName.index(',')])
 					xv2 = int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])
 					v.Start = get_x_var(self.x_var_assign, xv1, xv2)
-				elif v.varName[:2] == "y[":
-					v.Start = g[int(v.varName[2:v.varName.index(']')])].y
+				# elif v.varName[:2] == "y[":
+				# 	v.Start = g[int(v.varName[2:v.varName.index(']')])].y
 		if self.fix_x_vars:
 			if any(v == 2 for v in self.x_var_assign.values()):  # use current rel positions if no prior optimization
 				self.__assign_x_given_y()
@@ -1669,7 +1672,7 @@ class LayeredOptimizer:
 		self.__add_angular_resolution_constraints(m, ang_m_vars, ang_m, y, ang_combo_vars, ang_combo, ang_final)
 
 		""" Hybrid model bounding constraints """
-		self.__add_hybrid_constraints(m, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n, sym_e, ang_final, ang_combo_vars, d, r)
+		self.__add_hybrid_constraints(g, m, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n, sym_e, ang_final, ang_combo_vars, d, r)
 
 		return x_vars, c_vars
 
@@ -2317,7 +2320,7 @@ class LayeredOptimizer:
 		self.min_edges_with_crossings = kwargs.get("min_edges_with_crossings", False)
 		self.planarization = kwargs.get("planarization", False)
 		self.streamline = kwargs.get("streamline", False)
-		self.anchor_proximity = kwargs.get("anchor_proximity", 0.3)
+		self.anchor_proximity = kwargs.get("anchor_proximity", 0.4)
 		self.fix_x_vars = kwargs.get("fix_x_vars", False)
 		self.start_xy_vars = kwargs.get("start_xy_vars", False)
 		self.fix_nodes = kwargs.get("fix_nodes", False)

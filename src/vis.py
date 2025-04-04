@@ -13,7 +13,41 @@ import shutil
 # from altair_saver import save
 
 
-def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, emphasize_nodes=None, emphasize_edges=None, gravity=False, edge_thickness=False, label_nodes=True, as_png=False, color_scale=None, copies=1, fix_height=-1, remove_witespace=True, straighten_edges=False, node_weight_size=False, dot_group_anchors=False, label_anchors=False):
+def bezier_control_points(g, eid, y1, y2, l1, l2, minl, nxdist, nydist, offset, left_edges, right_edges, straight_edges, long_edges, less_curvy_edges):
+    if eid in long_edges:
+        les = g.get_long_edges()
+        the_le = [v for v in les if v[0] == eid[0] and v[1] == eid[1]][0]
+        y2, l2 = g[the_le[-1]].y, g[the_le[-1]].layer
+    cp1x = (l1 - 1 - minl) * nxdist + offset + nxdist // 1.5
+    cp1y = y1 * nydist + offset
+    if eid in left_edges or eid in straight_edges:
+        cp1x = (l1 - 1 - minl) * nxdist + offset
+    if eid in less_curvy_edges:
+        cp1x -= nxdist // 3.5
+    cp2x = (l2 - 1 - minl) * nxdist + offset - nxdist // 1.5
+    cp2y = y2 * nydist + offset
+    if eid in right_edges or eid in straight_edges:
+        cp2x = (l2 - 1 - minl) * nxdist + offset
+    if eid in less_curvy_edges:
+        cp2x += nxdist // 3.5
+    endx = (l2 - 1 - minl) * nxdist + offset
+    endy = y2 * nydist + offset
+    return cp1x, cp1y, cp2x, cp2y, endx, endy
+
+
+def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_distance=100, nested=False, motif=False, groups=None, emphasize_nodes=None, emphasize_edges=None, gravity=False, edge_thickness=False, label_nodes=True, as_png=False, color_scale=None, copies=1, fix_height=-1, remove_witespace=True, straighten_edges=False, node_weight_size=False, dot_group_anchors=False, label_anchors=False, left_straight_edges=None, right_straight_edges=None, full_straight_edges=None, straighten_only_true_edges=False, full_straight_long_edges=None, dont_draw_edges=None, less_curvy_edges=None):
+    if left_straight_edges is None:
+        left_straight_edges = []
+    if right_straight_edges is None:
+        right_straight_edges = []
+    if full_straight_edges is None:
+        full_straight_edges = []
+    if full_straight_long_edges is None:
+        full_straight_long_edges = []
+    if dont_draw_edges is None:
+        dont_draw_edges = []
+    if less_curvy_edges is None:
+        less_curvy_edges = []
     if nested:
         if "Images" not in os.listdir(".."):
             os.mkdir("../Images")
@@ -57,6 +91,8 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
     ctx.fill()
     ctx.set_line_width(line_width)
     for edge in g.edges:  # curve_to(c1x, c1y, c2x, c2y, ex, ey), control points c1, c2, end point e
+        if (edge.n1.id, edge.n2.id) in dont_draw_edges:
+            continue
         ctx.set_source_rgb(0.8, 0.8, 0.8)
         ctx.move_to((edge.n1.layer - 1 - min_l) * node_x_distance + offset, edge.n1.y * node_y_distance + offset)
         if edge_thickness:
@@ -65,11 +101,12 @@ def draw_graph(g: graph.LayeredGraph, svg_name, node_x_distance=150, node_y_dist
             ctx.set_source_rgb(17/256, 138/256, 89/256)
         if edge.same_layer_edge:
             ctx.curve_to((edge.n1.layer - 1 - min_l) * node_x_distance + offset + node_x_distance//1.5 - (node_x_distance//2)//(abs(edge.n1.y-edge.n2.y)), edge.n1.y * node_y_distance + offset, (edge.n1.layer - 1 - min_l) * node_x_distance + offset + node_x_distance//1.5 - (node_x_distance//2)//(abs(edge.n1.y-edge.n2.y)), edge.n2.y * node_y_distance + offset, (edge.n1.layer - 1 - min_l) * node_x_distance + offset, edge.n2.y * node_y_distance + offset)
-        elif edge.n1.y == edge.n2.y or straighten_edges:
+        elif edge.n1.y == edge.n2.y or straighten_edges or (straighten_only_true_edges and not edge.n1.is_anchor_node and not edge.n2.is_anchor_node):
             ctx.line_to((edge.n2.layer - 1 - min_l)*node_x_distance + offset, edge.n2.y*node_y_distance + offset)
         else:
             # ctx.curve_to((edge.n1.layer - 1) * node_x_distance + offset + node_x_distance, edge.n1.y * node_y_distance + offset, (edge.n2.layer - 1) * node_x_distance + offset - node_x_distance, edge.n2.y * node_y_distance + offset, (edge.n2.layer - 1) * node_x_distance + offset, edge.n2.y * node_y_distance + offset)
-            ctx.curve_to((edge.n1.layer - 1 - min_l) * node_x_distance + offset + node_x_distance//1.5, edge.n1.y * node_y_distance + offset, (edge.n2.layer - 1 - min_l) * node_x_distance + offset - node_x_distance//1.5, edge.n2.y * node_y_distance + offset, (edge.n2.layer - 1 - min_l) * node_x_distance + offset, edge.n2.y * node_y_distance + offset)
+            p1, p2, p3, p4, p5, p6 = bezier_control_points(g, (edge.n1.id, edge.n2.id), edge.n1.y, edge.n2.y, edge.n1.layer, edge.n2.layer, min_l, node_x_distance, node_y_distance, offset, left_straight_edges, right_straight_edges, full_straight_edges, full_straight_long_edges, less_curvy_edges)
+            ctx.curve_to(p1, p2, p3, p4, p5, p6)
         ctx.stroke()
     ctx.set_line_width(line_width)
 

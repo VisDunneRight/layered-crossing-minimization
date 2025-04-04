@@ -948,6 +948,39 @@ class LayeredGraph:
 		print(f"Crossings: {n_cr}\tBends: {n_bends}")
 		return gamma_1 * n_cr + gamma_2 * n_bends
 
+	def calculate_symmetry_score(self, include_edges=False, epsilon=0.01, use_near_middle_only=False):
+		best_axis, best_score_n, best_score_e = 0, 0, 0
+		potential_axes = sorted(list(set([round(nd.y, 3) for nd in self])))
+		potential_axes += [(potential_axes[i] + potential_axes[i+1]) / 2 for i in range(len(potential_axes) - 1)]
+		if use_near_middle_only:
+			miny, maxy = min(nd.y for nd in self.nodes), max(nd.y for nd in self.nodes)
+			potential_axes = [yv for yv in potential_axes if miny + ((maxy - miny) / 3) <= yv <= miny + (2 * (maxy - miny) / 3)]
+		for axis in potential_axes:
+			daxis = 2 * axis
+			axscore_n, axscore_e = 0, 0
+			for nlist in self.layers.values():
+				for n1, n2 in itertools.combinations(nlist, 2):
+					if n1.is_anchor_node == n2.is_anchor_node:
+						if abs(n1.y + n2.y - daxis) < epsilon:
+							axscore_n += 1
+			for nd in self.nodes:
+				if abs(2 * nd.y - daxis) < epsilon:
+					axscore_n += 1
+			if include_edges:
+				for elist in self.get_edges_by_layer().values():
+					for e1, e2 in itertools.combinations(elist, 2):
+						if (e1.n1.is_anchor_node == e2.n1.is_anchor_node) and (e1.n2.is_anchor_node == e2.n2.is_anchor_node):
+							if (abs(e1.n1.y + e2.n1.y - daxis) < epsilon) and (abs(e1.n2.y + e2.n2.y - daxis) < epsilon):
+								axscore_e += 1
+				for ed in self.edges:
+					if abs(2 * ed.n1.y - daxis) < epsilon and abs(2 * ed.n2.y - daxis) < epsilon:
+						axscore_e += 1
+			if axscore_n + axscore_e > best_score_n + best_score_e:
+				best_axis = axis
+				best_score_n = axscore_n
+				best_score_e = axscore_e
+		print(f"Symmetry score: {best_score_n + best_score_e} (nsym={best_score_n}, esym={best_score_e})\t Best axis: Y={best_axis}")
+
 	def collapse_ap_cases(self, leaves_only=False):
 		# 1) Recursive DFS to label all articulation points
 		idx = 0
