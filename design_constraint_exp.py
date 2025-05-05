@@ -231,45 +231,45 @@ def run_func(combo_idx, data_path):
         nweights = [random.randint(1, 5) for _ in range(opt.g.n_nodes)]
         opt.g.add_node_weights(nweights)
         opt.m_val *= 3
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, apply_node_weight_spacing=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, apply_node_weight_spacing=True, fix_x_vars=True)
     elif combo_choice == "Ewt+BR":  # Edge weight mult on BR
         improved_sifting(opt.g)
         eweights = {ed: random.randint(1, 5) for ed in opt.g.edge_ids}
         opt.g.add_edge_weights(eweights)
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, apply_edge_weight=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, apply_edge_weight=True, fix_x_vars=True)
     elif combo_choice == "Emph+CR":  # Node Emphasis + CR
         enodes = random.sample(list(opt.g.node_ids.keys()), max(round(0.05 * opt.g.n_nodes), 1))
-        opt.g.add_node_emphasis(enodes)
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, node_emphasis=True)
+        opt.g.add_node_focus(enodes)
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, node_focus=True)
     elif combo_choice == "Emph+BR":  # Node Emphasis + BR
         improved_sifting(opt.g)
         enodes = random.sample(list(opt.g.node_ids.keys()), max(round(0.05 * opt.g.n_nodes), 1))
-        opt.g.add_node_emphasis(enodes)
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, fix_x_vars=True, node_emphasis=True)
+        opt.g.add_node_focus(enodes)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, fix_x_vars=True, node_focus=True)
     elif combo_choice == "SLe+CR":  # Same Layer Edges + CR
         add_sl_edges(opt.g)
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
     elif combo_choice == "SLe+BR":  # Same layer edges + BR
         improved_sifting(opt.g)
         add_sl_edges(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, fix_x_vars=True)
     elif combo_choice == "StrE+CR":  # Straight edges + CR
         res = opt.optimize_layout(cutoff_time=tlimit, constrain_straight_long_arcs=True, crossing_minimization=True, vertical_transitivity=True)
     elif combo_choice == "StrE+BR":  # Straight edges + BR
         # difficult to find an assigment that guarantees edges can be drawn straight.
         try:
             improved_sifting(opt.g)
-            res = opt.optimize_layout(cutoff_time=tlimit, constrain_straight_long_arcs=True, bendiness_reduction=True, fix_x_vars=True)
+            res = opt.optimize_layout(cutoff_time=tlimit, constrain_straight_long_arcs=True, edge_length_minimization=True, fix_x_vars=True)
         except ValueError:
             return sum(1 for nd in opt.g.nodes if not nd.is_anchor_node), sum(1 for ed in opt.g.edges if not ed.n1.is_anchor_node), opt.g.n_nodes, len(opt.g.edges), "UNSOLVABLE", "UNSOLVABLE", "UNSOLVABLE", "UNSOLVABLE", "UNSOLVABLE"
     elif combo_choice == "Stream+CR":  # Streamlining + BR
         res = opt.optimize_layout(cutoff_time=tlimit, streamline=True, crossing_minimization=True, vertical_transitivity=True)
     elif combo_choice == "Stream+BR":  # Streamlining + BR
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, streamline=True, bendiness_reduction=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, streamline=True, edge_length_minimization=True, fix_x_vars=True)
     # elif combo_choice == 9:  # Groups + CR + BR
     #     add_groups(opt.g)
-    #     res = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, crossing_minimization=True, bendiness_reduction=True, y_based_group_constraints=True)
+    #     res = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, crossing_minimization=True, edge_length_minimization=True, y_based_group_constraints=True)
     elif combo_choice == "Group+CR":  # Groups + CR
         add_groups(opt.g)
         res = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, crossing_minimization=True)
@@ -277,7 +277,7 @@ def run_func(combo_idx, data_path):
         add_groups(opt.g)
         find_valid_group_layout_for_br(opt.g)
         opt.m_val *= 2
-        res = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, bendiness_reduction=True,y_based_group_constraints=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, edge_length_minimization=True,y_based_group_constraints=True, fix_x_vars=True)
     elif combo_choice == "Fix+CR":  # Fixed nodes + CR
         fix_nds = random.sample(list(opt.g.node_ids.keys()), max(round(0.2 * opt.g.n_nodes), 2))
         fix_top = random.sample(fix_nds, random.randint(0, max(round(0.2 * opt.g.n_nodes), 2)))
@@ -290,7 +290,7 @@ def run_func(combo_idx, data_path):
         fix_nds = random.sample(list(opt.g.node_ids.keys()), max(round(0.2 * opt.g.n_nodes), 2))
         fix_pos = {nd: opt.g[nd].y for nd in fix_nds}
         opt.g.add_node_fix(fix_pos)
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, fix_nodes=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, fix_nodes=True, fix_x_vars=True)
     else:
         raise Exception("No experiment with that idx")
 

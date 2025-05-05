@@ -25,5 +25,5 @@ class TestOptimizationWithStraightLongArcs(unittest.TestCase):
     def test_straightedge_2bends(self):
         opt = optimization.LayeredOptimizer(self.gsmall2)
         opt.optimize_layout(crossing_minimization=True, constrain_straight_long_arcs=True, vertical_transitivity=True, long_arc_bend_limit=1)
-        opt.optimize_layout(constrain_straight_long_arcs=True, long_arc_bend_limit=1, fix_x_vars=True, bendiness_reduction=True)
+        opt.optimize_layout(constrain_straight_long_arcs=True, long_arc_bend_limit=1, fix_x_vars=True, edge_length_minimization=True)
         vis.draw_graph(self.gsmall2, "STRAIGHT_TEST_4")

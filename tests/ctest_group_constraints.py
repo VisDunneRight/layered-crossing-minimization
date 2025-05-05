@@ -82,12 +82,13 @@ class TestOptimizationWithGroups(unittest.TestCase):
         opt = optimization.LayeredOptimizer(self.g3)
         opt.optimize_layout(grouping_constraints=True, crossing_minimization=True)
         vis.draw_graph(self.g3, "GRP_TEST_3bendA")
-        opt.optimize_layout(bendiness_reduction=True, grouping_constraints=True, y_based_group_constraints=True, fix_x_vars=True)
+        opt.optimize_layout(edge_length_minimization=True, grouping_constraints=True, y_based_group_constraints=True, fix_x_vars=True)
         vis.draw_graph(self.g3, "GRP_TEST_3bendB")
 
     def test_group_correctness(self):
         opt = optimization.LayeredOptimizer(self.g4)
         res1 = opt.optimize_layout(crossing_minimization=True)
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         vis.draw_graph(self.g4, "GRP_TEST_4a")
         grouped = set()
         groups = []
@@ -107,6 +108,7 @@ class TestOptimizationWithGroups(unittest.TestCase):
         self.g4.add_groups(groups)
         opt2 = optimization.LayeredOptimizer(self.g4)
         res2 = opt2.optimize_layout(grouping_constraints=True, crossing_minimization=True)
+        opt2.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         vis.draw_graph(self.g4, "GRP_TEST_4b")
         self.assertEqual(res1.objval, res2.objval)
 
@@ -118,7 +120,7 @@ class TestOptimizationWithGroups(unittest.TestCase):
                 add_groups(opt.g)
                 opt.optimize_layout(grouping_constraints=True, crossing_minimization=True)
                 vis.draw_graph(opt.g, "GRP_TEST_5bendA")
-                opt.optimize_layout(bendiness_reduction=True, grouping_constraints=True, y_based_group_constraints=True, fix_x_vars=True)
+                opt.optimize_layout(edge_length_minimization=True, grouping_constraints=True, y_based_group_constraints=True, fix_x_vars=True)
                 vis.draw_graph(opt.g, "GRP_TEST_5bendB")
         self.assertEqual(0, 0)
 
@@ -128,6 +130,6 @@ class TestOptimizationWithGroups(unittest.TestCase):
         opt.optimize_layout(grouping_constraints=True, crossing_minimization=True)
         vis.draw_graph(opt.g, "GRP_TEST_5bendA")
         print([(nd.id, nd.y) for nd in opt.g.nodes])
-        opt.optimize_layout(bendiness_reduction=True, grouping_constraints=True, y_based_group_constraints=True,
+        opt.optimize_layout(edge_length_minimization=True, grouping_constraints=True, y_based_group_constraints=True,
                             fix_x_vars=True)
         vis.draw_graph(opt.g, "GRP_TEST_5bendB")

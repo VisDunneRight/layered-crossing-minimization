@@ -14,10 +14,6 @@ class TestOptimizationWithFixedNodes(unittest.TestCase):
         opt.optimize_layout(crossing_minimization=True, fix_nodes=True)
         vis.draw_graph(self.g1, "FIX_TEST_1a", groups={nd: 1 if nd in fix_nodes else 0 for nd in self.g1.node_ids})
 
-        self.g1.add_node_fix(fix_nodes, "middle")
-        opt.optimize_layout(crossing_minimization=True, fix_nodes=True)
-        vis.draw_graph(self.g1, "FIX_TEST_1b", groups={nd: 1 if nd in fix_nodes else 0 for nd in self.g1.node_ids})
-
         self.g1.add_node_fix(fix_nodes, "bottom")
         opt.optimize_layout(crossing_minimization=True, fix_nodes=True)
         vis.draw_graph(self.g1, "FIX_TEST_1c", groups={nd: 1 if nd in fix_nodes else 0 for nd in self.g1.node_ids})

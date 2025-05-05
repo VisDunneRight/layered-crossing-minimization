@@ -22,8 +22,8 @@ if __name__ == '__main__':
     print(gr.n_nodes, len(gr.edges))
     print(gr.calculate_stratisfimal_objective(c1, c2))
 
-    optim = LayeredOptimizer(gr, vertical_transitivity=True, bendiness_reduction=True, sequential_bendiness=False, gamma_1=c1, gamma_2=c2, cutoff_time=600)
-    optim.just_bendiness_reduction(streamline=False)
+    optim = LayeredOptimizer(gr, vertical_transitivity=True, edge_length_minimization=True, sequential_bendiness=False, gamma_crossings=c1, gamma_edgelength=c2, cutoff_time=600)
+    optim.just_edge_length_minimization(streamline=False)
 
     # small neighborhoods
     res = optim.local_opt_increment(800, neighborhood_fn=degree_ratio_neighborhood, candidate_fn=degree_candidate)
@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     # global optimal
     gr2 = read(control_flow_file)
-    optim2 = LayeredOptimizer(gr2, vertical_transitivity=True, bendiness_reduction=True, sequential_bendiness=False, gamma_1=c1, gamma_2=c2, cutoff_time=1800)
+    optim2 = LayeredOptimizer(gr2, vertical_transitivity=True, edge_length_minimization=True, sequential_bendiness=False, gamma_crossings=c1, gamma_edgelength=c2, cutoff_time=1800)
     res = optim2.optimize_layout()
     with open("casestudy_data.csv", 'a') as fd:
         wrt = csv.writer(fd)

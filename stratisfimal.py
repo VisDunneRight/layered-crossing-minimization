@@ -11,7 +11,7 @@ from src.optimization import LayeredOptimizer
 random.seed(22)
 
 
-def run_all_rome_lib(num_nodes, num_graphs, num_drawings, bendiness_reduction, seq_bend, timelimit, save, savefile=None, shuffle=False, target=None, subgraph_reduction=False):
+def run_all_rome_lib(num_nodes, num_graphs, num_drawings, edge_length_minimization, seq_bend, timelimit, save, savefile=None, shuffle=False, target=None, subgraph_reduction=False):
     i = 1
     outputs = ["Results:\n"]
     if target is not None and int(target) != 0:
@@ -26,8 +26,8 @@ def run_all_rome_lib(num_nodes, num_graphs, num_drawings, bendiness_reduction, s
         print(f"\n\n{file} ({i}/{num_graphs}):")
         # print("Number of butterflies:", motifs.count_butterflies(g))
         # print("Vertex promotion time:", tvert)
-        run_optimizer(g, bendiness_reduction, seq_bend, timelimit, subgraph_reduction)
-        # outputs.append(f"{num_nodes},{bendiness_reduction},{seq_bend},{timelimit}," + run_optimizer(g, bendiness_reduction, seq_bend, timelimit, subgraph_reduction) + '\n')
+        run_optimizer(g, edge_length_minimization, seq_bend, timelimit, subgraph_reduction)
+        # outputs.append(f"{num_nodes},{edge_length_minimization},{seq_bend},{timelimit}," + run_optimizer(g, edge_length_minimization, seq_bend, timelimit, subgraph_reduction) + '\n')
         i += 1
         if num_drawings > 0:
             num_drawings -= 1
@@ -40,8 +40,8 @@ def run_all_rome_lib(num_nodes, num_graphs, num_drawings, bendiness_reduction, s
             print(output.replace('\n', ''))
 
 
-def run_optimizer(g: LayeredGraph, bendiness_reduction, sequential, timelimit, subgraph):
-    params = {"bendiness_raduction": bendiness_reduction, "sequential_bendiness": sequential, "do_subg_reduction": subgraph}
+def run_optimizer(g: LayeredGraph, edge_length_minimization, sequential, timelimit, subgraph):
+    params = {"bendiness_raduction": edge_length_minimization, "sequential_bendiness": sequential, "do_subg_reduction": subgraph}
     if len(timelimit) > 0 and int(timelimit) > 0:
         params["cutoff_time"] = int(timelimit)
     optimizer = LayeredOptimizer(g, params)
@@ -357,7 +357,7 @@ def record_baseline_info(filename, start_idx):
             opt = LayeredOptimizer(g, {})
             opt.return_full_data = True
             opt.symmetry_breaking = True
-            opt.bendiness_reduction = False
+            opt.edge_length_minimization = False
             opt.aggro_presolve = True
             opt.xvar_branch_priority = True
             tup = opt.optimize_layout()

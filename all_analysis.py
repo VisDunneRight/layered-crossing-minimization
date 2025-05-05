@@ -76,7 +76,7 @@ if __name__ == '__main__':
     # opt.cycle_constraints = True
     # opt.butterfly_reduction = True
     # opt.draw_graph = True
-    # opt.bendiness_reduction = True
+    # opt.edge_length_minimization = True
     # opt.optimize_layout()
-    opt.just_bendiness_reduction()
+    opt.just_edge_length_minimization()
     vis.draw_graph(g, opt.name, node_x_distance=700)

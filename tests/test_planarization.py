@@ -11,13 +11,13 @@ class TestMaxPlanarSubgraph(unittest.TestCase):
         opt = optimization.LayeredOptimizer(self.g2)
         opt.optimize_layout(min_edges_with_crossings=True, crossing_minimization=False)
         opt.optimize_layout(planarization=True, crossing_minimization=False)
-        opt.optimize_layout(bendiness_reduction=True, fix_x_vars=True)
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         vis.draw_graph(self.g2, "PLANAR_TEST")
 
     def test_planarization_plus_cr(self):
         opt = optimization.LayeredOptimizer(self.g2)
         opt.optimize_layout(planarization=True, crossing_minimization=True)
-        opt.optimize_layout(bendiness_reduction=True, fix_x_vars=True)
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         vis.draw_graph(self.g2, "PLANAR_TEST_2")
 
     def test_planarization_hybrid_cr(self):
@@ -25,5 +25,5 @@ class TestMaxPlanarSubgraph(unittest.TestCase):
         opt.optimize_layout(min_edges_with_crossings=True)
         res = opt.optimize_layout(planarization=True)
         opt.optimize_layout(crossing_minimization=True, hybrid_constraints=[("planarization", res.objval)])
-        opt.optimize_layout(bendiness_reduction=True, fix_x_vars=True)
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         vis.draw_graph(self.g2, "PLANAR_TEST_3")

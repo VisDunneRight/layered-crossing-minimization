@@ -21,7 +21,7 @@ def run_ensemble_layout_algorithm(graph_file):
     optimizer2.cutoff_time = 300
     results.append(optimizer2.optimize_layout())
 
-    optimizer3 = LayeredOptimizer(graph_file, nthreads=1, bendiness_reduction=True)
+    optimizer3 = LayeredOptimizer(graph_file, nthreads=1, edge_length_minimization=True)
     optimizer3.direct_transitivity = True
     optimizer3.symmetry_breaking = True
     optimizer3.cycle_constraints = True

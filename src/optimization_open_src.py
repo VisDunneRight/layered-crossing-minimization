@@ -119,7 +119,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 					self.bounds[x_vars[x_v[1], x_v[0]]] = (val, val)
 
 		""" Butterfly reduction """
-		butterfly_c_pairs = self.get_butterfly_cvars(g, c_vars)
+		butterfly_c_pairs = self.__get_butterfly_cvars(g, c_vars)
 
 		""" Transitivity constraints """
 		self.__transitivity_matrix(x_vars, y_vars, z_vars, g)
@@ -143,7 +143,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		self.__symmetry_breaking_matrix(x_vars, xvar_usage)
 
 		""" Non-sequential bendiness reduction, original Stratisfimal version"""
-		# if not self.sequential_bendiness and self.bendiness_reduction:
+		# if not self.sequential_bendiness and self.edge_length_minimization:
 
 		""" Create model objective """
 		self.c_t = [0] * self.nvars
@@ -199,7 +199,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 
 		""" Draw optimized graph """
 		if self.draw_graph:
-			if not self.bendiness_reduction:
+			if not self.edge_length_minimization:
 				if self.direct_transitivity:
 					g.assign_y_vals_given_x_vars(self.x_var_assign)
 				else:
@@ -547,7 +547,7 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 					self.__add_matrix_constraint([x_vars[kl1, kl2], x_vars[km1, km2], x_vars[lm1, lm2], c_vars[cikjl1, cikjl2], c_vars[ciljm1, ciljm2]], [-klc, 2*kmc, -lmc, -1, -1], (1 - klc)//2 - (1 - kmc) + (1 - lmc)//2)
 
 	def __sequential_bendiness_matrix(self):
-		if self.bendiness_reduction and self.sequential_bendiness:
+		if self.edge_length_minimization and self.sequential_bendiness:
 			g = self.g
 			x_var_opt = self.x_var_assign
 			ct = 0

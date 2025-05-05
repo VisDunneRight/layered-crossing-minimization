@@ -19,7 +19,7 @@ def visualize_cfg(path, do_bend_postprocess=False):
     print(gr.num_edge_crossings())
     if do_bend_postprocess:
         optimizer = LayeredOptimizer(gr)
-        optimizer.just_bendiness_reduction()
+        optimizer.just_edge_length_minimization()
     draw_graph(gr, path.split("/")[-1].replace(".lgbin", ""))
 
 
@@ -62,8 +62,8 @@ if __name__ == '__main__':
         # 1. LNS method
         gr1 = read(flname)
         barycenter(gr1)
-        optim = LayeredOptimizer(gr1, vertical_transitivity=True, bendiness_reduction=True, sequential_bendiness=False, gamma_1=c1, gamma_2=c2, cutoff_time=900)
-        optim.just_bendiness_reduction(streamline=False)
+        optim = LayeredOptimizer(gr1, vertical_transitivity=True, edge_length_minimization=True, sequential_bendiness=False, gamma_crossings=c1, gamma_edgelength=c2, cutoff_time=900)
+        optim.just_edge_length_minimization(streamline=False)
         _, _, crossings, times = optim.local_opt_increment(1000, neighborhood_fn=degree_ratio_neighborhood, candidate_fn=random_candidate)
         optim.g.write_out(f"LNS_case_study/LNS_cr+br_{control_flow_graph}.lgbin")
         write_to_csv("LNS_case_study/results.csv", ["CR+BR", control_flow_graph, "LNS", optim.g.calculate_stratisfimal_objective(c1, c2), crossings, times])
@@ -74,13 +74,13 @@ if __name__ == '__main__':
         init_obj = gr2.calculate_stratisfimal_objective(c1, c2)
         weighted_median(gr2)
         optim = LayeredOptimizer(gr2)
-        optim.just_bendiness_reduction(streamline=False)
+        optim.just_edge_length_minimization(streamline=False)
         gr2.write_out(f"LNS_case_study/WM_cr+br_{control_flow_graph}.lgbin")
         write_to_csv("LNS_case_study/results.csv", ["CR+BR", control_flow_graph, "WM", gr2.calculate_stratisfimal_objective(c1, c2), [init_obj, gr2.calculate_stratisfimal_objective(c1, c2)], [0, time.time() - gr2t1]])
 
         # 3. ILP
         gr3 = read(flname)
-        optim2 = LayeredOptimizer(gr3, vertical_transitivity=True, bendiness_reduction=True, sequential_bendiness=False, symmetry_breaking=True, gamma_1=c1, gamma_2=c2, cutoff_time=900, record_solution_data_over_time=True)
+        optim2 = LayeredOptimizer(gr3, vertical_transitivity=True, edge_length_minimization=True, sequential_bendiness=False, symmetry_breaking=True, gamma_crossings=c1, gamma_edgelength=c2, cutoff_time=900, record_solution_data_over_time=True)
         try:
             crossings, times = optim2.optimize_layout()
             optim2.g.write_out(f"LNS_case_study/ILP_cr+br_{control_flow_graph}.lgbin")

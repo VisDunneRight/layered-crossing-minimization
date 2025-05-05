@@ -19,13 +19,13 @@ def draw_chmod():
     gr1 = read("control-flow-graphs/chmod/dbg.main.dot")
     tabu(gr1)
     optimizer = LayeredOptimizer(gr1, symmetry_breaking=True)
-    optimizer.just_bendiness_reduction(streamline=False)
+    optimizer.just_edge_length_minimization(streamline=False)
     initial_positions = [nd.y for nd in gr1]
 
     gr2 = read("control-flow-graphs/chmod/dbg.main.dot")
     optimizer = LayeredOptimizer(gr2, symmetry_breaking=True)
     optimizer.optimize_layout()
-    optimizer.just_bendiness_reduction(streamline=False)
+    optimizer.just_edge_length_minimization(streamline=False)
 
     frame_count = 50
     pause_frames = 50
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     yvs2, yvs2_c = [nd.y for nd in gr.nodes], [nd.y for nd in gr.nodes]
     yvs1 = [max(yvs2) / 2 for _ in range(len(gr.nodes))]
     animate_two_layouts(gr, yvs1, yvs2, "HTDPPT/gr6anim")
-    opt.optimize_layout(bendiness_reduction=True, streamline=True, fix_x_vars=True)
+    opt.optimize_layout(edge_length_minimization=True, streamline=True, fix_x_vars=True)
     yvs3 = [nd.y for nd in gr.nodes]
     yvs3 = [v + 1 for v in yvs3]
     animate_two_layouts(gr, yvs2_c, yvs3, "HTDPPT/gr6anim2")

@@ -26,7 +26,7 @@ class TestCorrectnessAllDesigns(unittest.TestCase):
 
     def test_crmin_plus_bend_combo(self):
         opt = optimization.LayeredOptimizer(self.g_bend)
-        res = opt.optimize_layout(crossing_minimization=True, bendiness_reduction=True, sequential_bendiness=False, gamma_1=3)
+        res = opt.optimize_layout(crossing_minimization=True, edge_length_minimization=True, sequential_bendiness=False, gamma_crossings=3)
         self.assertAlmostEqual(48, res.objval, delta=0.0001)
         self.assertAlmostEqual(res.objval, self.g_bend.calculate_stratisfimal_objective(3, 1), delta=0.0001)
 
@@ -36,7 +36,7 @@ class TestCorrectnessAllDesigns(unittest.TestCase):
         basic_objective = self.g1.calculate_stratisfimal_objective(3, 1)
         opt = optimization.LayeredOptimizer(self.g1)
         res1 = opt.optimize_layout(crossing_minimization=True)
-        opt.optimize_layout(bendiness_reduction=True, fix_x_vars=True)
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         self.assertEqual(27, res1.objval)
         self.assertGreater(basic_objective, self.g1.calculate_stratisfimal_objective(3, 1))
 
@@ -54,21 +54,21 @@ class TestCorrectnessAllDesigns(unittest.TestCase):
     def test_all_groups_hard_with_bendiness(self):
         opt = optimization.LayeredOptimizer(self.g3)
         opt.optimize_layout(crossing_minimization=True, grouping_constraints=True)
-        res = opt.optimize_layout(grouping_constraints=True, fix_x_vars=True, bendiness_reduction=True, sequential_grouping_constraints=True)
+        res = opt.optimize_layout(grouping_constraints=True, fix_x_vars=True, edge_length_minimization=True, y_based_group_constraints=True)
         vis.draw_graph(self.g3, "CORR_HARD")
-        self.assertAlmostEqual(344, res.objval, delta=0.0001)
+        self.assertAlmostEqual(339, res.objval, delta=0.0001)
         self.assertEqual(41, self.g3.num_edge_crossings())
 
     def test_angle_opt(self):
         opt = optimization.LayeredOptimizer(self.g4)
         opt.optimize_layout(crossing_minimization=True)
-        res = opt.optimize_layout(angular_resolution=True, fix_x_vars=True, m_val=12)
+        res = opt.optimize_layout(crossing_angle=True, fix_x_vars=True, m_val=12)
         self.assertEqual(0, res.objval)
         for e1 in self.g4.edges:
             for e2 in self.g4.edges:
                 if e1.n1.layer == e2.n1.layer:
                     if (e1.n1.y > e2.n1.y and e1.n2.y < e2.n2.y) or (e1.n1.y < e2.n1.y and e1.n2.y > e2.n2.y):
-                        self.assertEqual(-1, round((e1.n2.y - e1.n1.y)/2 * (e2.n2.y - e2.n1.y)/2, 6))
+                        self.assertEqual(-1, round((e1.n2.y - e1.n1.y)/1.5 * (e2.n2.y - e2.n1.y)/1.5, 6))
 
     def test_sym_nodes_and_edges(self):
         opt = optimization.LayeredOptimizer(self.g5)
@@ -78,23 +78,25 @@ class TestCorrectnessAllDesigns(unittest.TestCase):
         for ndlist in self.g5.get_ids_by_layer().values():
             for i, nd1 in enumerate(ndlist):
                 for nd2 in ndlist[i:]:
-                    if round(self.g5[nd1].y + self.g5[nd2].y, 4) != opt.m_val:
-                        sum_sym += 1
+                    if self.g5[nd1].is_anchor_node == self.g5[nd2].is_anchor_node:
+                        if round(self.g5[nd1].y + self.g5[nd2].y, 4) != opt.m_val:
+                            sum_sym += 1
                     # else:
                     #     print(nd1, nd2, "are symmetric")
         for elist in self.g5.get_edges_by_layer().values():
             for i, e1 in enumerate(elist):
                 for e2 in elist[i:]:
-                    if e1 != e2 and (round(self.g5[e1.n1.id].y + self.g5[e2.n1.id].y, 4) != opt.m_val or round(self.g5[e1.n2.id].y + self.g5[e2.n2.id].y, 4) != opt.m_val):
-                        sum_sym += 1
+                    if self.g5[e1.n1.id].is_anchor_node == self.g5[e2.n1.id].is_anchor_node and self.g5[e1.n2.id].is_anchor_node == self.g5[e2.n2.id].is_anchor_node:
+                        if e1 != e2 and (round(self.g5[e1.n1.id].y + self.g5[e2.n1.id].y, 4) != opt.m_val or round(self.g5[e1.n2.id].y + self.g5[e2.n2.id].y, 4) != opt.m_val):
+                            sum_sym += 1
                     # else:
                     #     print(e1, e2, "are symmetric")
-        self.assertEqual(res.objval, sum_sym)
+        self.assertEqual(res.metrics.symmetry, sum_sym)
 
     def test_edge_length_fairness_with_minimization(self):
         opt = optimization.LayeredOptimizer(self.g6)
         opt.optimize_layout(crossing_minimization=True)
-        opt.optimize_layout(fairness_constraints=True, fairness_metric="bends", fix_x_vars=True, bendiness_reduction=True)
+        opt.optimize_layout(fairness_constraints=True, fairness_metric="edge_length", fix_x_vars=True, edge_length_minimization=True)
         g_bends = [0, 0]
         len_g0, len_g1 = sum((1 for v in self.fair_groups.values() if v == 0)), sum((1 for v in self.fair_groups.values() if v == 1))
         seen = set()

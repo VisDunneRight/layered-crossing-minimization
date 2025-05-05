@@ -22,5 +22,5 @@ class TestSymmetryMaximization(unittest.TestCase):
     def test_cr_then_sym_plus_bend(self):
         opt = optimization.LayeredOptimizer(self.g2)
         opt.optimize_layout(crossing_minimization=True)
-        opt.optimize_layout(symmetry_maximization=True, symmetry_maximization_edges=True, fix_x_vars=True, bendiness_reduction=True, streamline=True)
+        opt.optimize_layout(symmetry_maximization=True, symmetry_maximization_edges=True, fix_x_vars=True, edge_length_minimization=True, streamline=True)
         vis.draw_graph(self.g2, "SYM_TEST_3")

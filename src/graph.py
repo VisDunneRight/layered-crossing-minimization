@@ -379,7 +379,7 @@ class LayeredGraph:
 		else:
 			raise TypeError("Invalid format")
 
-	def add_node_emphasis(self, emphasis):
+	def add_node_focus(self, emphasis):
 		"""
 		:param emphasis: list of nodes to emphasize
 		:return: None
@@ -940,13 +940,13 @@ class LayeredGraph:
 		"""
 		return all(e.n1.layer + 1 == e.n2.layer for e in self.edges)
 
-	def calculate_stratisfimal_objective(self, gamma_1, gamma_2):
+	def calculate_stratisfimal_objective(self, gamma_crossings, gamma_edgelength):
 		n_cr = self.num_edge_crossings()
 		n_bends = 0
 		for ed in self.edges:
 			n_bends += abs(ed.n1.y - ed.n2.y)
 		print(f"Crossings: {n_cr}\tBends: {n_bends}")
-		return gamma_1 * n_cr + gamma_2 * n_bends
+		return gamma_crossings * n_cr + gamma_edgelength * n_bends
 
 	def calculate_symmetry_score(self, include_edges=False, epsilon=0.01, use_near_middle_only=False):
 		best_axis, best_score_n, best_score_e = 0, 0, 0

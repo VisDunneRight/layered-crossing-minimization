@@ -18,7 +18,8 @@ class TestOptimizationWithNodeEmphasis(unittest.TestCase):
 
     def test_both_weights(self):
         opt = optimization.LayeredOptimizer(self.g1)
-        opt.optimize_layout(bendiness_reduction=True, apply_node_weight_spacing=True, apply_edge_weight=True, hybrid_constraints=[("crossings", 4)])
+        r1 = opt.optimize_layout(crossing_minimization=True, apply_edge_weight=True)
+        opt.optimize_layout(edge_length_minimization=True, apply_node_weight_spacing=True, apply_edge_weight=True, hybrid_constraints=[("crossings", r1.metrics.crossings)])
         vis.draw_graph(self.g1, "EDWT_TEST")
 
     def test_lots_of_node_weights(self):

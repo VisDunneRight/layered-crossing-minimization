@@ -9,18 +9,18 @@ class TestSequentialOptimization(unittest.TestCase):
     def test_cr_then_bend(self):
         opt = optimization.LayeredOptimizer(self.g1)
         opt.optimize_layout(crossing_minimization=True)
-        opt.optimize_layout(bendiness_reduction=True, fix_x_vars=True)
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         vis.draw_graph(self.g1, "SEQ_TEST_1")
 
     def test_cr_then_bend_streamline(self):
         opt = optimization.LayeredOptimizer(self.g1)
         opt.optimize_layout(crossing_minimization=True)
-        opt.optimize_layout(bendiness_reduction=True, fix_x_vars=True, streamline=True)
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True, streamline=True)
         vis.draw_graph(self.g1, "SEQ_TEST_2")
 
     def test_hybrid_crossing_then_bend(self):
         opt = optimization.LayeredOptimizer(self.g1)
         res = opt.optimize_layout(crossing_minimization=True)
-        # opt.optimize_layout(bendiness_reduction=True, crossing_minimization=True, start_xy_vars=True)
-        opt.optimize_layout(bendiness_reduction=True, hybrid_constraints=[("crossings", 4)], start_xy_vars=True)
+        # opt.optimize_layout(edge_length_minimization=True, crossing_minimization=True, start_xy_vars=True)
+        opt.optimize_layout(edge_length_minimization=True, hybrid_constraints=[("crossings", res.metrics.crossings)], start_xy_vars=True)
         vis.draw_graph(self.g1, "SEQ_TEST_3")

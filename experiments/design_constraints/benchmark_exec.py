@@ -39,36 +39,36 @@ def run_func(combo_idx, data_path):
         improved_sifting(opt.g)
         eweights = {ed: random.randint(1, 10) for ed in opt.g.edge_ids}
         opt.g.add_edge_weights(eweights)
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, apply_edge_weight=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, apply_edge_weight=True, fix_x_vars=True)
     elif combo_idx == 2:  # Node Emphasis + CR
         enodes = random.sample(list(opt.g.node_ids.keys()), max(round(0.05 * opt.g.n_nodes), 1))
-        opt.g.add_node_emphasis(enodes)
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, node_emphasis=True)
+        opt.g.add_node_focus(enodes)
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, node_focus=True)
     elif combo_idx == 3:  # Node Emphasis + BR
         improved_sifting(opt.g)
         enodes = random.sample(list(opt.g.node_ids.keys()), max(round(0.05 * opt.g.n_nodes), 1))
-        opt.g.add_node_emphasis(enodes)
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, fix_x_vars=True, node_emphasis=True)
+        opt.g.add_node_focus(enodes)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, fix_x_vars=True, node_focus=True)
     elif combo_idx == 4:  # Same Layer Edges + CR
         add_sl_edges(opt.g)
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
     elif combo_idx == 5:  # Same layer edges + BR
         improved_sifting(opt.g)
         add_sl_edges(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, fix_x_vars=True)
     elif combo_idx == 6:  # Straight edges + BR
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, constrain_straight_long_arcs=True, bendiness_reduction=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, constrain_straight_long_arcs=True, edge_length_minimization=True, fix_x_vars=True)
     elif combo_idx == 7:  # Streamlining + BR
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, streamline=True, bendiness_reduction=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, streamline=True, edge_length_minimization=True, fix_x_vars=True)
     elif combo_idx == 8:  # Groups + CR + BR
         add_groups(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, crossing_minimization=True, bendiness_reduction=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, crossing_minimization=True, edge_length_minimization=True)
     elif combo_idx == 9:  # Groups + CR then Groups + BR
         add_groups(opt.g)
         res1 = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, crossing_minimization=True)
-        res2 = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, bendiness_reduction=True, y_based_group_constraints=True, fix_x_vars=True)
+        res2 = opt.optimize_layout(cutoff_time=tlimit, grouping_constraints=True, edge_length_minimization=True, y_based_group_constraints=True, fix_x_vars=True)
         retval = collections.namedtuple("retval", "runtime objval status")
         res = retval(res1.runtime + res2.runtime, res1.objval + res2.objval, 2 if res1.status == res2.status == 2 else 9)
     elif combo_idx == 10:  # Fixed nodes + CR

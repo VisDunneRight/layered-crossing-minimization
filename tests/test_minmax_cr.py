@@ -15,12 +15,12 @@ class TestMinMaxCrossingOptimization(unittest.TestCase):
     def test_minmax_plus_cr(self):
         opt = optimization.LayeredOptimizer(self.g1)
         opt.optimize_layout(min_max_crossings=True, crossing_minimization=True, gamma_min_max=3)
-        opt.optimize_layout(bendiness_reduction=True, fix_x_vars=True)
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         vis.draw_graph(self.g1, "MINMAX_TEST_2")
 
     def test_minmax_hybrid_cr(self):
         opt = optimization.LayeredOptimizer(self.g2)
         res = opt.optimize_layout(min_max_crossings=True)
         opt.optimize_layout(crossing_minimization=True, hybrid_constraints=[("min_max_crossings", res.objval)])
-        opt.optimize_layout(bendiness_reduction=True, fix_x_vars=True)
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         vis.draw_graph(self.g2, "MINMAX_TEST_3")

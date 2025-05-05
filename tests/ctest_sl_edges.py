@@ -37,7 +37,7 @@ class TestSameLayerEdgeOptimization(unittest.TestCase):
     def test_sl_edges_with_length_reduction(self):
         opt = optimization.LayeredOptimizer(self.g2)
         opt.optimize_layout(crossing_minimization=True)
-        res = opt.optimize_layout(bendiness_reduction=True, fix_x_vars=True)
+        res = opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         bsum = 0
         for ed in self.g2.edges:
             bsum += abs(ed.n1.y - ed.n2.y)

@@ -77,7 +77,7 @@ Then, set the desired options for your `optimizer`:
    ```
 3. Additional options that may be helpful are:
    1. `optimizer.cutoff_time` sets the amount of time (in seconds) the optimizer will run before terminating and returning its best found solution
-   2. `optimizer.draw_graph` generates the image of the layout as an svg in the /Images folder. It is recommended to also set `optimizer.bendiness_reduction` to `True` for a prettier, edge-length minimized drawing.
+   2. `optimizer.draw_graph` generates the image of the layout as an svg in the /Images folder. It is recommended to also set `optimizer.edge_length_minimization` to `True` for a prettier, edge-length minimized drawing.
       1. `optimizer.name` sets the name of the file
    3. `optimizer.verbose` prints more information about the solving process
 

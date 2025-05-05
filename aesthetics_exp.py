@@ -70,9 +70,9 @@ def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False, 
     if combo_choice == "CR":  # ID=0
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, streamline=add_streamline)
     elif combo_choice == "Bend":  # ID=1
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, streamline=add_streamline)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, streamline=add_streamline)
     elif combo_choice == "Angle":  # ID=2
-        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, streamline=add_streamline)
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_angle=True, streamline=add_streamline)
     elif combo_choice == "CRFair":  # ID=3
         fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
         while 0 not in fair_vals or 1 not in fair_vals:
@@ -86,7 +86,7 @@ def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False, 
             fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
         fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
         opt.g.add_fairness_values(fair_nds)
-        res = opt.optimize_layout(cutoff_time=tlimit, fairness_constraints=True, fairness_metric="bends", streamline=add_streamline)
+        res = opt.optimize_layout(cutoff_time=tlimit, fairness_constraints=True, fairness_metric="edge_length", streamline=add_streamline)
     elif combo_choice == "SymN":  # ID=5
         res = opt.optimize_layout(cutoff_time=tlimit, symmetry_maximization=True, symmetry_maximization_edges=False, streamline=add_streamline)
     elif combo_choice == "SymNE":  # ID=6
@@ -98,9 +98,9 @@ def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False, 
     elif combo_choice == "MinEwCr":  # ID=9
         res = opt.optimize_layout(cutoff_time=tlimit, min_edges_with_crossings=True, streamline=add_streamline)
     elif combo_choice == "CR+Bend":  # ID=10
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, bendiness_reduction=True, streamline=add_streamline)
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, edge_length_minimization=True, streamline=add_streamline)
     elif combo_choice == "CR+Angle":  # ID=11
-        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, angular_resolution=True, streamline=add_streamline)
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, crossing_angle=True, streamline=add_streamline)
     elif combo_choice == "CR+CRFair":  # ID=12
         fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
         while 0 not in fair_vals or 1 not in fair_vals:
@@ -116,7 +116,7 @@ def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False, 
         fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
         opt.g.add_fairness_values(fair_nds)
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, fairness_constraints=True,
-                                  fairness_metric="bends", gamma_fair=5, streamline=add_streamline)
+                                  fairness_metric="edge_length", gamma_fair=5, streamline=add_streamline)
     elif combo_choice == "CR+SymN":  # ID=14
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, symmetry_maximization=True,
                                   symmetry_maximization_edges=False, streamline=add_streamline)
@@ -132,10 +132,10 @@ def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False, 
         res = opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True, min_edges_with_crossings=True, streamline=add_streamline)
     elif combo_choice == "Bend (fixed x)":  # ID=19
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True, streamline=add_streamline)
+        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, edge_length_minimization=True, streamline=add_streamline)
     elif combo_choice == "Angle (fixed x)":  # ID=20
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, angular_resolution=True, streamline=add_streamline)
+        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, crossing_angle=True, streamline=add_streamline)
     elif combo_choice == "BendFair (fixed x)":  # ID=21
         improved_sifting(opt.g)
         fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
@@ -144,7 +144,7 @@ def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False, 
         fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
         opt.g.add_fairness_values(fair_nds)
         res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, fairness_constraints=True,
-                                  fairness_metric="bends", streamline=add_streamline)
+                                  fairness_metric="edge_length", streamline=add_streamline)
     elif combo_choice == "SymN (fixed x)":  # ID=22
         improved_sifting(opt.g)
         res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, symmetry_maximization=True,
@@ -155,8 +155,8 @@ def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False, 
                                   symmetry_maximization_edges=True, streamline=add_streamline)
     elif combo_choice == "Angle+Bend (fixed x)":  # ID=24
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True,
-                                  angular_resolution=True, streamline=add_streamline)
+        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, edge_length_minimization=True,
+                                  crossing_angle=True, streamline=add_streamline)
     elif combo_choice == "BendFair+Bend (fixed x)":  # ID=25
         improved_sifting(opt.g)
         fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
@@ -164,15 +164,15 @@ def run_func(combo_idx, data_path, drawing_filepath=None, add_streamline=False, 
             fair_vals = random.choices([0, 1], k=opt.g.n_nodes)
         fair_nds = [[v for v in opt.g.node_ids if fair_vals[v] == 0], [v for v in opt.g.node_ids if fair_vals[v] == 1]]
         opt.g.add_fairness_values(fair_nds)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True,
-                                  fairness_constraints=True, fairness_metric="bends", streamline=add_streamline)
+        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, edge_length_minimization=True,
+                                  fairness_constraints=True, fairness_metric="edge_length", streamline=add_streamline)
     elif combo_choice == "SymN+Bend (fixed x)":  # ID=26
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True,
+        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, edge_length_minimization=True,
                                   symmetry_maximization=True, symmetry_maximization_edges=False, streamline=add_streamline)
     elif combo_choice == "SymNE+Bend (fixed x)":  # ID=27
         improved_sifting(opt.g)
-        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, bendiness_reduction=True,
+        res = opt.optimize_layout(cutoff_time=tlimit, fix_x_vars=True, edge_length_minimization=True,
                                   symmetry_maximization=True, symmetry_maximization_edges=True, streamline=add_streamline)
     elif combo_choice == "Planar":  # ID=28
         res = opt.optimize_layout(cutoff_time=tlimit, planarization=True, streamline=add_streamline)

@@ -89,17 +89,17 @@ def run_func(combo_idx, data_path, crossing_optval, time_limit=600):
     elif combo_choice == "Sym2":  # ID=5
         res = opt.optimize_layout(cutoff_time=tlimit, symmetry_maximization=True, hybrid_constraints=[("crossings", crossing_optval * 2)])
     elif combo_choice == "Len1":  # ID=6
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, hybrid_constraints=[("crossings", crossing_optval)])
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, hybrid_constraints=[("crossings", crossing_optval)])
     elif combo_choice == "Len1.05":  # ID=7
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, hybrid_constraints=[("crossings", crossing_optval * 1.05)])
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, hybrid_constraints=[("crossings", crossing_optval * 1.05)])
     elif combo_choice == "Len1.1":  # ID=8
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, hybrid_constraints=[("crossings", crossing_optval * 1.1)])
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, hybrid_constraints=[("crossings", crossing_optval * 1.1)])
     elif combo_choice == "Len1.2":  # ID=9
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, hybrid_constraints=[("crossings", crossing_optval * 1.2)])
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, hybrid_constraints=[("crossings", crossing_optval * 1.2)])
     elif combo_choice == "Len1.5":  # ID=10
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, hybrid_constraints=[("crossings", crossing_optval * 1.5)])
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, hybrid_constraints=[("crossings", crossing_optval * 1.5)])
     elif combo_choice == "Len2":  # ID=11
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, hybrid_constraints=[("crossings", crossing_optval * 2)])
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, hybrid_constraints=[("crossings", crossing_optval * 2)])
     elif combo_choice == "Planar1":  # ID=12
         res = opt.optimize_layout(cutoff_time=tlimit, planarization=True, hybrid_constraints=[("crossings", crossing_optval)])
     elif combo_choice == "Planar1.05":  # ID=13
@@ -125,26 +125,26 @@ def run_func(combo_idx, data_path, crossing_optval, time_limit=600):
     elif combo_choice == "Minmax2":  # ID=23
         res = opt.optimize_layout(cutoff_time=tlimit, min_max_crossings=True, hybrid_constraints=[("crossings", crossing_optval * 2)])
     elif combo_choice == "Angle1":  # ID=24
-        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, hybrid_constraints=[("crossings", crossing_optval)])
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_angle=True, hybrid_constraints=[("crossings", crossing_optval)])
     elif combo_choice == "Angle1.05":  # ID=25
-        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, hybrid_constraints=[("crossings", crossing_optval * 1.05)])
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_angle=True, hybrid_constraints=[("crossings", crossing_optval * 1.05)])
     elif combo_choice == "Angle1.1":  # ID=26
-        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, hybrid_constraints=[("crossings", crossing_optval * 1.1)])
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_angle=True, hybrid_constraints=[("crossings", crossing_optval * 1.1)])
     elif combo_choice == "Angle1.2":  # ID=27
-        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, hybrid_constraints=[("crossings", crossing_optval * 1.2)])
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_angle=True, hybrid_constraints=[("crossings", crossing_optval * 1.2)])
     elif combo_choice == "Angle1.5":  # ID=28
-        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, hybrid_constraints=[("crossings", crossing_optval * 1.5)])
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_angle=True, hybrid_constraints=[("crossings", crossing_optval * 1.5)])
     elif combo_choice == "Angle2":  # ID=29
-        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, hybrid_constraints=[("crossings", crossing_optval * 2)])
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_angle=True, hybrid_constraints=[("crossings", crossing_optval * 2)])
     elif combo_choice == "SymSeq":  # ID=30
         opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
         res = opt.optimize_layout(cutoff_time=tlimit, symmetry_maximization=True, fix_x_vars=True)
     elif combo_choice == "LenSeq":  # ID=31
         opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
-        res = opt.optimize_layout(cutoff_time=tlimit, bendiness_reduction=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, edge_length_minimization=True, fix_x_vars=True)
     elif combo_choice == "AngleSeq":  # ID=32
         opt.optimize_layout(cutoff_time=tlimit, crossing_minimization=True)
-        res = opt.optimize_layout(cutoff_time=tlimit, angular_resolution=True, fix_x_vars=True)
+        res = opt.optimize_layout(cutoff_time=tlimit, crossing_angle=True, fix_x_vars=True)
 
     gcr = opt.g.num_edge_crossings()
     bnds = sum(abs(e.n1.y - e.n2.y) for e in opt.g.edges)

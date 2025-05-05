@@ -390,7 +390,7 @@ def sandbox():
     # n_cv = opt.g.c_vars_count()
 
     # heuristics.barycenter(opt.g)
-    # opt.just_bendiness_reductiont()
+    # opt.just_edge_length_minimizationt()
     #     # vis.draw_graph(opt.g, "heurisic_bend", groups=[0] * opt.g.n_nodes, label_nodes=False)
     # vis.draw_graph(opt.g, "solution_heuristic")
 
@@ -406,7 +406,7 @@ def sandbox():
     # opt.optimize_layout()
 
     # opt.m_val *= 2
-    # opt.just_bendiness_reduction()
+    # opt.just_edge_length_minimization()
     # vis.draw_graph(opt.g, "solution_bend", groups=[0] * opt.g.n_nodes, label_nodes=False)
     # print(opt.g.num_edge_crossings())
 
