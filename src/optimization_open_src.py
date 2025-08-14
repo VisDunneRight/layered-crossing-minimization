@@ -194,6 +194,8 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 		""" Optimize and merge collapsed subgraphs """
 		g, t1, num_crossings = self.__optimize_subgraphs_matrix(g, x_vars, t1, n_cr)
 
+		g.assign_y_vals_given_x_vars(self.x_var_assign)
+
 		""" Sequential bendiness reduction """
 		self.__sequential_bendiness_matrix()
 
@@ -603,3 +605,34 @@ class HiGHSLayeredOptimizer(LayeredOptimizer):
 			seq_res = linprog(c_t, method="highs", A_ub=a_ub, b_ub=b_ub)
 			for nd in g.nodes:
 				nd.y = seq_res.x[y_vars_br[nd.id]]
+
+	def __get_butterfly_cvars(self, graph: LayeredGraph, c_vars):
+		butterfly_c_vars = set()
+		butterfly_c_pairs = []
+		if self.butterfly_reduction:
+			b_set_list = []
+			for b_v in motifs.get_butterflies(graph):
+				b_set_list.append(set(b_v))
+			b_set_one_found = [0] * len(b_set_list)
+			print("Butterfly set:", b_set_list)
+			if b_set_list:
+				for c_var in c_vars:
+					c_set = {c_var[0][0], c_var[0][1], c_var[1][0], c_var[1][1]}
+					if c_set in b_set_list:
+						b_ind = b_set_list.index(c_set)
+						if self.mirror_vars and b_set_one_found[b_ind] == 3:
+							c_org = [c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set]
+							cv_p = [c_v for c_v in c_org if c_v[0][0] == c_var[0][0]][0]
+							cv_r = [c_v for c_v in c_org if c_v[0][1] == c_var[0][1]][0]
+							cv_q = [c_v for c_v in c_org if c_v[0] == c_var[1]][0]
+							butterfly_c_pairs.append((c_var, cv_p))
+							butterfly_c_pairs.append((c_var, cv_r))
+							butterfly_c_pairs.append((cv_q, cv_p))
+							butterfly_c_pairs.append((cv_q, cv_r))
+						elif not self.mirror_vars and b_set_one_found[b_ind]:
+							c_org = [c_v for c_v in butterfly_c_vars if {c_v[0][0], c_v[0][1], c_v[1][0], c_v[1][1]} == c_set][0]
+							butterfly_c_pairs.append((c_org, c_var))
+						else:
+							b_set_one_found[b_ind] += 1
+						butterfly_c_vars.add(c_var)
+		return butterfly_c_pairs

@@ -10,8 +10,8 @@ if __name__ == '__main__':
 
 
 	""" Example use case. Optimizes and draws a 40-node Rome-Lib graph with direct transitivity (default) and a selection of switches. """
-	optimizer = LayeredOptimizer("Rome-Lib/graficon40nodi/grafo3216.40")
+	optimizer = HiGHSLayeredOptimizer("Rome-Lib/graficon40nodi/grafo3216.40")
 	# optimizer = LayeredOptimizer("Rome-Lib/graficon96nodi/grafo3510.96")
 	# optimizer = LayeredOptimizer("random graphs/ratio_d3/r1.5k12n8/graph5.lgbin")
-	optimizer.optimize_layout(crossing_minimization=True)
-	# draw_graph(optimizer.g, "testing")
+	optimizer.optimize_layout()
+	draw_graph(optimizer.g, "testing")

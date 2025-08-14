@@ -6,24 +6,25 @@ import networkx as nx
 import pydot
 
 
-def read(filepath, w=4, c=2, layer_assignments=None, remove_sl=True):
+def read(filepath: str, w=4, c=2, layer_assignments=None, remove_sl=True):
 	assert os.path.isfile(filepath), f"invalid file path '{filepath}'"
 	collection = ""
-	if '/' in filepath:
-		if filepath[:2] == "..":
-			idx = 2
-			while filepath[idx + 1:idx + 3] == "..":
-				idx += 3
-			collection = filepath[filepath.index('/', idx) + 1:filepath.index('/', idx + 1)]
-		else:
-			collection = filepath[:filepath.index('/')]
-	if collection == "Rome-Lib":
+	# if '/' in filepath:
+	# 	collection = filepath.strip(".").split("/")[0]
+		# if filepath[:2] == "..":
+		# 	idx = 2
+		# 	while filepath[idx + 1:idx + 3] == "..":
+		# 		idx += 3
+		# 	collection = filepath[filepath.index('/', idx) + 1:filepath.index('/', idx + 1)]
+		# else:
+		# 	collection = filepath[:filepath.index('/')]
+	if "Rome-Lib" in filepath:
 		g, tv = layering.create_better_layered_graph(filepath, w, c, remove_sl=remove_sl)
-	elif collection == "DAGmar":
+	elif "DAGmar" in filepath:
 		g = type_conversions.dagmar_nx_to_layered_graph(nx.read_graphml(filepath, node_type=str), remove_sl=remove_sl)
-	elif collection == "north":
+	elif "north" in filepath:
 		g = type_conversions.north_nx_to_layered_graph(nx.read_graphml(filepath, node_type=str), w, c, remove_sl=remove_sl)
-	elif collection == "control-flow-graphs":
+	elif "control-flow-graphs" in filepath:
 		gp = pydot.graph_from_dot_file(filepath)[0]
 		gnx = networkx.drawing.nx_pydot.from_pydot(gp)
 		if '\\n' in gnx:
