@@ -3,7 +3,7 @@ import itertools
 import pickle
 import random
 from typing import Tuple
-from src.helpers import *
+from layered_optimization.helpers import *
 import networkx as nx
 
 
@@ -21,10 +21,10 @@ class LayeredNode:
 		self.tabu = False
 
 	def __str__(self):
-		return f"ID={self.id}/L={self.layer}"
+		return f"<node{self.id}:L={self.layer}>"
 
 	def __repr__(self):
-		return f"ID={self.id}/L={self.layer}"
+		return f"<node{self.id}:L={self.layer}>"
 
 
 class LayeredEdge:

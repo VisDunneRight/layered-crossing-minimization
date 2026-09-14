@@ -1,6 +1,6 @@
 import unittest
-from src import read_data, optimization, vis
-from src.heuristics import improved_sifting
+from layered_optimization import read_data, optimization, vis
+from layered_optimization.heuristics import improved_sifting
 
 
 class TestAngularOptimization(unittest.TestCase):

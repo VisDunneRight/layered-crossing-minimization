@@ -1,6 +1,6 @@
 import copy
 import time
-from src import graph, vis
+from layered_optimization import graph, vis
 import re
 import random
 import networkx as nx
@@ -34,21 +34,21 @@ def create_bfs_layered_graph(s_g):  # DEPRECATED
     return g
 
 
-def create_layered_graph(rome_file):  # DEPRECATED
-    with open(f"Rome-Lib/{rome_file}") as f:
-        simple_g = {}
-        n_e = True
-        for line in f.readlines():
-            if line[0] == '#':
-                n_e = False
-                continue
-            elif n_e:
-                simple_g[int(line.split(' ')[0])] = []
-            else:
-                e = re.split('[ \n]', line)
-                simple_g[int(e[2])].append(int(e[3]))
-                simple_g[int(e[3])].append(int(e[2]))
-        return create_bfs_layered_graph(simple_g)
+# def create_layered_graph(rome_file):  # DEPRECATED
+#     with open(f"Rome-Lib/{rome_file}") as f:
+#         simple_g = {}
+#         n_e = True
+#         for line in f.readlines():
+#             if line[0] == '#':
+#                 n_e = False
+#                 continue
+#             elif n_e:
+#                 simple_g[int(line.split(' ')[0])] = []
+#             else:
+#                 e = re.split('[ \n]', line)
+#                 simple_g[int(e[2])].append(int(e[3]))
+#                 simple_g[int(e[3])].append(int(e[2]))
+#         return create_bfs_layered_graph(simple_g)
 
 
 def create_better_layered_graph(rome_file, w, c, remove_sl=True):

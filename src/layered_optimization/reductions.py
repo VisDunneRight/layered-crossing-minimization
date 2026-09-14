@@ -1,6 +1,6 @@
 import random
 import itertools
-from src import graph
+from layered_optimization import graph
 
 
 def normal_c_vars(g: graph.LayeredGraph, edges_by_layer, mirror_vars, use_e_weights=False):

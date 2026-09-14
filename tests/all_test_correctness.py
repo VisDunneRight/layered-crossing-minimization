@@ -1,5 +1,5 @@
 import unittest
-from src import read_data, optimization, vis
+from layered_optimization import read_data, optimization, vis
 
 
 class TestCorrectnessAllDesigns(unittest.TestCase):

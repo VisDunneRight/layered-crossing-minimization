@@ -1,5 +1,5 @@
 import time
-from src.graph import LayeredGraph
+from layered_optimization.graph import LayeredGraph
 from copy import deepcopy
 import numpy as np
 

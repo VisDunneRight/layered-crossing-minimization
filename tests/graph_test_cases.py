@@ -2,11 +2,10 @@ import os
 import graph
 import read_data
 from random import choice, randint
-import heuristics
-from src.optimization import LayeredOptimizer
+from layered_optimization import heuristics
+from layered_optimization.optimization import LayeredOptimizer
 from sklearn.cluster import SpectralClustering
-
-import src.vis
+import layered_optimization.vis
 
 
 def test_all_unique_ids(test_graphs):

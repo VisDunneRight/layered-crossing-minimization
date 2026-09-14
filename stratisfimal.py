@@ -1,11 +1,10 @@
 import os
 import csv
 import random
-from src import vis
-import experiments
-from src.graph import *
-from src.read_data import *
-from src.optimization import LayeredOptimizer
+from layered_optimization import vis
+from layered_optimization.graph import *
+from layered_optimization.read_data import *
+from layered_optimization.optimization import LayeredOptimizer
 
 
 random.seed(22)

@@ -1,4 +1,4 @@
-from src import graph
+from layered_optimization import graph
 
 
 def count_butterflies(g: graph.LayeredGraph):

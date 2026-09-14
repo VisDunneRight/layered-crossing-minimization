@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/layered_optimization"]
+
+[project]
+name = "layered_optimization_cwilson22"
+version = "0.0.1"
+authors = [
+  { name="Connor Wilson", email="connorswilson@icloud.com" },
+]
+description = "A tool for optimizing aesthetic properties and creating visualizations of (layered) graphs"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = [
+    "altair",
+    "cairosvg",
+    "gurobipy",
+    "networkx",
+    "numpy",
+    "pycairo",
+    "pydot",
+    "scikit-learn",
+    "scipy",
+]
+
+[project.urls]
+Homepage = "https://github.com/VisDunneRight/layered-crossing-minimization/"

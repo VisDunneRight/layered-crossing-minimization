@@ -2,9 +2,8 @@ import time
 
 import networkx as nx
 
-import src.read_data
-import src.vis
-from src import graph
+from layered_optimization.read_data import read
+from layered_optimization import vis, graph
 import random
 import os
 import networkx
@@ -257,6 +256,7 @@ def random_layered_graph_edgecount_drop_unconnected(k, n, n_edges):
 			g = gp
 
 		if g.is_connected():
+			g.y_val_setup()
 			return g
 		else:
 			print("fail")
@@ -578,6 +578,20 @@ def generate_ratio_graphs_degree_3(seed=22201):
 	# 			ng.write_out(f"../random graphs/ratio_d3/r3k{k}n{n}/graph{i}.lgbin")
 
 
+def generate_small_ratio_graphs(seed=22201):
+	if "ratio_small_d3" not in os.listdir("../random graphs"):
+		os.mkdir(f"../random graphs/ratio_small_d3")
+
+	n = 4
+	k = int(n * 1.5)
+	if f"r1.5k{k}n{n}" not in os.listdir("../random graphs/ratio_small_d3"):
+		os.mkdir(f"../random graphs/ratio_small_d3/r1.5k{k}n{n}")
+	for i in range(10):
+		ng = random_layered_graph_edgecount_drop_unconnected(k, n, round(1.5 * n * (k - 1)))
+		print(f"k={k}/n={n} graph {i + 1}")
+		ng.write_out(f"../random graphs/ratio_small_d3/r1.5k{k}n{n}/graph{i}.lgbin")
+
+
 def generate_nx_random_graph_dataset():
 	for n in range(5, 101):
 		gid = 0
@@ -603,10 +617,11 @@ if __name__ == '__main__':
 	# generate_ratio_graphs_degree_3()
 	# generate_ratio1dot5_graphs_d3_with_big_layers()
 	# generate_ratio1dot5_graphs_d3_triangle()
-	generate_nx_random_graph_dataset()
+	# generate_nx_random_graph_dataset()
+	generate_small_ratio_graphs()
 
-	# gr = src.read_data.read("../random graphs/big_layer/k36n24/graph1.lgbin")
-	# gr = src.read_data.read("../random graphs/ratio_d3/r1.5k24n16/graph44.lgbin")
+	# gr = read("../random graphs/big_layer/k36n24/graph1.lgbin")
+	# gr = read("../random graphs/ratio_d3/r1.5k24n16/graph44.lgbin")
 	# print(gr.layers)
 	# print(gr.nodes)
 	# print(gr.node_ids)
@@ -616,10 +631,10 @@ if __name__ == '__main__':
 	# print([len(lay) for lay in gr.layers.values()])
 	# print([len(gr.get_edges_by_layer()[ls]) for ls in range(gr.n_layers - 1)])
 
-	# gr = src.read_data.read("../random graphs/matuszewski/10_by_10_density/d15/graph0.lgbin")
-	# gr = src.read_data.read("../random graphs/rectangles/k70n20/graph0.lgbin")
-	# gr = src.read_data.read("../random graphs/triangle/k30n20/graph9.lgbin")
-	# gr = src.read_data.read("../random graphs/ratio_d3/r1.5k18n12/graph8.lgbin")
+	# gr = read("../random graphs/matuszewski/10_by_10_density/d15/graph0.lgbin")
+	# gr = read("../random graphs/rectangles/k70n20/graph0.lgbin")
+	# gr = read("../random graphs/triangle/k30n20/graph9.lgbin")
+	# gr = read("../random graphs/ratio_d3/r1.5k18n12/graph8.lgbin")
 	# print(gr.n_layers)
 	# gr = random_layered_graph_connect_help_edgecount(3, 10, 35)
 	# src.vis.draw_graph(gr, "rand", gravity=True, nested=True)

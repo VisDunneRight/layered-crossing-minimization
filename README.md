@@ -8,7 +8,10 @@ This repository is written and maintained by [Connor Wilson](https://vis.khoury.
 
 It comprises research performed at Northeastern University's [Data Visualization Lab](https://vis.khoury.northeastern.edu) by [Connor Wilson](https://vis.khoury.northeastern.edu/people/Connor-Wilson/), [Eduardo Puerta](https://vis.khoury.northeastern.edu/people/Eduardo-Puerta/), [Tarik Crnovrsanin](https://www.tarikc.net), and [Sara Di Bartolomeo](https://vis.khoury.northeastern.edu/people/Sara-Di-Bartolomeo/), under the advising of [Cody Dunne](https://vis.khoury.northeastern.edu/people/Cody-Dunne/).
 
-A free copy of our paper, *Evaluating and extending speedup techniques for optimal crossing minimization in layered graph drawings*, is available at [https://osf.io/5vq79]().
+Our papers:
+* *Evaluating and extending speedup techniques for optimal crossing minimization in layered graph drawings*, available at [https://osf.io/5vq79]()
+* *Fast and readable layered network visualizations using large neighborhood search*, available at [https://osf.io/fytk7]()
+* *CINDER: An expressive framework for optimal layered graph layouts*, available at [https://osf.io/9cywt/]()
 
 # Quickstart Guide
 1. A Gurobi license is recommended to run this app, but not required. Visit [Gurobi for Academics and Researchers](https://www.gurobi.com/academia/academic-program-and-licenses/) for instructions on obtaining an individual academic license 
@@ -19,25 +22,46 @@ A free copy of our paper, *Evaluating and extending speedup techniques for optim
 # Overview of class `LayeredOptimizer`
 Defined in `src/optimization.py`, `LayeredOptimizer` reads as input a path to graph file or a `LayeredGraph` object.
 If you do not have a Gurobi license, the `HiGHSLayeredOptimizer` class defined in `src/optimization_open_src.py` can be used instead.
-Besides using a different ILP solver on the back end, it functions identically to `LayeredOptimizer`, with the exception that some switch techniques are not available.
 
 Supported file types for the input graph include `.graphml`, and text files containing an edge list where each line of the file is an edge `u, v` such that `u` and `v` are integer IDs for nodes.
-Any path to a Rome-Lib or AT&T graph included in this repo will also be read automatically.
 
-```Python
+```python
 from src.optimization import LayeredOptimizer
-from src.optimization_open_src import HiGHSLayeredOptimizer
 
-optimizer = LayeredOptimizer("[path_to_file]")
-optimizer_open_source = HiGHSLayeredOptimizer("[path_to_file]")
+opt = LayeredOptimizer("./path/to/graph/file")
 ```
 
-Then, set the desired options for your `optimizer`:
+The model is optimized using `opt.optimize()`. Many flags can be set which control the behavior of the optimization process. These options are described in the following sections.
+
+## Aesthetic Metrics
+
+Many different aesthetic qualities of the graph can be optimized using `optimize()`. See our paper, [*CINDER: An expressive framework for optimal layered graph layouts*](https://osf.io/9cywt/), for more discussion about these models. They can be used as follows:
+```python
+opt.optimize(crossing_minimization=True)  # minimize number of edge crossings
+opt.optimize(edge_length_minimization=True)  # minimize total edge lengths
+opt.optimize(crossing_angle=True)  # make edge crossings angles as close as possible to 90 degrees
+opt.optimize(symmetry_maximization=True)  # maximize vertical reflection node symmetry
+opt.optimize(symmetry_maximization_edges=True)  # maximize vertical reflection edge symmetry
+opt.optimize(min_max_crossings=True)  # minimize the maximum local crossing number
+opt.optimize(planarization=True)  # minimize the number of edges which when removed make the graph planar
+opt.optimize(edge_bundling=True)  # maximize the number of adjacent long edges
+```
+
+
+
+These can be combined and optimized simultaneously, for instance:
+```python
+opt.optimize(crossing_minimization=True, edge_length_minimization=True, planarization=True)
+```
+
+
+
+## Speedup Techniques
 1. Direct transitivity is the default. To switch to vertical position transitivity, set `optimizer.vertical_transitivity = True` and `optimizer.direct_transitivity = False`.
 2. Switches from our paper are set using the following options (note that all switches are off by default):
    1. Symmetry breaking is set using
    ```Python
-   optimizer.symmetry_breaking = True
+   optimizer.optimize_layout(symmetry_breaking=True)
    ```
    2. Butterfly reduction is set using
    ```Python

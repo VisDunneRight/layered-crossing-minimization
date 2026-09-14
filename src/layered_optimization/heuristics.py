@@ -1,5 +1,5 @@
 from sys import maxsize
-from src import graph
+from layered_optimization import graph
 import random
 import copy
 from queue import PriorityQueue
@@ -194,7 +194,7 @@ def barycenter(g: graph.LayeredGraph, n_iter=24):
 
 def __barycenter_sort_fn(g, layer, order, forward):
 	adj = g.get_double_adj_list()
-	ln = 1 - int(forward)
+	ln = 1 - int(forward)  # 0 if sweeping forward, 1 if backward
 
 	# The next line is a generator for the barycentric sorted order, ignoring vertices with no adjacent nodes in the previous layer
 	lsort = iter(sorted((v for v in layer if len(adj[v.id][ln]) != 0), key=lambda nd: (sum(order[ndk] for ndk in adj[nd.id][ln]) / len(adj[nd.id][ln]))))
@@ -238,6 +238,13 @@ def global_sifting(g: graph.LayeredGraph, maxfails=0):
 
 
 def __sift(v, layer, ranks, d_adj, cr_num):
+	"""
+	v: sift node id
+	layer: sift layer id, int
+	ranks: list of current rank ids for all nodes
+	d_adj: double adjacency list
+	cr_num: current number of crossings
+	"""
 	best_cr = cr_num
 	idx = next((i for i, nd in enumerate(layer) if nd.id == v))
 	for i in range(idx, 0, -1):

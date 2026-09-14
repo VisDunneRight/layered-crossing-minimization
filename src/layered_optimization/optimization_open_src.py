@@ -2,10 +2,10 @@ import random
 from scipy.optimize import linprog
 import itertools
 import time
-from src import motifs, vis
-from src.optimization import LayeredOptimizer
-from src.graph import LayeredGraph
-from src.helpers import *
+from layered_optimization import motifs, vis
+from layered_optimization.optimization import LayeredOptimizer
+from layered_optimization.graph import LayeredGraph
+from layered_optimization.helpers import *
 
 
 class HiGHSLayeredOptimizer(LayeredOptimizer):

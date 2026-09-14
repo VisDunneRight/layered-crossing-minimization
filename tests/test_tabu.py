@@ -1,7 +1,7 @@
 import random
 import unittest
 import numpy as np
-from src import read_data, tabu
+from layered_optimization import read_data, tabu
 
 
 class TestTabu(unittest.TestCase):
