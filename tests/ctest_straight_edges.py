@@ -4,9 +4,9 @@ from layered_optimization import read_data, optimization, vis
 
 class TestOptimizationWithStraightLongArcs(unittest.TestCase):
     def setUp(self) -> None:
-        self.gsmall = read_data.read("../Rome-Lib/graficon41nodi/grafo2019.41")
-        self.gsmall2 = read_data.read("../Rome-Lib/graficon41nodi/grafo2019.41")
-        self.glarge = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
+        self.gsmall = read_data.read("../datasets/Rome-Lib/graficon41nodi/grafo2019.41")
+        self.gsmall2 = read_data.read("../datasets/Rome-Lib/graficon41nodi/grafo2019.41")
+        self.glarge = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71")
 
     def test_straightedge_basic(self):
         opt = optimization.LayeredOptimizer(self.gsmall)

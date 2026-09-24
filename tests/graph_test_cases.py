@@ -128,7 +128,7 @@ def test_optimization_on_graphs_with_non_ascending_names(test_graphs):
 
 if __name__ == '__main__':
 	n_cases = 5
-	test_folds = [f"../Rome-Lib/graficon" + str(choice(list(range(10, 65)))) + "nodi/" for i in range(n_cases)]
+	test_folds = [f"../datasets/Rome-Lib/graficon" + str(choice(list(range(10, 65)))) + "nodi/" for i in range(n_cases)]
 	test_set = [l1 + choice(list(os.listdir(l1))) for l1 in test_folds]
 	test_all_unique_ids(test_set)
 	test_ascending_names_from_zero(test_set)

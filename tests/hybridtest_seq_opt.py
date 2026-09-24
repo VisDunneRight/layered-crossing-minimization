@@ -4,7 +4,7 @@ from layered_optimization import read_data, optimization, vis
 
 class TestSequentialOptimization(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
+        self.g1 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71")
 
     def test_cr_then_bend(self):
         opt = optimization.LayeredOptimizer(self.g1)

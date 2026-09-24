@@ -4,8 +4,8 @@ from layered_optimization import read_data, optimization, vis
 
 class TestMaxPlanarSubgraph(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
-        self.g2 = read_data.read("../Rome-Lib/graficon60nodi/grafo3199.60")
+        self.g1 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71")
+        self.g2 = read_data.read("../datasets/Rome-Lib/graficon60nodi/grafo3199.60")
 
     def test_planarization_only(self):
         opt = optimization.LayeredOptimizer(self.g2)

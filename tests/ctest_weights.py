@@ -5,10 +5,10 @@ from layered_optimization import read_data, optimization, vis
 
 class TestOptimizationWithNodeEmphasis(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../Rome-Lib/graficon41nodi/grafo2019.41")
+        self.g1 = read_data.read("../datasets/Rome-Lib/graficon41nodi/grafo2019.41")
         self.g1.add_node_weights({9: 6})
         self.g1.add_edge_weights({(2, 17): 5, (2, 18): 5, (2, 0): 5, (25, 9): 4, (25, 10): 4})
-        self.g2 = read_data.read("../Rome-Lib/graficon35nodi/grafo179.35")
+        self.g2 = read_data.read("../datasets/Rome-Lib/graficon35nodi/grafo179.35")
         self.g2.add_node_weights([random.randint(1, 10) for _ in range(self.g2.n_nodes)])
 
     def test_node_weight_spacing_basic(self):

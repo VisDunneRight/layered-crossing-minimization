@@ -496,8 +496,8 @@ def neighborhood_sift(g: graph.LayeredGraph, sift_vertices, n_ops):
 
 
 # if __name__ == '__main__':
-# 	graph = read_data.read("../random graphs/matuszewski/5_by_n/n30/graph2.lgbin")
-# 	graph = read_data.read("../Rome-Lib/graficon70nodi/grafo1233.70")
+# 	graph = read_data.read("../datasets/random_graphs/matuszewski/5_by_n/n30/graph2.lgbin")
+# 	graph = read_data.read("../datasets/Rome-Lib/graficon70nodi/grafo1233.70")
 # 	barycenter(graph)
 # 	median(graph)
 # 	global_sifting(graph)

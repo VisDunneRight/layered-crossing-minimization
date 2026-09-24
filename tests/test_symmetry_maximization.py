@@ -4,9 +4,9 @@ from layered_optimization import read_data, optimization, vis
 
 class TestSymmetryMaximization(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../Rome-Lib/graficon41nodi/grafo2019.41")
-        self.g2 = read_data.read("../Rome-Lib/graficon13nodi/grafo201.13")
-        self.g3 = read_data.read("../Rome-Lib/graficon13nodi/grafo2221.13")
+        self.g1 = read_data.read("../datasets/Rome-Lib/graficon41nodi/grafo2019.41")
+        self.g2 = read_data.read("../datasets/Rome-Lib/graficon13nodi/grafo201.13")
+        self.g3 = read_data.read("../datasets/Rome-Lib/graficon13nodi/grafo2221.13")
 
     def test_cr_then_node_sym(self):
         opt = optimization.LayeredOptimizer(self.g1)

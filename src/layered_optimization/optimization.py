@@ -28,8 +28,8 @@ class LayeredOptimizer:
 		self.edge_length_minimization = False
 		self.gamma_crossings = 1
 		self.gamma_edgelength = 1
-		self.m_val = round(1.5 * max(len(lr) for lr in self.g.layers.values()))
 		self.node_gap = 1
+		self.m_val = round(1.5 * max(len(lr) for lr in self.g.layers.values()))
 		self.use_lns = False
 		self.n_partitions = -1
 		self.return_full_data = False
@@ -272,7 +272,6 @@ class LayeredOptimizer:
 				metric_vals["sym"] += v.x
 				ct += v.x
 				if v.x == 0:
-					print(v.varName)
 					metric_vals["act_sym"] += 1
 			elif v.varName[:2] == "b[":
 				if "length" not in metric_vals:
@@ -297,12 +296,14 @@ class LayeredOptimizer:
 					metric_vals["planar"] = 0
 				metric_vals["planar"] += v.x
 			elif v.varName[:7] == "bend_v[":
-				print(v.varName, v.x)
+				if "bend" not in metric_vals:
+					metric_vals["bend"] = 0
+				metric_vals["bend"] += v.x
 			# elif v.varName[:1] == "c" and round(v.x) != 0:
 			# 	print(v.varName, v.x)
 		# print(gs1, gs2)
 		# print(ct)
-		mtrv = collections.namedtuple("metric_vals", "crossings length angle symmetry fairness bundling minmax planar actual_symmetries")
+		mtrv = collections.namedtuple("metric_vals", "crossings length angle symmetry fairness bundling minmax planar bend actual_symmetries")
 		metrics = mtrv(
 			metric_vals["cr"] if "cr" in metric_vals else -1,
 			metric_vals["length"] if "length" in metric_vals else -1,
@@ -312,13 +313,17 @@ class LayeredOptimizer:
 			metric_vals["bundle"] if "bundle" in metric_vals else -1,
 			metric_vals["minmax"] if "minmax" in metric_vals else -1,
 			metric_vals["planar"] if "planar" in metric_vals else -1,
+			metric_vals["bend"] if "bend" in metric_vals else -1,
 			metric_vals["act_sym"] if "act_sym" in metric_vals else -1
 		)
 		model_objval = 0
 		# print(metrics)
-		for o in range(m.NumObj):
-			m.params.ObjNumber = o
-			model_objval += m.ObjNVal
+		if self.crossing_angle:
+			model_objval = m.ObjVal
+		else:
+			for o in range(m.NumObj):
+				m.params.ObjNumber = o
+				model_objval += m.ObjNVal
 			# print("MSOL", m.ObjNVal, m.status)
 
 		""" Optimize and merge collapsed subgraphs """
@@ -1640,7 +1645,7 @@ class LayeredOptimizer:
 			for l_e in g.get_long_edges():
 				for i in range(1, len(l_e) - 1):
 					bend_vars.append((l_e[i - 1], l_e[i], l_e[i + 1]))
-			b_v = m.addVars(bend_vars, vtype=GRB.BINARY, name="bend_v")
+			b_v = m.addVars(bend_vars, vtype=GRB.CONTINUOUS, name="bend_v")
 			# b_v = m.addVars(bend_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="bend_v")
 
 		m.update()  # required after adding variables in order to use them in constraints
@@ -2452,7 +2457,7 @@ class LayeredOptimizer:
 		self.gamma_bundle = kwargs.get("gamma_bundle", 1)
 		self.gamma_fair = kwargs.get("gamma_fair", 1)
 		self.edge_bundling_pos_restrict = kwargs.get("edge_bundling_pos_restrict", False)
-		self.m_val = kwargs.get("m_val", round(1.5 * max(len(lr) for lr in self.g.layers.values())))
+		self.m_val = kwargs.get("m_val", round(1.5 * self.node_gap * max(len(lr) for lr in self.g.layers.values())))
 		self.fix_x_vars = kwargs.get("fix_x_vars", False)
 		self.start_xy_vars = kwargs.get("start_xy_vars", False)
 		self.fix_nodes = kwargs.get("fix_nodes", False)

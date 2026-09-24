@@ -5,39 +5,39 @@ from layered_optimization.heuristics import improved_sifting
 
 class TestAngularOptimization(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../Rome-Lib/graficon18nodi/grafo198.18")
-        self.g2 = read_data.read("../Rome-Lib/graficon32nodi/grafo1053.32")
-        self.g3 = read_data.read("../Rome-Lib/graficon10nodi/grafo166.10")
+        self.g1 = read_data.read("../datasets/Rome-Lib/graficon18nodi/grafo198.18")
+        self.g2 = read_data.read("../datasets/Rome-Lib/graficon32nodi/grafo1053.32")
+        self.g3 = read_data.read("../datasets/Rome-Lib/graficon10nodi/grafo166.10")
 
-    def test_angle_opt(self):
+    def test1_angle_opt(self):
         opt = optimization.LayeredOptimizer(self.g1)
         opt.optimize_layout(crossing_minimization=True)
         opt.optimize_layout(crossing_angle=True, fix_x_vars=True, m_val=12)
-        vis.draw_graph(self.g1, "ANG_TEST")
+        vis.draw_graph(self.g1, "ANG_TEST_CR_THEN_ANG")
 
-    def test_angle_opt_bland(self):
+    def test2_angle_opt_bland(self):
         opt = optimization.LayeredOptimizer(self.g3)
         opt.optimize_layout(crossing_angle=True)
-        vis.draw_graph(self.g3, "ANG_TEST_0")
+        vis.draw_graph(self.g3, "ANG_TEST_SOLO")
 
-    def test_angle_opt_bigger(self):
+    def test3_angle_opt_bigger(self):
         opt = optimization.LayeredOptimizer(self.g2)
         opt.optimize_layout(crossing_minimization=True)
         opt.optimize_layout(crossing_angle=True, fix_x_vars=True)
-        vis.draw_graph(self.g2, "ANG_TEST_2")
+        vis.draw_graph(self.g2, "ANG_TEST_CR_THEN_ANG_BIG")
 
-    def test_angle_combined(self):
+    def test4_angle_combined(self):
         opt = optimization.LayeredOptimizer(self.g1)
         opt.optimize_layout(crossing_minimization=True, crossing_angle=True, m_val=10)
-        vis.draw_graph(self.g1, "ANG_TEST_3")
+        vis.draw_graph(self.g1, "ANG_TEST_PLUS_CR")
 
-    def test_angle_combined_with_bend(self):
+    def test5_angle_combined_with_bend(self):
         opt = optimization.LayeredOptimizer(self.g1)
         opt.optimize_layout(crossing_minimization=True)
         opt.optimize_layout(crossing_angle=True, edge_length_minimization=True, gamma_edgelength=0.1, fix_x_vars=True, m_val=12)
-        vis.draw_graph(self.g1, "ANG_TEST_4")
+        vis.draw_graph(self.g1, "ANG_TEST_W_BEND")
 
-    def test_fixed_x_sifting(self):
+    def test6_fixed_x_sifting(self):
         opt = optimization.LayeredOptimizer(self.g2)
         improved_sifting(opt.g)
         vis.draw_graph(self.g2, "ANG_TEST_5a")

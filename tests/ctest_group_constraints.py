@@ -50,13 +50,13 @@ def add_groups(g):
 
 class TestOptimizationWithGroups(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
+        self.g1 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71")
         self.g1.add_groups([[30, 37, 1, 25], [57, 43], [52, 9, 24]])
-        self.g2 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
+        self.g2 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71")
         self.g2.add_groups([[31, 38, 18, 27], [2, 65, 12, 28]])
-        self.g3 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
+        self.g3 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71")
         self.g3.add_groups([[30, 37, 1, 25], [52, 9, 24], [31, 38, 18, 27], [2, 65, 12, 28], [57, 43, 19], [41, 60]])
-        self.g4 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
+        self.g4 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71")
 
     def test_sl_groups(self):
         opt = optimization.LayeredOptimizer(self.g1)
@@ -116,7 +116,7 @@ class TestOptimizationWithGroups(unittest.TestCase):
         for i in range(5, 15):
             for j in range(50):
                 print(f"graph_{i}_{j}")
-                opt = optimization.LayeredOptimizer(f"../random graphs/networkx2/graph_{i}_{j}")
+                opt = optimization.LayeredOptimizer(f"../datasets/random_graphs/networkx2/graph_{i}_{j}")
                 add_groups(opt.g)
                 opt.optimize_layout(grouping_constraints=True, crossing_minimization=True)
                 vis.draw_graph(opt.g, "GRP_TEST_5bendA")
@@ -125,7 +125,7 @@ class TestOptimizationWithGroups(unittest.TestCase):
         self.assertEqual(0, 0)
 
     def test_crbend_specific(self):
-        opt = optimization.LayeredOptimizer("../random graphs/networkx2/graph_8_9")
+        opt = optimization.LayeredOptimizer("../datasets/random_graphs/networkx2/graph_8_9")
         opt.g.add_groups({5: 0, 0: 0, 3: 0, 7: 0})
         opt.optimize_layout(grouping_constraints=True, crossing_minimization=True)
         vis.draw_graph(opt.g, "GRP_TEST_5bendA")

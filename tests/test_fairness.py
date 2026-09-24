@@ -4,10 +4,10 @@ from layered_optimization import read_data, optimization, vis
 
 class TestOptimizationWithFairness(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../Rome-Lib/graficon41nodi/grafo2019.41")
+        self.g1 = read_data.read("../datasets/Rome-Lib/graficon41nodi/grafo2019.41")
         self.fair_groups = {nid: 0 if nid <= self.g1.n_nodes // 2 else 1 for nid in self.g1.node_ids}
         self.g1.add_fairness_values(self.fair_groups)
-        self.g2 = read_data.read("../Rome-Lib/graficon41nodi/grafo2531.41")
+        self.g2 = read_data.read("../datasets/Rome-Lib/graficon41nodi/grafo2531.41")
         self.fair_groups_2 = {nid: 0 if nid % 2 == 0 else 1 for nid in self.g2.node_ids}
         self.g2.add_fairness_values(self.fair_groups_2)
 

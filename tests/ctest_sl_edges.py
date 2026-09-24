@@ -5,15 +5,15 @@ from layered_optimization import read_data, optimization, vis
 
 class TestSameLayerEdgeOptimization(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71", remove_sl=False)
-        self.g2 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71", remove_sl=False)
+        self.g1 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71", remove_sl=False)
+        self.g2 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71", remove_sl=False)
         self.g2.add_edge(63, 64)
         self.g2.add_edge(8, 64)
         self.g2.add_edge(8, 34)
 
     def test_errorcheck_sl_edges(self):
-        for grpath in os.listdir("../Rome-Lib/graficon71nodi"):
-            the_g = read_data.read("../Rome-Lib/graficon71nodi/" + grpath, remove_sl=False)
+        for grpath in os.listdir("../datasets/Rome-Lib/graficon71nodi"):
+            the_g = read_data.read("../datasets/Rome-Lib/graficon71nodi/" + grpath, remove_sl=False)
             if not all((e1.n1.layer != e1.n2.layer for e1 in the_g.edges)):
                 print(f"{grpath} Has SL Edge")
                 opt = optimization.LayeredOptimizer(the_g)

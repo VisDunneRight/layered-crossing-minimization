@@ -6,9 +6,9 @@ from layered_optimization import read_data, tabu
 
 class TestTabu(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../random graphs/ratio_d3/r1.5k12n8/graph5.lgbin")
+        self.g1 = read_data.read("../datasets/random_graphs/ratio_d3/r1.5k12n8/graph5.lgbin")
         self.g1.y_val_setup()
-        self.g2 = read_data.read("../random graphs/ratio_d3/r1.5k12n8/graph10.lgbin")
+        self.g2 = read_data.read("../datasets/random_graphs/ratio_d3/r1.5k12n8/graph10.lgbin")
         self.g2.y_val_setup()
 
     def test_K_matrix_and_E_values_hard(self):

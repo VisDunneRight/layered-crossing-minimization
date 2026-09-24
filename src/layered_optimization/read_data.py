@@ -18,10 +18,8 @@ def read(filepath: str, w=4, c=2, layer_assignments=None, remove_sl=True):
 		caller_frame = inspect.stack()[1]
 		caller_file = caller_frame.filename
 
-		# 2. Get the directory of that caller script
+		# 2. Get the directory of the caller script; append path
 		caller_dir = Path(caller_file).parent.resolve()
-		
-		# 3. Combine the caller's directory with the relative path input
 		fp = (caller_dir / path).resolve()
 
 	assert fp.is_file(), f"invalid file path '{fp}'"
@@ -31,7 +29,7 @@ def read(filepath: str, w=4, c=2, layer_assignments=None, remove_sl=True):
 	elif "DAGmar" in filepath:
 		g = type_conversions.dagmar_nx_to_layered_graph(nx.read_graphml(fp, node_type=str), remove_sl=remove_sl)
 	elif "north" in filepath:
-		g = type_conversions.north_nx_to_layered_graph(nx.read_graphml(fp, node_type=str), w, c, remove_sl=remove_sl)
+		g = type_conversions.nx_to_layered_graph(nx.read_graphml(fp, node_type=str), w, c, remove_sl=remove_sl)
 	elif "control-flow-graphs" in filepath:
 		gp = pydot.graph_from_dot_file(fp)[0]
 		gnx = networkx.drawing.nx_pydot.from_pydot(gp)
@@ -42,10 +40,9 @@ def read(filepath: str, w=4, c=2, layer_assignments=None, remove_sl=True):
 		print("Reading graph... ", end="")
 		f_ext = os.path.splitext(filepath)[1]
 		if f_ext == ".graphml":
-			if layer_assignments is not None:
-				g = type_conversions.nx_with_separate_layerings_to_layered_graph(nx.read_graphml(fp, node_type=str), layer_assignments)
-			else:
-				g = type_conversions.north_nx_to_layered_graph(nx.read_graphml(fp, node_type=str), w, c, remove_sl=remove_sl)
+			g = type_conversions.nx_to_layered_graph(nx.read_graphml(fp, node_type=str), w, c, layer_assign=layer_assignments, remove_sl=remove_sl)
+		elif f_ext == ".adjlist":
+			g = type_conversions.nx_to_layered_graph(nx.read_adjlist(fp), w, c, layer_assign=layer_assignments, remove_sl=remove_sl)
 		elif f_ext == ".lgbin":
 			with open(fp, 'rb') as fdb:
 				g = pickle.load(fdb)

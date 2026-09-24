@@ -35,7 +35,7 @@ def create_bfs_layered_graph(s_g):  # DEPRECATED
 
 
 # def create_layered_graph(rome_file):  # DEPRECATED
-#     with open(f"Rome-Lib/{rome_file}") as f:
+#     with open(f"datasets/Rome-Lib/{rome_file}") as f:
 #         simple_g = {}
 #         n_e = True
 #         for line in f.readlines():

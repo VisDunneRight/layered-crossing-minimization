@@ -3,10 +3,12 @@ import sys
 import csv
 import inspect
 import math
+import pickle
+from pathlib import Path
 from natsort import natsorted
 
 
-def generate_benchmark(conditions, condition_map, run_function, path_to_data, name="my_benchmark", in_conds=None, nested_data=-1, exclude_files=None, exclude_dirs=None, allowed_filetypes=None, csv_header=None, dependencies=None, local_dependencies=None, class_dependencies=None, project_root=None, file_sort_key=None):
+def generate_benchmark(conditions, condition_map, run_function, path_to_data, name="my_benchmark", in_conds=None, nested_data=-1, exclude_files=None, exclude_dirs=None, allowed_filetypes=None, csv_header=None, dependencies=None, local_dependencies=None, class_dependencies=None, project_root=None, file_sort_key=None, dataset_prefix=None, experiment_dir="."):
     """
     :param conditions: List of conditions as strings
     :param condition_map: Dictionary mapping all conditions to a list of values for that condition. Values may be any hashable type
@@ -29,14 +31,6 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
     :param name: String, name for your benchmark. Will be applied to created files and directories
     :return:
     """
-
-    # self.in_conds = in_conds
-    # self.out_conds = out_conds
-    # self.condition_map = condition_map
-    # self.path_to_data = path_to_data
-    # self.nested_data = nested_data
-    # self.exclude_files = exclude_files
-    # self.exclude_dirs = exclude_dirs
 
     in_conds = [] if in_conds is None else in_conds
     out_conds = [cond for cond in conditions if cond not in in_conds]
@@ -68,21 +62,24 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
     elif type(allowed_filetypes) != list:
         raise TypeError("allowed_filetypes is not a list or string")
 
-    with os.scandir(path_to_data) as ita:
-        for entry in ita:
-            if entry.is_dir() and entry.name[0] != '.' and entry.name not in exclude_dirs:
-                n_dirs += 1
-                dir_paths.append(entry.name)
-            elif entry.is_file() and entry.name[0] != '.' and entry.name not in exclude_files and (allowed_filetypes is None or entry.name.split('.')[-1] in allowed_filetypes):
-                n_flat_files += 1
-                file_paths.append(entry.name)
-    dir_paths.sort()
-
-    # determine if nested data directory
-    if nested_data == -1:
-        data_is_nested = True if 2 ** n_dirs >= n_flat_files else False
+    if type(path_to_data) == list:
+        file_paths = path_to_data
     else:
-        data_is_nested = bool(nested_data)
+        with os.scandir(path_to_data) as ita:
+            for entry in ita:
+                if entry.is_dir() and entry.name[0] != '.' and entry.name not in exclude_dirs:
+                    n_dirs += 1
+                    dir_paths.append(entry.name)
+                elif entry.is_file() and entry.name[0] != '.' and entry.name not in exclude_files and (allowed_filetypes is None or entry.name.split('.')[-1] in allowed_filetypes):
+                    n_flat_files += 1
+                    file_paths.append(entry.name)
+        dir_paths.sort()
+
+        # determine if nested data directory
+        if nested_data == -1:
+            data_is_nested = True if 2 ** n_dirs >= n_flat_files else False
+        else:
+            data_is_nested = bool(nested_data)
 
     # recollect files if data is nested
     if data_is_nested:
@@ -103,14 +100,28 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
         file_paths.sort(key=lambda x: file_sort_key[x])
     print("Dataset size:", len(file_paths), "files")
 
-    if not os.path.isdir(f"./{name}"):
-        os.mkdir(f"./{name}")
-    if not os.path.isdir(f"./{name}/results"):
-        os.mkdir(f"./{name}/results")
+    epath = Path(experiment_dir)
+    if epath.is_absolute():
+        exp_path = epath
+    else:
+        caller_frame = inspect.stack()[1]
+        caller_file = caller_frame.filename
+        caller_dir = Path(caller_file).parent.resolve()
+        exp_path = (caller_dir / epath).resolve()
+
+    if not os.path.isdir(f"{exp_path}/{name}"):
+        os.mkdir(f"{exp_path}/{name}")
+    if not os.path.isdir(f"{exp_path}/{name}/results"):
+        os.mkdir(f"{exp_path}/{name}/results")
+    if not os.path.isdir(f"{exp_path}/{name}/.extras"):
+        os.mkdir(f"{exp_path}/{name}/.extras")
+
+    with open(f"{exp_path}/{name}/.extras/files.bin", 'wb') as fdb:
+        pickle.dump(file_paths, fdb)
 
     # build python executable
     tab = ' ' * 4
-    build_code = ["import sys", "import csv", "import os"]
+    build_code = ["import sys", "import csv", "import os", "import pickle"]
 
     # import all dependencies
     if dependencies is not None:
@@ -153,7 +164,9 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
     build_code.append("if __name__ == '__main__':")
     build_code += [
         f"{tab}files = {file_paths}",
-        f"{tab}prefix = '../{path_to_data}/'",
+        f"{tab}with open('.extras/files.bin', 'rb') as fdb:",
+        f"{tab}{tab}g = pickle.load(fdb)\n",
+        f"{tab}prefix = '{dataset_prefix}'" if dataset_prefix else f"{tab}prefix = '../{path_to_data}/'",
         f"{tab}conditions = {conditions}",
         f"{tab}csv_header = ['Index', 'Data'] + conditions + {csv_header if csv_header is not None else []}",
         # f"{tab}out_conditions = {out_conds}",
@@ -225,7 +238,7 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
         f"{tab * (len(in_conds) + 3)}ct += 1"
     ]
 
-    with open(f"./{name}/benchmark_exec.py", 'w') as fw:
+    with open(f"{exp_path}/{name}/benchmark_exec.py", 'w') as fw:
         fw.writelines(line + '\n' for line in build_code)
 
     # build bash file for running slurm job in parallel
@@ -244,7 +257,7 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
         "srun python benchmark_exec.py $SLURM_ARRAY_TASK_ID"
     ]
 
-    with open(f"./{name}/benchmark_slurm.sh", 'w') as fw:
+    with open(f"{exp_path}/{name}/benchmark_slurm.sh", 'w') as fw:
         fw.writelines(line + '\n' for line in build_script)
 
     # Build local parallelized script
@@ -256,7 +269,7 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
         "done"
     ]
 
-    with open(f"./{name}/benchmark_parallel.sh", 'w') as fw:
+    with open(f"{exp_path}/{name}/benchmark_parallel.sh", 'w') as fw:
         fw.writelines(line + '\n' for line in build_parallel)
 
     # Build README file
@@ -282,7 +295,7 @@ def generate_benchmark(conditions, condition_map, run_function, path_to_data, na
         "- run `sbatch benchmark_slurm.sh`"
     ]
 
-    with open(f"./{name}/README.md", 'w') as fw:
+    with open(f"{exp_path}/{name}/README.md", 'w') as fw:
         fw.writelines(line + '\n' for line in build_readme)
 
 

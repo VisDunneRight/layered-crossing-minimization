@@ -4,17 +4,17 @@ from layered_optimization import read_data, optimization, vis
 
 class TestCorrectnessAllDesigns(unittest.TestCase):
     def setUp(self) -> None:
-        self.g1 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
-        self.g2 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71", remove_sl=False)
+        self.g1 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71")
+        self.g2 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71", remove_sl=False)
         self.g2.add_edge(63, 64)
         self.g2.add_edge(8, 64)
         self.g2.add_edge(8, 34)
-        self.g3 = read_data.read("../Rome-Lib/graficon71nodi/grafo6545.71")
+        self.g3 = read_data.read("../datasets/Rome-Lib/graficon71nodi/grafo6545.71")
         self.g3.add_groups([[30, 37, 1, 25], [52, 9, 24], [31, 38, 18, 27], [2, 65, 12, 28], [57, 43, 19], [41, 60]])
-        self.g_bend = read_data.read("../Rome-Lib/graficon41nodi/grafo2019.41")
-        self.g4 = read_data.read("../Rome-Lib/graficon18nodi/grafo198.18")
-        self.g5 = read_data.read("../Rome-Lib/graficon13nodi/grafo201.13")
-        self.g6 = read_data.read("../Rome-Lib/graficon41nodi/grafo2019.41")
+        self.g_bend = read_data.read("../datasets/Rome-Lib/graficon41nodi/grafo2019.41")
+        self.g4 = read_data.read("../datasets/Rome-Lib/graficon18nodi/grafo198.18")
+        self.g5 = read_data.read("../datasets/Rome-Lib/graficon13nodi/grafo201.13")
+        self.g6 = read_data.read("../datasets/Rome-Lib/graficon41nodi/grafo2019.41")
         self.fair_groups = {nid: 0 if nid <= self.g1.n_nodes // 2 else 1 for nid in self.g6.node_ids}
         self.g6.add_fairness_values(self.fair_groups)
 

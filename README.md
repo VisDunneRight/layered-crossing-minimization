@@ -10,6 +10,7 @@ It comprises research performed at Northeastern University's [Data Visualization
 
 Our papers:
 * *Evaluating and extending speedup techniques for optimal crossing minimization in layered graph drawings*, available at [https://osf.io/5vq79]()
+> Connor Wilson, Eduardo Puerta, Tarik Crnovrsanin, Sara Di Bartolomeo, and Cody Dunne. IEEE Transactions on Visualization and Computer Graphics—VIS/TVCG. 2024. DOI: [doi.org/10.1109/TVCG.2024.3456349](https://doi.org/10.1109/TVCG.2024.3456349)
 * *Fast and readable layered network visualizations using large neighborhood search*, available at [https://osf.io/fytk7]()
 * *CINDER: An expressive framework for optimal layered graph layouts*, available at [https://osf.io/9cywt/]()
 
