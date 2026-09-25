@@ -1441,8 +1441,8 @@ class LayeredOptimizer:
 	def __add_bend_minimization_constraints(self, m: gp.Model, bend_vars, b_v, y):
 		if self.bend_minimization or any(ele[0] == "bend_minimization" for ele in self.hybrid_constraints):
 			for b_var in bend_vars:
-				m.addConstr(b_v[b_var] >= y[b_var[0]] + y[b_var[2]] - 2 * y[b_var[1]])
-				m.addConstr(b_v[b_var] >= -y[b_var[0]] - y[b_var[2]] + 2 * y[b_var[1]])
+				m.addConstr(2 * self.m_val * b_v[b_var] >= y[b_var[0]] + y[b_var[2]] - 2 * y[b_var[1]])
+				m.addConstr(2 * self.m_val * b_v[b_var] >= -y[b_var[0]] - y[b_var[2]] + 2 * y[b_var[1]])
 
 	def __add_hybrid_constraints(self, g: LayeredGraph, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, n_sym, e_sym, ang, ang_vars, d, r, b_v):
 		if self.hybrid_constraints:
@@ -1645,7 +1645,7 @@ class LayeredOptimizer:
 			for l_e in g.get_long_edges():
 				for i in range(1, len(l_e) - 1):
 					bend_vars.append((l_e[i - 1], l_e[i], l_e[i + 1]))
-			b_v = m.addVars(bend_vars, vtype=GRB.CONTINUOUS, name="bend_v")
+			b_v = m.addVars(bend_vars, vtype=GRB.BINARY, name="bend_v")
 			# b_v = m.addVars(bend_vars, vtype=GRB.CONTINUOUS, lb=0, ub=self.m_val, name="bend_v")
 
 		m.update()  # required after adding variables in order to use them in constraints
