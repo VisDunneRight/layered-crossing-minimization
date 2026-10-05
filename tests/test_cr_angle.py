@@ -8,6 +8,7 @@ class TestAngularOptimization(unittest.TestCase):
         self.g1 = read_data.read("../datasets/Rome-Lib/graficon18nodi/grafo198.18")
         self.g2 = read_data.read("../datasets/Rome-Lib/graficon32nodi/grafo1053.32")
         self.g3 = read_data.read("../datasets/Rome-Lib/graficon10nodi/grafo166.10")
+        self.g4 = read_data.read("../datasets/random_graphs/uniform_layered/n5/graph144.lgbin")
 
     def test1_angle_opt(self):
         opt = optimization.LayeredOptimizer(self.g1)
@@ -43,3 +44,10 @@ class TestAngularOptimization(unittest.TestCase):
         vis.draw_graph(self.g2, "ANG_TEST_5a")
         opt.optimize_layout(fix_x_vars=True, crossing_angle=True)
         vis.draw_graph(self.g2, "ANG_TEST_5")
+
+    def test7_angle_opt_hybrid(self):
+        opt = optimization.LayeredOptimizer(self.g4)
+        res0 = opt.optimize_layout(crossing_angle=True)
+        print("RES0 OBJVAL", res0.objval)
+        opt.optimize_layout(crossing_minimization=True, hybrid_constraints=[("crossing_angle", res0.objval + 0.001)])
+        vis.draw_graph(self.g4, "ANG_TEST_HYBRD")

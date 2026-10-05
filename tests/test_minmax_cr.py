@@ -9,7 +9,8 @@ class TestMinMaxCrossingOptimization(unittest.TestCase):
 
     def test_minmax_only(self):
         opt = optimization.LayeredOptimizer(self.g2)
-        opt.optimize_layout(min_max_crossings=True, crossing_minimization=False)
+        res = opt.optimize_layout(min_max_crossings=True, crossing_minimization=False)
+        print(res.metrics)
         vis.draw_graph(self.g2, "MINMAX_TEST")
 
     def test_minmax_plus_cr(self):

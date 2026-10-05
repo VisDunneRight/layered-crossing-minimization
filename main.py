@@ -43,8 +43,49 @@ if __name__ == '__main__':
 	# draw_graph(graph3, "scalefree")
 
 	# generate_three_to_two_dataset()
-	make_up_extra_three_two({225: 96, 230: 88, 245: 98})
+	# make_up_extra_three_two({225: 96, 230: 88, 245: 98})
 
-	# graph4 = read("datasets/random_graphs/uniform_layered/n25/graph4.lgbin")
-	# print(graph4.n_nodes, len(graph4.edges))
-	# draw_graph(graph4, "random_layered")
+	graph4 = read("datasets/random_graphs/uniform_layered/n25/graph40.lgbin")
+	
+	opt3 = LayeredOptimizer(graph4)
+	rs1 = opt3.optimize_layout(crossing_minimization=True)
+	rs2 = opt3.optimize_layout(fix_x_vars=True, symmetry_maximization_edges=True, edge_length_minimization=True)
+	print("SEQ", rs1.metrics, rs2.metrics)
+	print("SEQ TOTAL", rs1.metrics.crossings + rs2.metrics.edge_symmetry + rs2.metrics.length)
+	draw_graph(opt3.g, "un1_seq")
+
+	opt2 = LayeredOptimizer(graph4)
+	rh1 = opt2.optimize_layout(crossing_minimization=True)
+	rh2 = opt2.optimize_layout(symmetry_maximization_edges=True, fix_x_vars=True)
+	rh3 = opt2.optimize_layout(edge_length_minimization=True, fix_x_vars=True, hybrid_constraints=[("edge_symmetry", rh2.metrics.edge_symmetry * 1)])
+	print("HYBRID", rh3.metrics)
+	print("HYBRID TOTAL", rh1.metrics.crossings + rh3.metrics.edge_symmetry + rh3.metrics.length)
+	draw_graph(opt2.g, "un1_hybrid")
+
+	opt1 = LayeredOptimizer(graph4)
+	rc1 = opt1.optimize_layout(crossing_minimization=True, symmetry_maximization_edges=True, edge_length_minimization=True)
+	print("COMBO", rc1.metrics)
+	print("COMBO TOTAL", rc1.metrics.crossings + rc1.metrics.edge_symmetry + rc1.metrics.length)
+	draw_graph(opt1.g, "un1_combo")
+
+
+	# opt3 = LayeredOptimizer(graph4)
+	# rs1 = opt3.optimize_layout(crossing_minimization=True, planarization=True)
+	# rs2 = opt3.optimize_layout(fix_x_vars=True, edge_length_minimization=True)
+	# print("SEQ", rs1.metrics, rs2.metrics)
+	# print("SEQ TOTAL", rs1.metrics.crossings + rs1.metrics.planar + rs2.metrics.length)
+	# draw_graph(opt3.g, "un2_seq")
+
+	# opt2 = LayeredOptimizer(graph4)
+	# rh1 = opt2.optimize_layout(crossing_minimization=True)
+	# rh2 = opt2.optimize_layout(planarization=True, hybrid_constraints=[("crossings", rh1.metrics.crossings)])
+	# rh3 = opt2.optimize_layout(edge_length_minimization=True, hybrid_constraints=[("crossings", rh1.metrics.crossings), ("planarization", rh2.metrics.planar)])
+	# print("HYBRID", rh3.metrics)
+	# print("HYBRID TOTAL", rh3.metrics.crossings + rh3.metrics.planar + rh3.metrics.length)
+	# draw_graph(opt2.g, "un2_hybrid")
+
+	# opt1 = LayeredOptimizer(graph4)
+	# rc1 = opt1.optimize_layout(crossing_minimization=True, planarization=True, edge_length_minimization=True)
+	# print("COMBO", rc1.metrics)
+	# print("COMBO TOTAL", rc1.metrics.crossings + rc1.metrics.planar + rc1.metrics.length)
+	# draw_graph(opt1.g, "un2_combo")

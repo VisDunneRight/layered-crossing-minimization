@@ -249,7 +249,6 @@ class LayeredOptimizer:
 			return float('inf'), t2, {}
 		# gs1, gs2 = 0, 0
 		metric_vals = {}
-		ct = 0
 		for v in m.getVars():
 			if v.varName[:2] == "x[":
 				xv1 = int(v.varName[2:v.varName.index(',')])
@@ -265,13 +264,21 @@ class LayeredOptimizer:
 				if "cr" not in metric_vals:
 					metric_vals["cr"] = 0
 				metric_vals["cr"] += v.x
-			elif v.varName[:3] == "sym":
-				if "sym" not in metric_vals:
-					metric_vals["sym"] = 0
-					metric_vals["act_sym"] = 0
-				metric_vals["sym"] += v.x
-				ct += v.x
-				if v.x == 0:
+			elif v.varName[:5] == "sym_n":
+				if "sym_n" not in metric_vals:
+					metric_vals["sym_n"] = 0
+				metric_vals["sym_n"] += v.x
+				if v.x == 0 and (self.symmetry_maximization or any(ele[0] == "node_symmetry" for ele in self.hybrid_constraints)):
+					if "act_sym" not in metric_vals:
+						metric_vals["act_sym"] = 0
+					metric_vals["act_sym"] += 1
+			elif v.varName[:5] == "sym_e":
+				if "sym_e" not in metric_vals:
+					metric_vals["sym_e"] = 0
+				metric_vals["sym_e"] += v.x
+				if v.x == 0 and (self.symmetry_maximization_edges or any(ele[0] == "edge_symmetry" for ele in self.hybrid_constraints)):
+					if "act_sym" not in metric_vals:
+						metric_vals["act_sym"] = 0
 					metric_vals["act_sym"] += 1
 			elif v.varName[:2] == "b[":
 				if "length" not in metric_vals:
@@ -289,7 +296,7 @@ class LayeredOptimizer:
 				if "bundle" not in metric_vals:
 					metric_vals["bundle"] = 0
 				metric_vals["bundle"] += v.x
-			elif v.varName[:2] == "C[":
+			elif v.varName == "C":
 				metric_vals["minmax"] = v.x
 			elif v.varName[:2] == "r[":
 				if "planar" not in metric_vals:
@@ -302,13 +309,13 @@ class LayeredOptimizer:
 			# elif v.varName[:1] == "c" and round(v.x) != 0:
 			# 	print(v.varName, v.x)
 		# print(gs1, gs2)
-		# print(ct)
-		mtrv = collections.namedtuple("metric_vals", "crossings length angle symmetry fairness bundling minmax planar bend actual_symmetries")
+		mtrv = collections.namedtuple("metric_vals", "crossings length angle node_symmetry edge_symmetry fairness bundling minmax planar bend actual_symmetries")
 		metrics = mtrv(
 			metric_vals["cr"] if "cr" in metric_vals else -1,
 			metric_vals["length"] if "length" in metric_vals else -1,
 			metric_vals["ang"] if "ang" in metric_vals else -1,
-			metric_vals["sym"] if "sym" in metric_vals else -1,
+			metric_vals["sym_n"] if "sym_n" in metric_vals else -1,
+			metric_vals["sym_e"] if "sym_e" in metric_vals else -1,
 			metric_vals["fair"] if "fair" in metric_vals else -1,
 			metric_vals["bundle"] if "bundle" in metric_vals else -1,
 			metric_vals["minmax"] if "minmax" in metric_vals else -1,
@@ -324,7 +331,7 @@ class LayeredOptimizer:
 			for o in range(m.NumObj):
 				m.params.ObjNumber = o
 				model_objval += m.ObjNVal
-			# print("MSOL", m.ObjNVal, m.status)
+				# print(f"SOL{o}=", m.ObjNVal)
 
 		""" Optimize and merge collapsed subgraphs """
 		g, t4, model_objval = self.__optimize_subgraphs(g, self.__get_x_vars(g), model_objval)
@@ -1091,21 +1098,21 @@ class LayeredOptimizer:
 			total_zeros = sum(1 for v in g.node_data["fairness"].values() if v == 0)
 			total_ones = sum(1 for v in g.node_data["fairness"].values() if v == 1)
 			f0_csum, f1_csum = gp.LinExpr(), gp.LinExpr()
-			if self.fairness_metric == "crossings" or any(ele[0] == "crossing_fairness" for ele in self.hybrid_constraints):
+			if (self.fairness_constraints and self.fairness_metric == "crossings") or any(ele[0] == "crossing_fairness" for ele in self.hybrid_constraints):
 				for c_var in c_vars:
 					cv_total = sum(g.node_data["fairness"][nd] for nd in (c_var[0][0], c_var[0][1], c_var[1][0], c_var[1][1]))
 					if cv_total <= 1:
 						f0_csum += c[c_var]
 					elif cv_total >= 3:
 						f1_csum += c[c_var]
-			elif self.fairness_metric == "edge_length" or any(ele[0] == "edge_length_fairness" for ele in self.hybrid_constraints):
+			elif (self.fairness_constraints and self.fairness_metric == "edge_length") or any(ele[0] == "edge_length_fairness" for ele in self.hybrid_constraints):
 				for b_var in b_vars:
 					if g.node_data["fairness"][b_var[0]] == 0 and g.node_data["fairness"][b_var[1]] == 0:
 						f0_csum += b[b_var]
 					elif g.node_data["fairness"][b_var[0]] == 1 and g.node_data["fairness"][b_var[1]] == 1:
 						f1_csum += b[b_var]
 			else:
-				raise Exception(f"'{self.fairness_metric}' not supported with fairness optimization.\nAllowed metrics: 'crossings', 'edge_length'\nProceeding without fairness.")
+				raise Exception(f"'{self.fairness_metric}' not supported with fairness optimization.\nAllowed metrics: 'crossings', 'edge_length'.")
 			f1_csum = f1_csum * total_zeros / total_ones
 			m.addConstr(fair_var >= f0_csum - f1_csum)
 			m.addConstr(fair_var >= f1_csum - f0_csum)
@@ -1431,12 +1438,12 @@ class LayeredOptimizer:
 			for m_var in m_vars:
 				m.addConstr(m_v[m_var] == (y[m_var[0]] - y[m_var[1]]) / 1.5)
 			for c_var in combo_vars:
-				if combo is None:
-					m.addConstr(m_v[c_var[0]] * m_v[c_var[1]] + 1 <= final[c_var])
-					m.addConstr(- m_v[c_var[0]] * m_v[c_var[1]] - 1 <= final[c_var])
-				else:
-					m.addConstr(combo[c_var] == m_v[c_var[0]] * m_v[c_var[1]] + 1)
-					m.addGenConstrAbs(final[c_var], combo[c_var])
+				# if combo is None:
+				m.addConstr(m_v[c_var[0]] * m_v[c_var[1]] + 1 <= final[c_var])
+				m.addConstr(- m_v[c_var[0]] * m_v[c_var[1]] - 1 <= final[c_var])
+				# else:
+				# 	m.addConstr(combo[c_var] == m_v[c_var[0]] * m_v[c_var[1]] + 1)
+				# 	m.addGenConstrAbs(final[c_var], combo[c_var])
 
 	def __add_bend_minimization_constraints(self, m: gp.Model, bend_vars, b_v, y):
 		if self.bend_minimization or any(ele[0] == "bend_minimization" for ele in self.hybrid_constraints):
@@ -1444,37 +1451,40 @@ class LayeredOptimizer:
 				m.addConstr(2 * self.m_val * b_v[b_var] >= y[b_var[0]] + y[b_var[2]] - 2 * y[b_var[1]])
 				m.addConstr(2 * self.m_val * b_v[b_var] >= -y[b_var[0]] - y[b_var[2]] + 2 * y[b_var[1]])
 
-	def __add_hybrid_constraints(self, g: LayeredGraph, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, n_sym, e_sym, ang, ang_vars, d, r, b_v):
+	def __add_hybrid_constraints(self, g: LayeredGraph, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, n_sym, e_sym, e_v_sym, ang, ang_vars, d, r, b_v):
 		if self.hybrid_constraints:
 			for metric, bound in self.hybrid_constraints:
 				if metric == "crossings":
 					csum = gp.LinExpr()
 					for i, c_var in enumerate(c_vars):
 						csum += self.gamma_crossings * c_consts[i] * c[c_var]
-					m.addConstr(csum <= int(bound))
+					m.addConstr(csum <= round(bound))
 				elif metric == "edge_length":
 					if self.apply_edge_weight:
-						m.addConstr(sum(g.get_edge(b_v[0], b_v[1]).weight * self.gamma_edgelength * b[b_v] for b_v in g.edge_ids) <= int(bound))
+						m.addConstr(sum(g.get_edge(b_v[0], b_v[1]).weight * self.gamma_edgelength * b[b_v] for b_v in g.edge_ids) <= bound)
 					else:
-						m.addConstr(self.gamma_edgelength * b.sum() <= int(bound))
+						m.addConstr(self.gamma_edgelength * b.sum() <= bound)
 				elif metric == "edge_bundles":
-					m.addConstr(self.gamma_bundle * alpha.sum() <= int(bound))
+					m.addConstr(self.gamma_bundle * alpha.sum() <= round(bound))
 				elif metric == "min_max_crossings":
-					m.addConstr(big_c <= int(bound))
+					m.addConstr(big_c <= round(bound))
 				elif metric == "crossing_fairness" or metric == "edge_length_fairness":
-					m.addConstr(fair_var <= int(bound))
+					m.addConstr(fair_var <= bound)
 				elif metric == "node_symmetry":
-					m.addConstr(n_sym.sum() <= int(bound))
+					m.addConstr(n_sym.sum() <= round(bound))
 				elif metric == "edge_symmetry":
-					m.addConstr(n_sym.sum() + e_sym.sum() <= int(bound))
+					if self.symmetry_maximization_type in ["vertical", "rotation"]:
+						m.addConstr(e_v_sym.sum() <= round(bound))
+					else:
+						m.addConstr(e_sym.sum() <= round(bound))
 				elif metric == "crossing_angle":
-					m.addConstr(sum((ang[cv] * c[cv] for cv in ang_vars)) <= int(bound))
+					m.addQConstr(sum((ang[cv] * c[cv] for cv in ang_vars)) <= bound)
 				elif metric == "min_edges_with_crossings":
-					m.addConstr(d.sum() <= int(bound))
+					m.addConstr(d.sum() <= round(bound))
 				elif metric == "planarization":
-					m.addConstr(r.sum() <= int(bound))
+					m.addConstr(r.sum() <= round(bound))
 				elif metric == "bend_minimization":
-					m.addConstr(b_v.sum() <= int(bound))
+					m.addConstr(b_v.sum() <= round(bound))
 				else:
 					raise Exception(f"No metric with name {metric}.\nAllowed metrics: [crossings, edge_length, edge_bundles, min_max_crossings, crossing_fairness, edge_length_fairness, node_symmetry, edge_symmetry, crossing_angle, min_edges_with_crossings, planarization]")
 
@@ -1750,7 +1760,7 @@ class LayeredOptimizer:
 		self.__add_bend_minimization_constraints(m, bend_vars, b_v, y)
 
 		""" Hybrid model bounding constraints """
-		self.__add_hybrid_constraints(g, m, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n, sym_e, ang_final, ang_combo_vars, d, r, b_v)
+		self.__add_hybrid_constraints(g, m, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n, sym_e, sym_e_v, ang_final, ang_combo_vars, d, r, b_v)
 
 	# def __optimize_with_subgraph_reduction(self, n_partitions, cluster, top_level_g, crosses, contacts, stack_to_nodeset, node_to_stack):  # DEPRECATED
 	# 	# TODO (later): remove all the parameters to standard_opt, replace non-top-level calls with creation of new optimizer object

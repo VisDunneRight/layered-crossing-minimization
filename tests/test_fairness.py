@@ -10,6 +10,9 @@ class TestOptimizationWithFairness(unittest.TestCase):
         self.g2 = read_data.read("../datasets/Rome-Lib/graficon41nodi/grafo2531.41")
         self.fair_groups_2 = {nid: 0 if nid % 2 == 0 else 1 for nid in self.g2.node_ids}
         self.g2.add_fairness_values(self.fair_groups_2)
+        self.g3 = read_data.read("../datasets/random_graphs/uniform_layered/n5/graph131.lgbin")
+        self.fair_groups_3 = {nid: 0 if nid in [0, 1, 3, 6, 7] else 1 for nid in self.g3.node_ids}
+        self.g3.add_fairness_values(self.fair_groups_3)
 
     def test_edge_length_fairness(self):
         opt = optimization.LayeredOptimizer(self.g1)
@@ -82,3 +85,25 @@ class TestOptimizationWithFairness(unittest.TestCase):
         res2 = opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         opt.optimize_layout(fairness_constraints=True, fix_x_vars=True, fairness_metric="edge_length", hybrid_constraints=[("edge_length", res2.objval + 5)])
         vis.draw_graph(self.g2, "FAIR_BOTH_TEST", groups=self.fair_groups_2)
+
+    def test_edgefair_hybridized(self):
+        opt = optimization.LayeredOptimizer(self.g3)
+        res0 = opt.optimize_layout(fairness_constraints=True, fairness_metric="edge_length")
+        vis.draw_graph(self.g3, "EFAIR_HYBRIDa", groups=self.fair_groups_3)
+
+        g_bends = [0, 0]
+        len_g0, len_g1 = sum((1 for v in self.fair_groups_3.values() if v == 0)), sum((1 for v in self.fair_groups_3.values() if v == 1))
+        seen = set()
+        for nd, v in self.fair_groups_3.items():
+            for nd_ot in self.g3.get_adj_list()[nd]:
+                if nd_ot not in seen:
+                    if self.fair_groups_3[nd_ot] == v == 0:
+                        g_bends[v] += abs(self.g3[nd].y - self.g3[nd_ot].y)
+                    elif self.fair_groups_3[nd_ot] == v == 1:
+                        g_bends[v] += abs(self.g3[nd].y - self.g3[nd_ot].y)
+            seen.add(nd)
+        print(g_bends)
+        print(g_bends[0] / len_g0, g_bends[1] / len_g1)
+
+        res = opt.optimize_layout(crossing_minimization=True, fairness_metric="edge_length", hybrid_constraints=[("edge_length_fairness", res0.objval + 0.0001)])
+        vis.draw_graph(self.g3, "EFAIR_HYBRID", groups=self.fair_groups_3)
