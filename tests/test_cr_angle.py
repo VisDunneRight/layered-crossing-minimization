@@ -1,5 +1,5 @@
 import unittest
-from layered_optimization import read_data, optimization, vis
+from layered_optimization import read_data, optimization, vis, metrics
 from layered_optimization.heuristics import improved_sifting
 
 
@@ -13,8 +13,9 @@ class TestAngularOptimization(unittest.TestCase):
     def test1_angle_opt(self):
         opt = optimization.LayeredOptimizer(self.g1)
         opt.optimize_layout(crossing_minimization=True)
-        opt.optimize_layout(crossing_angle=True, fix_x_vars=True, m_val=12)
+        res = opt.optimize_layout(crossing_angle=True, fix_x_vars=True, m_val=12)
         vis.draw_graph(self.g1, "ANG_TEST_CR_THEN_ANG")
+        self.assertAlmostEqual(res.objval, metrics.crossing_angle(self.g1, use_approximation=True))
 
     def test2_angle_opt_bland(self):
         opt = optimization.LayeredOptimizer(self.g3)
@@ -51,3 +52,10 @@ class TestAngularOptimization(unittest.TestCase):
         print("RES0 OBJVAL", res0.objval)
         opt.optimize_layout(crossing_minimization=True, hybrid_constraints=[("crossing_angle", res0.objval + 0.001)])
         vis.draw_graph(self.g4, "ANG_TEST_HYBRD")
+
+    def test8_true_angle_with_tangent(self):
+        opt = optimization.LayeredOptimizer(self.g4)
+        res0 = opt.optimize_layout(crossing_minimization=True)
+        res = opt.optimize_layout(crossing_angle=True, ca_use_tangent=True, fix_x_vars=True)
+        self.assertAlmostEqual(res.objval, metrics.crossing_angle(self.g4))
+        vis.draw_graph(self.g4, "ANG_TEST_TAN")

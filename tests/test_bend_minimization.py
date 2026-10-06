@@ -1,5 +1,5 @@
 import unittest
-from layered_optimization import read_data, optimization, vis
+from layered_optimization import read_data, optimization, vis, metrics
 from layered_optimization.heuristics import improved_sifting
 
 
@@ -12,7 +12,8 @@ class TestBendMinimization(unittest.TestCase):
     def test1_min_bends_only(self):
         opt = optimization.LayeredOptimizer(self.g2)
         opt.optimize_layout(crossing_minimization=True)
-        opt.optimize_layout(bend_minimization=True, fix_x_vars=True, streamline=True)
+        res = opt.optimize_layout(bend_minimization=True, fix_x_vars=True, streamline=True)
+        self.assertEqual(res.objval, metrics.bend_minimization(self.g2))
         vis.draw_graph(self.g2, "BENDMIN_TEST", straighten_edges=False)
 
     def test2_min_bends_with_edgelength(self):
@@ -26,7 +27,8 @@ class TestBendMinimization(unittest.TestCase):
     def test3_fixed_x_solo(self):
         opt = optimization.LayeredOptimizer(self.g2)
         improved_sifting(opt.g)
-        opt.optimize_layout(bend_minimization=True, fix_x_vars=True)
+        res = opt.optimize_layout(bend_minimization=True, fix_x_vars=True)
+        self.assertEqual(res.objval, metrics.bend_minimization(self.g3))
         vis.draw_graph(self.g2, "BENDMIN_TEST_3")
 
     def test4_problematic_graph(self):
