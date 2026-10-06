@@ -4,6 +4,8 @@ import time
 import hashlib
 import json
 import gurobipy as gp
+from gurobipy import nlfunc
+import math
 # import multiprocessing as mp
 from gurobipy import GRB
 # from sklearn.cluster import SpectralClustering
@@ -62,6 +64,7 @@ class LayeredOptimizer:
 		self.apply_node_weight_spacing = False
 		self.apply_edge_weight = False
 		self.crossing_angle = False
+		self.ca_use_tangent = False
 		self.symmetry_maximization = False
 		self.symmetry_maximization_edges = False
 		self.symmetry_maximization_type = "horizontal"
@@ -237,6 +240,9 @@ class LayeredOptimizer:
 		else:
 			m.optimize()
 		t2 = time.time() - t2
+
+		mtrv = collections.namedtuple("metric_vals", "crossings length angle node_symmetry edge_symmetry fairness bundling minmax planar bend actual_symmetries", defaults=[-1]*11)
+
 		if m.status != 2 and m.status != 9:
 			print("model returned status code:", m.status)
 			print("3: model unsolvable")
@@ -246,7 +252,8 @@ class LayeredOptimizer:
 			raise Exception("Invalid model status")
 		elif m.SolCount == 0:
 			print("Model did not find a valid solution before cutoff")
-			return float('inf'), t2, {}
+			return float('inf'), t2, mtrv()
+		
 		# gs1, gs2 = 0, 0
 		metric_vals = {}
 		for v in m.getVars():
@@ -309,7 +316,7 @@ class LayeredOptimizer:
 			# elif v.varName[:1] == "c" and round(v.x) != 0:
 			# 	print(v.varName, v.x)
 		# print(gs1, gs2)
-		mtrv = collections.namedtuple("metric_vals", "crossings length angle node_symmetry edge_symmetry fairness bundling minmax planar bend actual_symmetries")
+		
 		metrics = mtrv(
 			metric_vals["cr"] if "cr" in metric_vals else -1,
 			metric_vals["length"] if "length" in metric_vals else -1,
@@ -1433,17 +1440,32 @@ class LayeredOptimizer:
 								svsum += 1 - sev_obj[e_v]
 						m.addConstr(svsum <= 1)
 
-	def __add_crossing_angle_constraints(self, m: gp.Model, m_vars, m_v, y, combo_vars, combo, final):
+	def __add_crossing_angle_constraints(self, m: gp.Model, m_vars, m_v, y, combo_vars, combo, combo_1a, combo_2, final):
 		if self.crossing_angle or any(ele[0] == "crossing_angle" for ele in self.hybrid_constraints):
 			for m_var in m_vars:
 				m.addConstr(m_v[m_var] == (y[m_var[0]] - y[m_var[1]]) / 1.5)
-			for c_var in combo_vars:
-				# if combo is None:
-				m.addConstr(m_v[c_var[0]] * m_v[c_var[1]] + 1 <= final[c_var])
-				m.addConstr(- m_v[c_var[0]] * m_v[c_var[1]] - 1 <= final[c_var])
-				# else:
-				# 	m.addConstr(combo[c_var] == m_v[c_var[0]] * m_v[c_var[1]] + 1)
-				# 	m.addGenConstrAbs(final[c_var], combo[c_var])
+			if not self.ca_use_tangent:
+				for c_var in combo_vars:
+					# if combo is None:
+					m.addConstr(m_v[c_var[0]] * m_v[c_var[1]] + 1 <= final[c_var])
+					m.addConstr(- m_v[c_var[0]] * m_v[c_var[1]] - 1 <= final[c_var])
+					# else:
+					# 	m.addConstr(combo[c_var] == m_v[c_var[0]] * m_v[c_var[1]] + 1)
+					# 	m.addGenConstrAbs(final[c_var], combo[c_var])
+			else:
+				ptu = []
+				ptf = []
+				npts = 101
+				for i in range(npts):
+					ptu.append(100 * i / (npts - 1))
+					ptf.append(math.atan(ptu[i]))
+				ptf[-1] = math.pi / 2
+
+				for c_var in combo_vars:
+					m.addGenConstrNL(combo_1a[c_var], (m_v[c_var[0]] - m_v[c_var[1]]) / (1 + m_v[c_var[0]] * m_v[c_var[1]]))
+					m.addGenConstrAbs(combo[c_var], combo_1a[c_var])
+					m.addGenConstrPWL(combo[c_var], combo_2[c_var], ptu, ptf)
+					m.addConstr(math.pi / 2 - combo_2[c_var] <= final[c_var])
 
 	def __add_bend_minimization_constraints(self, m: gp.Model, bend_vars, b_v, y):
 		if self.bend_minimization or any(ele[0] == "bend_minimization" for ele in self.hybrid_constraints):
@@ -1634,7 +1656,7 @@ class LayeredOptimizer:
 					sym_e_v = m.addVars(sym_e_v_vars, vtype=GRB.BINARY, name="sym_e_v")
 
 		# Crossing angle variables, with necessary auxilliary variables
-		ang_m_vars, ang_m, ang_combo_vars, ang_combo, ang_final = None, None, None, None, None
+		ang_m_vars, ang_m, ang_combo_vars, ang_combo, ang_combo_1a, ang_combo_2, ang_final = None, None, None, None, None, None, None
 		if self.crossing_angle or any(ele[0] == "crossing_angle" for ele in self.hybrid_constraints):
 			if self.fix_x_vars:
 				ang_combo_vars = g.edge_crossing_edges()
@@ -1643,9 +1665,15 @@ class LayeredOptimizer:
 				ang_m_vars = list(g.edge_ids.keys())
 				ang_combo_vars = c_vars
 			ang_m = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val, ub=self.m_val)
-			ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, name="ang")
-			if any(ele[0] == "crossing_angle" for ele in self.hybrid_constraints):
-				ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS)
+			if self.ca_use_tangent:
+				ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=100)
+				ang_combo_1a = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=-100, ub=100)
+				ang_combo_2 = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi / 2)
+				ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi / 2, name="ang")
+			else:
+				ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, name="ang")
+			# if any(ele[0] == "crossing_angle" for ele in self.hybrid_constraints):
+			# 	ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS)
 			m.setParam("NonConvex", 2)  # this model is not convex, need different solver algorithm
 
 		# Minimizes the number of edge bends (direction changes on long edges)
@@ -1754,7 +1782,7 @@ class LayeredOptimizer:
 		self.__add_symmetry_maximization_constraints(m, g, y, sym_n, sym_n_vars, sym_e, sym_e_vars, sym_n_v, sym_n_v_vars, sym_e_v, sym_e_v_vars)
 
 		""" Angular resolution constraints, make crossings close to 90 degrees """
-		self.__add_crossing_angle_constraints(m, ang_m_vars, ang_m, y, ang_combo_vars, ang_combo, ang_final)
+		self.__add_crossing_angle_constraints(m, ang_m_vars, ang_m, y, ang_combo_vars, ang_combo, ang_combo_1a, ang_combo_2, ang_final)
 
 		""" Minimize number of edge bends """
 		self.__add_bend_minimization_constraints(m, bend_vars, b_v, y)
@@ -2471,6 +2499,7 @@ class LayeredOptimizer:
 		self.fix_x_vars = kwargs.get("fix_x_vars", False)
 		self.start_xy_vars = kwargs.get("start_xy_vars", False)
 		self.fix_nodes = kwargs.get("fix_nodes", False)
+		self.ca_use_tangent = kwargs.get("ca_use_tangent", False)
 
 		# Speedup Techniques
 		self.do_subg_reduction = kwargs.get("do_subg_reduction", False)
