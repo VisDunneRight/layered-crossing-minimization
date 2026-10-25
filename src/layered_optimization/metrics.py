@@ -50,9 +50,9 @@ def crossing_angle(g: LayeredGraph, layer_dist=1.5, use_approximation=False, use
 			if return_angles:
 				angles[ed1, ed2] = min(abs(1 + e1m * e2m), np.pi / 2)
 		else:
-			t_angle_radians += np.pi / 2 - np.atan(abs((e1m - e2m) / (1 + e1m * e2m))) if 1 + e1m * e2m != 0 else 0
+			t_angle_radians += np.pi / 2 - np.arctan(abs((e1m - e2m) / (1 + e1m * e2m))) if 1 + e1m * e2m != 0 else 0
 			if return_angles:
-				angles[ed1, ed2] = np.pi / 2 - np.atan(abs((e1m - e2m) / (1 + e1m * e2m))) if 1 + e1m * e2m != 0 else 0
+				angles[ed1, ed2] = np.pi / 2 - np.arctan(abs((e1m - e2m) / (1 + e1m * e2m))) if 1 + e1m * e2m != 0 else 0
 	if return_angles:
 		return angles
 	return t_angle_radians

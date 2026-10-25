@@ -72,10 +72,10 @@ class TestAngularOptimization(unittest.TestCase):
             vis.draw_graph(gr, f"ANG_TAN/gr{i}_TAN")
             tru_times.append(res.runtime)
             tru_obj.append(res.objval)
-            res2 = opt.optimize_layout(crossing_angle=True, fix_x_vars=False)
-            vis.draw_graph(gr, f"ANG_TAN/gr{i}_APX")
-            apr_times.append(res2.runtime)
-            apr_obj.append(res2.objval)
+            # res2 = opt.optimize_layout(crossing_angle=True, fix_x_vars=False)
+            # vis.draw_graph(gr, f"ANG_TAN/gr{i}_APX")
+            # apr_times.append(res2.runtime)
+            # apr_obj.append(res2.objval)
         n2 = 10
         for i, fl in enumerate(os.listdir("../datasets/random_graphs/uniform_layered/n30")[:n2]):
             gr = read_data.read(f"../datasets/random_graphs/uniform_layered/n30/{fl}")
@@ -85,14 +85,14 @@ class TestAngularOptimization(unittest.TestCase):
             vis.draw_graph(gr, f"ANG_TAN/gr{i + n1}_TAN")
             tru_times.append(res.runtime)
             tru_obj.append(res.objval)
-            res2 = opt.optimize_layout(crossing_angle=True, fix_x_vars=True)
-            vis.draw_graph(gr, f"ANG_TAN/gr{i + n1}_APX")
-            apr_times.append(res2.runtime)
-            apr_obj.append(res2.objval)
+            # res2 = opt.optimize_layout(crossing_angle=True, fix_x_vars=True)
+            # vis.draw_graph(gr, f"ANG_TAN/gr{i + n1}_APX")
+            # apr_times.append(res2.runtime)
+            # apr_obj.append(res2.objval)
         print("TRU TIME:", sum(tru_times)/(n1 + n2), tru_times)
-        print("APRX TIME:", sum(apr_times)/(n1 + n2), apr_times)
+        # print("APRX TIME:", sum(apr_times)/(n1 + n2), apr_times)
         print("TRU OBJ:", sum(tru_obj)/(n1 + n2), tru_obj)
-        print("APRX OBJ:", sum(apr_obj)/(n1 + n2), apr_obj)
+        # print("APRX OBJ:", sum(apr_obj)/(n1 + n2), apr_obj)
 
     def test10_angle_with_minimum(self):
         opt = optimization.LayeredOptimizer(self.g2)
@@ -100,3 +100,12 @@ class TestAngularOptimization(unittest.TestCase):
         res = opt.optimize_layout(crossing_angle=True, ca_use_minimum=True, edge_length_minimization=True, fix_x_vars=True)
         self.assertAlmostEqual(res.metrics.angle, metrics.crossing_angle(self.g2, use_min_approx=True), places=4)
         vis.draw_graph(self.g2, "ANG_TEST_MIN")
+
+    def test11_problematic_case(self):
+        gr = read_data.read("../datasets/random_graphs/uniform_layered/n5/graph46.lgbin")
+        # gr = read_data.read("../datasets/north/g.10.62.graphml")
+        improved_sifting(gr)
+        opt = optimization.LayeredOptimizer(gr)
+        res0 = opt.optimize_layout(fix_x_vars=True, crossing_angle=True, ca_use_tangent=True)
+        res = opt.optimize_layout(fix_x_vars=True, edge_length_minimization=True, ca_use_tangent=True, hybrid_constraints=[("crossing_angle", res0.objval + 0.0001)])
+        vis.draw_graph(gr, "ANG_TEST_PROB")

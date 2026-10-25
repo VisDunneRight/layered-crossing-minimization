@@ -4,13 +4,13 @@ import time
 import hashlib
 import json
 import gurobipy as gp
-from gurobipy import nlfunc
 import math
 import re
+import numpy as np
 # import multiprocessing as mp
 from gurobipy import GRB
 # from sklearn.cluster import SpectralClustering
-from layered_optimization import vis, reductions, motifs, read_data, metrics
+from layered_optimization import vis, reductions, motifs, read_data, metrics, breakpoints
 from layered_optimization.graph import LayeredGraph, CollapsedGraph
 from layered_optimization.helpers import *
 from layered_optimization.neighborhood import *
@@ -33,6 +33,7 @@ class LayeredOptimizer:
 		self.gamma_edgelength = 1
 		self.node_gap = 1
 		self.m_val = round(1.5 * max(len(lr) for lr in self.g.layers.values()))
+		self.layer_gap = 1.5
 		self.use_lns = False
 		self.n_partitions = -1
 		self.return_full_data = False
@@ -266,7 +267,7 @@ class LayeredOptimizer:
 			m.optimize()
 		t2 = time.time() - t2
 
-		mtrv = collections.namedtuple("metric_vals", "crossings length angle horizontal_node_symmetry vertical_node_symmetry rotation_node_symmetry horizontal_edge_symmetry vertical_edge_symmetry rotation_edge_symmetry fairness bundling minmax planar bend actual_symmetries", defaults=[-1]*11)
+		mtrv = collections.namedtuple("metric_vals", "crossings length angle horizontal_node_symmetry vertical_node_symmetry rotation_node_symmetry horizontal_edge_symmetry vertical_edge_symmetry rotation_edge_symmetry fairness bundling minmax planar bend actual_symmetries", defaults=[-1]*15)
 
 		if m.status != 2 and m.status != 9:
 			print("model returned status code:", m.status)
@@ -1518,7 +1519,7 @@ class LayeredOptimizer:
 	def __add_crossing_angle_constraints(self, m: gp.Model, m_vars, m_v, y, combo_vars, combo, combo_1a, combo_2, final):
 		if self.crossing_angle or self.fix_crossing_angle or any(ele[0] == "crossing_angle" for ele in self.hybrid_constraints):
 			for m_var in m_vars:
-				m.addConstr(m_v[m_var] == (y[m_var[0]] - y[m_var[1]]) / 1.5)
+				m.addConstr(m_v[m_var] == (y[m_var[0]] - y[m_var[1]]) / self.layer_gap)
 			if not self.ca_use_tangent:
 				for c_var in combo_vars:
 					if self.ca_use_minimum:
@@ -1529,8 +1530,18 @@ class LayeredOptimizer:
 						m.addConstr(m_v[c_var[0]] * m_v[c_var[1]] + 1 <= final[c_var])
 						m.addConstr(- m_v[c_var[0]] * m_v[c_var[1]] - 1 <= final[c_var])
 			else:
+				# adaptive breakpoints for PWL to solve within 0.1 degrees
+				bpoints = breakpoints.adaptive_breakpoints(-self.m_val / self.layer_gap, self.m_val / self.layer_gap, np.radians(0.1))
 				for m_var in m_vars:
-					m.addGenConstrTan(combo_1a[m_var], m_v[m_var])
+					# the following works well in Gurobi 13 (but not 10):
+					# m.addGenConstrTan(combo_1a[m_var], m_v[m_var])
+
+				    breakpoints.add_arctan_pwl(m, m_v[m_var], combo_1a[m_var], bpoints)
+
+					# phi_pts = np.linspace(np.arctan(-self.m_val / self.layer_gap), np.arctan(self.m_val / self.layer_gap), 100)
+					# phi_pts = np.linspace(-1.55, 1.55, 100)
+					# s_pts   = np.tan(phi_pts)
+					# m.addGenConstrPWL(m_v[m_var], combo_1a[m_var], s_pts.tolist(), phi_pts.tolist())
 
 				for c_var in combo_vars:
 					m.addConstr(combo[c_var] == combo_1a[c_var[0]] - combo_1a[c_var[1]])
@@ -1774,12 +1785,17 @@ class LayeredOptimizer:
 			else:
 				ang_m_vars = list(g.edge_ids.keys())
 				ang_combo_vars = c_vars
-			ang_m = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val, ub=self.m_val)
+			ang_m = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val / self.layer_gap, ub=self.m_val / self.layer_gap)
 			if self.ca_use_tangent:
+				# ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=2*np.arctan(-self.m_val / self.layer_gap), ub=2*np.arctan(self.m_val / self.layer_gap))
+				# ang_combo_1a = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=np.arctan(-self.m_val / self.layer_gap), ub=np.arctan(self.m_val / self.layer_gap))
+				# ang_combo_2 = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=2*np.arctan(self.m_val / self.layer_gap))
+				# ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=np.arctan(self.m_val / self.layer_gap), name="ang")
+				
 				ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=-math.pi, ub=math.pi)
 				ang_combo_1a = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=-math.pi/2, ub=math.pi/2)
 				ang_combo_2 = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi)
-				ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi / 2, name="ang")
+				ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi/2, name="ang")
 			elif self.ca_use_minimum:
 				ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0)
 				ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi / 2, name="ang")
@@ -2483,9 +2499,10 @@ class LayeredOptimizer:
 		self.gamma_bundle = kwargs.get("gamma_bundle", 1)
 		self.gamma_fair = kwargs.get("gamma_fair", 1)
 		self.edge_bundling_pos_restrict = kwargs.get("edge_bundling_pos_restrict", False)
-		self.ca_use_tangent = kwargs.get("ca_use_tangent", True)
+		self.ca_use_tangent = kwargs.get("ca_use_tangent", False)
 		self.ca_use_minimum = kwargs.get("ca_use_minimum", False)
 		self.m_val = kwargs.get("m_val", round(1.5 * self.node_gap * max(len(lr) for lr in self.g.layers.values())))
+		self.layer_gap = kwargs.get("layer_gap", 1.5)
 		self.fix_x_vars = kwargs.get("fix_x_vars", False)
 		self.start_xy_vars = kwargs.get("start_xy_vars", False)
 		self.fix_nodes = kwargs.get("fix_nodes", False)
