@@ -73,7 +73,7 @@ class TestCorrectnessAllDesigns(unittest.TestCase):
     def test_sym_nodes_and_edges(self):
         opt = optimization.LayeredOptimizer(self.g5)
         opt.optimize_layout(crossing_minimization=True)
-        res = opt.optimize_layout(symmetry_maximization=True, symmetry_maximization_edges=True, fix_x_vars=True)
+        res = opt.optimize_layout(horizontal_node_symmetry=True, horizontal_edge_symmetry=True, fix_x_vars=True)
         sum_sym = 0
         for ndlist in self.g5.get_ids_by_layer().values():
             for i, nd1 in enumerate(ndlist):
@@ -91,7 +91,7 @@ class TestCorrectnessAllDesigns(unittest.TestCase):
                             sum_sym += 1
                     # else:
                     #     print(e1, e2, "are symmetric")
-        self.assertEqual(res.metrics.symmetry, sum_sym)
+        self.assertEqual(res.metrics.horizontal_node_symmetry + res.metrics.horizontal_edge_symmetry, sum_sym)
 
     def test_edge_length_fairness_with_minimization(self):
         opt = optimization.LayeredOptimizer(self.g6)

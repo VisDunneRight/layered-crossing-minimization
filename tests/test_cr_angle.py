@@ -1,6 +1,7 @@
 import unittest
 from layered_optimization import read_data, optimization, vis, metrics
 from layered_optimization.heuristics import improved_sifting
+import os
 
 
 class TestAngularOptimization(unittest.TestCase):
@@ -59,3 +60,43 @@ class TestAngularOptimization(unittest.TestCase):
         res = opt.optimize_layout(crossing_angle=True, ca_use_tangent=True, fix_x_vars=True)
         self.assertAlmostEqual(res.objval, metrics.crossing_angle(self.g4))
         vis.draw_graph(self.g4, "ANG_TEST_TAN")
+
+    def test9_stress_test_compare(self):
+        tru_times, apr_times = [], []
+        tru_obj, apr_obj = [], []
+        n1 = 10
+        for i, fl in enumerate(os.listdir("../datasets/random_graphs/uniform_layered/n10")[:n1]):
+            gr = read_data.read(f"../datasets/random_graphs/uniform_layered/n10/{fl}")
+            opt = optimization.LayeredOptimizer(gr)
+            res = opt.optimize_layout(crossing_angle=True, ca_use_tangent=True, fix_x_vars=False)
+            vis.draw_graph(gr, f"ANG_TAN/gr{i}_TAN")
+            tru_times.append(res.runtime)
+            tru_obj.append(res.objval)
+            res2 = opt.optimize_layout(crossing_angle=True, fix_x_vars=False)
+            vis.draw_graph(gr, f"ANG_TAN/gr{i}_APX")
+            apr_times.append(res2.runtime)
+            apr_obj.append(res2.objval)
+        n2 = 10
+        for i, fl in enumerate(os.listdir("../datasets/random_graphs/uniform_layered/n30")[:n2]):
+            gr = read_data.read(f"../datasets/random_graphs/uniform_layered/n30/{fl}")
+            opt = optimization.LayeredOptimizer(gr)
+            res0 = opt.optimize_layout(crossing_minimization=True)
+            res = opt.optimize_layout(crossing_angle=True, ca_use_tangent=True, fix_x_vars=True)
+            vis.draw_graph(gr, f"ANG_TAN/gr{i + n1}_TAN")
+            tru_times.append(res.runtime)
+            tru_obj.append(res.objval)
+            res2 = opt.optimize_layout(crossing_angle=True, fix_x_vars=True)
+            vis.draw_graph(gr, f"ANG_TAN/gr{i + n1}_APX")
+            apr_times.append(res2.runtime)
+            apr_obj.append(res2.objval)
+        print("TRU TIME:", sum(tru_times)/(n1 + n2), tru_times)
+        print("APRX TIME:", sum(apr_times)/(n1 + n2), apr_times)
+        print("TRU OBJ:", sum(tru_obj)/(n1 + n2), tru_obj)
+        print("APRX OBJ:", sum(apr_obj)/(n1 + n2), apr_obj)
+
+    def test10_angle_with_minimum(self):
+        opt = optimization.LayeredOptimizer(self.g2)
+        res0 = opt.optimize_layout(crossing_minimization=True)
+        res = opt.optimize_layout(crossing_angle=True, ca_use_minimum=True, edge_length_minimization=True, fix_x_vars=True)
+        self.assertAlmostEqual(res.metrics.angle, metrics.crossing_angle(self.g2, use_min_approx=True), places=4)
+        vis.draw_graph(self.g2, "ANG_TEST_MIN")

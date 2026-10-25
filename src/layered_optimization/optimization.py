@@ -6,10 +6,11 @@ import json
 import gurobipy as gp
 from gurobipy import nlfunc
 import math
+import re
 # import multiprocessing as mp
 from gurobipy import GRB
 # from sklearn.cluster import SpectralClustering
-from layered_optimization import vis, reductions, motifs, read_data
+from layered_optimization import vis, reductions, motifs, read_data, metrics
 from layered_optimization.graph import LayeredGraph, CollapsedGraph
 from layered_optimization.helpers import *
 from layered_optimization.neighborhood import *
@@ -65,10 +66,14 @@ class LayeredOptimizer:
 		self.apply_edge_weight = False
 		self.crossing_angle = False
 		self.ca_use_tangent = False
-		self.symmetry_maximization = False
-		self.symmetry_maximization_edges = False
-		self.symmetry_maximization_type = "horizontal"
-		self.symmetry_vertical_axis = (self.g.n_layers - 1) / 2
+		self.ca_use_minimum = False
+		self.horizontal_node_symmetry = False
+		self.vertical_node_symmetry = False
+		self.rotation_node_symmetry = False
+		self.horizontal_edge_symmetry = False
+		self.vertical_edge_symmetry = False
+		self.rotation_edge_symmetry = False
+		self.symmetry_vertical_axis = -1
 		self.symmetry_tolerance = 0.03
 		self.symmetry_cutting_plane_constraints = True
 		self.min_max_crossings = False
@@ -81,6 +86,18 @@ class LayeredOptimizer:
 		self.fix_x_vars = False
 		self.start_xy_vars = False
 		self.fix_nodes = False
+		self.fix_c_vars = False
+		self.fix_horizontal_node_symmetry = False
+		self.fix_vertical_node_symmetry = False
+		self.fix_rotation_node_symmetry = False
+		self.fix_horizontal_edge_symmetry = False
+		self.fix_vertical_edge_symmetry = False
+		self.fix_rotation_edge_symmetry = False
+		self.fix_crossing_angle = False
+		self.fix_edge_bends = False
+		self.fix_planarization = False
+		self.fix_planarization_removals = None
+		self.fix_min_max_crossings = False
 		self.edge_bundling = False
 		self.gamma_bundle = 1
 		self.edge_bundling_pos_restrict = False
@@ -203,6 +220,14 @@ class LayeredOptimizer:
 					t2 += prev_opt["time_elapsed"]
 				self.__write_out_optimization_state(g, opt_val=obj_val, time_elapsed=t2, is_optimal=m.status == 2, metrics=metric_vals)
 
+			if self.planarization or any(ele[0] == "planarization" for ele in self.hybrid_constraints):  # save planarization removal vars for later
+				removal_vars = {}
+				for v in m.getVars():
+					if v.varName[:2] == "r[":
+						ids = [int(n) for n in re.findall(r'-?\d+', v.varName)]
+						removal_vars[(ids[0], ids[1])] = int(v.x)
+				self.fix_planarization_removals = removal_vars
+
 			""" Print results and return data """
 			print(f"Optimization objective value: {obj_val}\t\tOptimization runtime: {round(m.runtime, 3) if not already_solved else 0}s")
 			print("g calculation \t", end='')
@@ -241,7 +266,7 @@ class LayeredOptimizer:
 			m.optimize()
 		t2 = time.time() - t2
 
-		mtrv = collections.namedtuple("metric_vals", "crossings length angle node_symmetry edge_symmetry fairness bundling minmax planar bend actual_symmetries", defaults=[-1]*11)
+		mtrv = collections.namedtuple("metric_vals", "crossings length angle horizontal_node_symmetry vertical_node_symmetry rotation_node_symmetry horizontal_edge_symmetry vertical_edge_symmetry rotation_edge_symmetry fairness bundling minmax planar bend actual_symmetries", defaults=[-1]*11)
 
 		if m.status != 2 and m.status != 9:
 			print("model returned status code:", m.status)
@@ -253,9 +278,9 @@ class LayeredOptimizer:
 		elif m.SolCount == 0:
 			print("Model did not find a valid solution before cutoff")
 			return float('inf'), t2, mtrv()
-		
+
 		# gs1, gs2 = 0, 0
-		metric_vals = {}
+		metric_vals = collections.defaultdict(int)
 		for v in m.getVars():
 			if v.varName[:2] == "x[":
 				xv1 = int(v.varName[2:v.varName.index(',')])
@@ -264,32 +289,37 @@ class LayeredOptimizer:
 			elif v.varName[:2] == "y[":
 				g[int(v.varName[2:v.varName.index(']')])].y = v.x
 			elif v.varName[:3] == "ang":
-				if "ang" not in metric_vals:
-					metric_vals["ang"] = 0
-				metric_vals["ang"] += v.x
+				avs = [int(n) for n in re.findall(r'-?\d+', v.varName)]
+				cvar = m.getVarByName(f"c[({avs[0]}, {avs[1]}),({avs[2]}, {avs[3]})]")
+				cvar = cvar if cvar else m.getVarByName(f"c[({avs[2]}, {avs[3]}),({avs[0]}, {avs[1]})]")
+				metric_vals["ang"] += v.x * int(cvar.x)
 			elif v.varName[:2] == "c[":
-				if "cr" not in metric_vals:
-					metric_vals["cr"] = 0
 				metric_vals["cr"] += v.x
-			elif v.varName[:5] == "sym_n":
-				if "sym_n" not in metric_vals:
-					metric_vals["sym_n"] = 0
-				metric_vals["sym_n"] += v.x
-				if v.x == 0 and (self.symmetry_maximization or any(ele[0] == "node_symmetry" for ele in self.hybrid_constraints)):
-					if "act_sym" not in metric_vals:
-						metric_vals["act_sym"] = 0
+			elif v.varName[:7] == "sym_n_h":
+				metric_vals["sym_n_h"] += v.x
+				if v.x == 0 and self.__is_node_symmetry_model():
 					metric_vals["act_sym"] += 1
-			elif v.varName[:5] == "sym_e":
-				if "sym_e" not in metric_vals:
-					metric_vals["sym_e"] = 0
-				metric_vals["sym_e"] += v.x
-				if v.x == 0 and (self.symmetry_maximization_edges or any(ele[0] == "edge_symmetry" for ele in self.hybrid_constraints)):
-					if "act_sym" not in metric_vals:
-						metric_vals["act_sym"] = 0
+			elif v.varName[:7] == "sym_n_v":
+				metric_vals["sym_n_v"] += v.x
+				if v.x == 0 and self.__is_node_symmetry_model():
+					metric_vals["act_sym"] += 1
+			elif v.varName[:7] == "sym_n_r":
+				metric_vals["sym_n_r"] += v.x
+				if v.x == 0 and self.__is_node_symmetry_model():
+					metric_vals["act_sym"] += 1
+			elif v.varName[:7] == "sym_e_h":
+				metric_vals["sym_e_h"] += v.x
+				if v.x == 0 and self.__is_edge_symmetry_model():
+					metric_vals["act_sym"] += 1
+			elif v.varName[:7] == "sym_e_v":
+				metric_vals["sym_e_v"] += v.x
+				if v.x == 0 and self.__is_edge_symmetry_model():
+					metric_vals["act_sym"] += 1
+			elif v.varName[:7] == "sym_e_r":
+				metric_vals["sym_e_r"] += v.x
+				if v.x == 0 and self.__is_edge_symmetry_model():
 					metric_vals["act_sym"] += 1
 			elif v.varName[:2] == "b[":
-				if "length" not in metric_vals:
-					metric_vals["length"] = 0
 				metric_vals["length"] += v.x
 				# xv1 = int(v.varName[2:v.varName.index(',')])
 				# xv2 = int(v.varName[v.varName.index(',') + 1:v.varName.index(']')])
@@ -300,18 +330,12 @@ class LayeredOptimizer:
 			elif v.varName[:4] == "fair":
 				metric_vals["fair"] = v.x
 			elif v.varName[:5] == "alpha":
-				if "bundle" not in metric_vals:
-					metric_vals["bundle"] = 0
 				metric_vals["bundle"] += v.x
 			elif v.varName == "C":
 				metric_vals["minmax"] = v.x
 			elif v.varName[:2] == "r[":
-				if "planar" not in metric_vals:
-					metric_vals["planar"] = 0
 				metric_vals["planar"] += v.x
 			elif v.varName[:7] == "bend_v[":
-				if "bend" not in metric_vals:
-					metric_vals["bend"] = 0
 				metric_vals["bend"] += v.x
 			# elif v.varName[:1] == "c" and round(v.x) != 0:
 			# 	print(v.varName, v.x)
@@ -321,8 +345,12 @@ class LayeredOptimizer:
 			metric_vals["cr"] if "cr" in metric_vals else -1,
 			metric_vals["length"] if "length" in metric_vals else -1,
 			metric_vals["ang"] if "ang" in metric_vals else -1,
-			metric_vals["sym_n"] if "sym_n" in metric_vals else -1,
-			metric_vals["sym_e"] if "sym_e" in metric_vals else -1,
+			metric_vals["sym_n_h"] if "sym_n_h" in metric_vals else -1,
+			metric_vals["sym_n_v"] if "sym_n_v" in metric_vals else -1,
+			metric_vals["sym_n_r"] if "sym_n_r" in metric_vals else -1,
+			metric_vals["sym_e_h"] if "sym_e_h" in metric_vals else -1,
+			metric_vals["sym_e_v"] if "sym_e_v" in metric_vals else -1,
+			metric_vals["sym_e_r"] if "sym_e_r" in metric_vals else -1,
 			metric_vals["fair"] if "fair" in metric_vals else -1,
 			metric_vals["bundle"] if "bundle" in metric_vals else -1,
 			metric_vals["minmax"] if "minmax" in metric_vals else -1,
@@ -348,7 +376,7 @@ class LayeredOptimizer:
 		else:
 			return model_objval, t2, metrics
 
-	def __set_optimization_function(self, m: gp.Model, g, c, c_vars, c_vars_orig, b, b_vars, c_consts, nc_consts, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n, sym_e, sym_n_v, sym_e_v, ang, ang_vars, d, r, b_v):
+	def __set_optimization_function(self, m: gp.Model, g, c, c_vars, c_vars_orig, b, b_vars, c_consts, nc_consts, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n_h, sym_n_v, sym_n_r, sym_e_h, sym_e_v, sym_e_r, ang, ang_vars, d, r, b_v):
 		idx = 0
 		c_to_iter = c_vars_orig if self.mirror_vars and self.symmetry_constraints else c_vars
 		use_consts = nc_consts if self.mirror_vars and self.symmetry_constraints else c_consts
@@ -387,23 +415,29 @@ class LayeredOptimizer:
 		if self.fairness_constraints:
 			m.setObjectiveN(fair_var, idx, weight=self.gamma_fair)
 			idx += 1
-		if self.symmetry_maximization and self.symmetry_maximization_type == "horizontal":
-			m.setObjectiveN(sym_n.sum(), idx)
+		if self.horizontal_node_symmetry:
+			m.setObjectiveN(sym_n_h.sum(), idx)
 			idx += 1
-		if self.symmetry_maximization_edges and self.symmetry_maximization_type == "horizontal":
-			m.setObjectiveN(sym_e.sum(), idx)
-			idx += 1
-		if self.symmetry_maximization and self.symmetry_maximization_type in ["vertical", "rotation"]:
+		if self.vertical_node_symmetry:
 			m.setObjectiveN(sym_n_v.sum(), idx)
 			idx += 1
-		if self.symmetry_maximization_edges and self.symmetry_maximization_type in ["vertical", "rotation"]:
+		if self.rotation_node_symmetry:
+			m.setObjectiveN(sym_n_r.sum(), idx)
+			idx += 1
+		if self.horizontal_edge_symmetry:
+			m.setObjectiveN(sym_e_h.sum(), idx)
+			idx += 1
+		if self.vertical_edge_symmetry:
 			m.setObjectiveN(sym_e_v.sum(), idx)
+			idx += 1
+		if self.rotation_edge_symmetry:
+			m.setObjectiveN(sym_e_r.sum(), idx)
 			idx += 1
 		if self.bend_minimization:
 			m.setObjectiveN(b_v.sum(), idx)
 			idx += 1
 
-	def __nonlinear_optimization_function(self, m: gp.Model, g, c, c_vars, c_vars_orig, b, b_vars, c_consts, nc_consts, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n, sym_e, sym_n_v, sym_e_v, ang, ang_vars, d, r, b_v):
+	def __nonlinear_optimization_function(self, m: gp.Model, g, c, c_vars, c_vars_orig, b, b_vars, c_consts, nc_consts, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n_h, sym_n_v, sym_n_r, sym_e_h, sym_e_v, sym_e_r, ang, ang_vars, d, r, b_v):
 		opt = gp.LinExpr()
 		c_mult, b_mult = self.gamma_crossings, self.gamma_edgelength
 		c_to_iter = c_vars_orig if self.mirror_vars and self.symmetry_constraints else c_vars
@@ -434,14 +468,18 @@ class LayeredOptimizer:
 			opt += r.sum()
 		if self.fairness_constraints:
 			opt += self.gamma_fair * fair_var
-		if self.symmetry_maximization and self.symmetry_maximization_type == "horizontal":
-			opt += sym_n.sum()
-		if self.symmetry_maximization_edges and self.symmetry_maximization_type == "horizontal":
-			opt += sym_e.sum()
-		if self.symmetry_maximization and self.symmetry_maximization_type in ["vertical", "rotation"]:
+		if self.horizontal_node_symmetry:
+			opt += sym_n_h.sum()
+		if self.vertical_node_symmetry:
 			opt += sym_n_v.sum()
-		if self.symmetry_maximization_edges and self.symmetry_maximization_type in ["vertical", "rotation"]:
+		if self.rotation_node_symmetry:
+			opt += sym_n_r.sum()
+		if self.horizontal_edge_symmetry:
+			opt += sym_e_h.sum()
+		if self.vertical_edge_symmetry:
 			opt += sym_e_v.sum()
+		if self.rotation_edge_symmetry:
+			opt += sym_e_r.sum()
 		if self.crossing_angle:
 			opt += sum((ang[cv] * c[cv] for cv in ang_vars))
 		if self.bend_minimization:
@@ -1180,7 +1218,7 @@ class LayeredOptimizer:
 					self.__fix_x_var(m, nid, loc, y_var=True)
 
 	def __min_max_crossing_constraints(self, m: gp.Model, g: LayeredGraph, c_vars, c, cp_vars, cp, big_c_var, e_b_l):
-		if self.min_max_crossings or any(ele[0] == "min_max_crossings" for ele in self.hybrid_constraints):
+		if self.min_max_crossings or self.fix_min_max_crossings or any(ele[0] == "min_max_crossings" for ele in self.hybrid_constraints):
 			cvset = set(c_vars)
 			for cp_var in cp_vars:
 				cp_esum = gp.LinExpr()
@@ -1222,7 +1260,7 @@ class LayeredOptimizer:
 				m.addGenConstrOr(d[d_var], list_of_c_vars)
 
 	def __planarization_constraints(self, m: gp.Model, g: LayeredGraph, r, c, c_vars, e_b_l):
-		if self.planarization or any(ele[0] == "planarization" for ele in self.hybrid_constraints):
+		if self.planarization or self.fix_planarization or any(ele[0] == "planarization" for ele in self.hybrid_constraints):
 			cvset = set(c_vars)
 			r_map = {eid: eid for eid in g.edge_ids}
 			for l_e in g.get_long_edges():  # map all long edges to (first, second) node in long edge
@@ -1384,34 +1422,35 @@ class LayeredOptimizer:
 				# 				m.addConstr(ubx[grp_ot] - x21_r * self.m_val * x[u2, u1] - lbx[i] - self.m_val * (1 - x21_r) // 2 <= 0)  # Eqs. 13
 				# 				m.addConstr(-ubx[grp_ot] + x21_r * self.m_val * x[u2, u1] + lbx[i] + self.m_val * (1 - x21_r) // 2 <= self.m_val)
 
-	def __add_symmetry_maximization_constraints(self, m: gp.Model, g: LayeredGraph, y, sym_n, sym_n_vars, sym_e, sym_e_vars, sym_n_v, sym_n_v_vars, sym_e_v, sym_e_v_vars):
-		if self.symmetry_maximization or self.symmetry_maximization_edges or any(ele[0] == "node_symmetry" or ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
-			if self.symmetry_maximization_type == "horizontal":
-				for snv in sym_n_vars:
+	def __add_symmetry_maximization_constraints(self, m: gp.Model, g: LayeredGraph, y, sym_n_h, sym_n_h_vars, sym_n_v, sym_n_v_vars, sym_n_r, sym_n_r_vars, sym_e_h, sym_e_h_vars, sym_e_v, sym_e_v_vars, sym_e_r, sym_e_r_vars):
+		if self.__is_node_symmetry_model() or self.__is_edge_symmetry_model():
+			if self.__is_horizontal_symmetry_model():
+				for snv in sym_n_h_vars:
 					# m.addConstr(ysum[ysv] == y[ysv[0]] + y[ysv[1]])  # unnecessary
-					m.addConstr(self.m_val * sym_n[snv] + y[snv[0]] + y[snv[1]] - self.m_val + self.symmetry_tolerance >= 0)
-					m.addConstr(self.m_val * sym_n[snv] + self.m_val - y[snv[0]] - y[snv[1]] + self.symmetry_tolerance >= 0)
-			if self.symmetry_maximization_type == "vertical":
+					m.addConstr(self.m_val * sym_n_h[snv] + y[snv[0]] + y[snv[1]] - self.m_val + self.symmetry_tolerance >= 0)
+					m.addConstr(self.m_val * sym_n_h[snv] + self.m_val - y[snv[0]] - y[snv[1]] + self.symmetry_tolerance >= 0)
+			if self.__is_vertical_symmetry_model():
 				for snv in sym_n_v_vars:
 					m.addConstr(self.m_val * sym_n_v[snv] - y[snv[0]] + y[snv[1]] + self.symmetry_tolerance >= 0)
 					m.addConstr(self.m_val * sym_n_v[snv] + y[snv[0]] - y[snv[1]] + self.symmetry_tolerance >= 0)
-			if self.symmetry_maximization_type == "rotation":
-				for snv in sym_n_v_vars:
-					m.addConstr(self.m_val * sym_n_v[snv] + y[snv[0]] + y[snv[1]] - self.m_val + self.symmetry_tolerance >= 0)
-					m.addConstr(self.m_val * sym_n_v[snv] + self.m_val - y[snv[0]] - y[snv[1]] + self.symmetry_tolerance >= 0)
+			if self.__is_rotation_symmetry_model():
+				for snv in sym_n_r_vars:
+					m.addConstr(self.m_val * sym_n_r[snv] + y[snv[0]] + y[snv[1]] - self.m_val + self.symmetry_tolerance >= 0)
+					m.addConstr(self.m_val * sym_n_r[snv] + self.m_val - y[snv[0]] - y[snv[1]] + self.symmetry_tolerance >= 0)
 			
-			if self.symmetry_maximization_edges or any(ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
-				ys_set = set(sym_n_vars) if self.symmetry_maximization_type == "horizontal" else set(sym_n_v_vars)
-				if self.symmetry_maximization_type == "horizontal":
-					for e_v in sym_e_vars:
+			if self.__is_edge_symmetry_model():
+				if self.__is_horizontal_symmetry_model():
+					ys_set = set(sym_n_h_vars)
+					for e_v in sym_e_h_vars:
 						sv1 = (e_v[0][0], e_v[1][0])
 						if sv1 not in ys_set:
 							sv1 = (e_v[1][0], e_v[0][0])
 						sv2 = (e_v[0][1], e_v[1][1])
 						if sv2 not in ys_set:
 							sv2 = (e_v[1][1], e_v[0][1])
-						m.addConstr(2 * sym_e[e_v] - sym_n[sv1] - sym_n[sv2] >= 0)
-				if self.symmetry_maximization_type in ["vertical", "rotation"]:
+						m.addConstr(2 * sym_e_h[e_v] - sym_n_h[sv1] - sym_n_h[sv2] >= 0)
+				if self.__is_vertical_symmetry_model():
+					ys_set = set(sym_n_v_vars)
 					for e_v in sym_e_v_vars:
 						sv1 = (e_v[0][0], e_v[1][1])
 						if sv1 not in ys_set:
@@ -1420,60 +1459,92 @@ class LayeredOptimizer:
 						if sv2 not in ys_set:
 							sv2 = (e_v[1][0], e_v[0][1])
 						m.addConstr(2 * sym_e_v[e_v] - sym_n_v[sv1] - sym_n_v[sv2] >= 0)
+				if self.__is_rotation_symmetry_model():
+					ys_set = set(sym_n_r_vars)
+					for e_v in sym_e_r_vars:
+						sv1 = (e_v[0][0], e_v[1][1])
+						if sv1 not in ys_set:
+							sv1 = (e_v[1][1], e_v[0][0])
+						sv2 = (e_v[0][1], e_v[1][0])
+						if sv2 not in ys_set:
+							sv2 = (e_v[1][0], e_v[0][1])
+						m.addConstr(2 * sym_e_r[e_v] - sym_n_r[sv1] - sym_n_r[sv2] >= 0)
 
 			if self.symmetry_cutting_plane_constraints:
-				snv_to_iter = sym_n_vars if self.symmetry_maximization_type == "horizontal" else sym_n_v_vars
-				snv_obj = sym_n if self.symmetry_maximization_type == "horizontal" else sym_n_v
-				for nd in g.nodes:
-					svsum = LinExpr()
-					for snv in snv_to_iter:
-						if snv[0] == nd.id or snv[1] == nd.id:
-							svsum += 1 - snv_obj[snv]
-					m.addConstr(svsum <= 1)
-				if self.symmetry_maximization_edges:
-					sev_to_iter = sym_e_vars if self.symmetry_maximization_type == "horizontal" else sym_e_v_vars
-					sev_obj = sym_e if self.symmetry_maximization_type == "horizontal" else sym_e_v
-					for ed in g.edge_ids.keys():
+				if self.__is_horizontal_symmetry_model():
+					for nd in g.nodes:
 						svsum = LinExpr()
-						for e_v in sev_to_iter:
-							if e_v[0] == ed or e_v[1] == ed:
-								svsum += 1 - sev_obj[e_v]
+						for snv in sym_n_h_vars:
+							if snv[0] == nd.id or snv[1] == nd.id:
+								svsum += 1 - sym_n_h[snv]
 						m.addConstr(svsum <= 1)
+				if self.__is_vertical_symmetry_model():
+					for nd in g.nodes:
+						svsum = LinExpr()
+						for snv in sym_n_v_vars:
+							if snv[0] == nd.id or snv[1] == nd.id:
+								svsum += 1 - sym_n_v[snv]
+						m.addConstr(svsum <= 1)
+				if self.__is_rotation_symmetry_model():
+					for nd in g.nodes:
+						svsum = LinExpr()
+						for snv in sym_n_r_vars:
+							if snv[0] == nd.id or snv[1] == nd.id:
+								svsum += 1 - sym_n_r[snv]
+						m.addConstr(svsum <= 1)
+				if self.__is_edge_symmetry_model():
+					if self.__is_horizontal_symmetry_model():
+						for ed in g.edge_ids.keys():
+							svsum = LinExpr()
+							for e_v in sym_e_h_vars:
+								if e_v[0] == ed or e_v[1] == ed:
+									svsum += 1 - sym_e_h[e_v]
+							m.addConstr(svsum <= 1)
+					if self.__is_vertical_symmetry_model():
+						for ed in g.edge_ids.keys():
+							svsum = LinExpr()
+							for e_v in sym_e_v_vars:
+								if e_v[0] == ed or e_v[1] == ed:
+									svsum += 1 - sym_e_v[e_v]
+							m.addConstr(svsum <= 1)
+					if self.__is_rotation_symmetry_model():
+						for ed in g.edge_ids.keys():
+							svsum = LinExpr()
+							for e_v in sym_e_r_vars:
+								if e_v[0] == ed or e_v[1] == ed:
+									svsum += 1 - sym_e_r[e_v]
+							m.addConstr(svsum <= 1)
 
 	def __add_crossing_angle_constraints(self, m: gp.Model, m_vars, m_v, y, combo_vars, combo, combo_1a, combo_2, final):
-		if self.crossing_angle or any(ele[0] == "crossing_angle" for ele in self.hybrid_constraints):
+		if self.crossing_angle or self.fix_crossing_angle or any(ele[0] == "crossing_angle" for ele in self.hybrid_constraints):
 			for m_var in m_vars:
 				m.addConstr(m_v[m_var] == (y[m_var[0]] - y[m_var[1]]) / 1.5)
 			if not self.ca_use_tangent:
 				for c_var in combo_vars:
-					# if combo is None:
-					m.addConstr(m_v[c_var[0]] * m_v[c_var[1]] + 1 <= final[c_var])
-					m.addConstr(- m_v[c_var[0]] * m_v[c_var[1]] - 1 <= final[c_var])
-					# else:
-					# 	m.addConstr(combo[c_var] == m_v[c_var[0]] * m_v[c_var[1]] + 1)
-					# 	m.addGenConstrAbs(final[c_var], combo[c_var])
+					if self.ca_use_minimum:
+						m.addConstr(m_v[c_var[0]] * m_v[c_var[1]] + 1 <= combo[c_var])
+						m.addConstr(- m_v[c_var[0]] * m_v[c_var[1]] - 1 <= combo[c_var])
+						m.addGenConstrMin(final[c_var], [combo[c_var]], math.pi / 2)
+					else:
+						m.addConstr(m_v[c_var[0]] * m_v[c_var[1]] + 1 <= final[c_var])
+						m.addConstr(- m_v[c_var[0]] * m_v[c_var[1]] - 1 <= final[c_var])
 			else:
-				ptu = []
-				ptf = []
-				npts = 101
-				for i in range(npts):
-					ptu.append(100 * i / (npts - 1))
-					ptf.append(math.atan(ptu[i]))
-				ptf[-1] = math.pi / 2
+				for m_var in m_vars:
+					m.addGenConstrTan(combo_1a[m_var], m_v[m_var])
 
 				for c_var in combo_vars:
-					m.addGenConstrNL(combo_1a[c_var], (m_v[c_var[0]] - m_v[c_var[1]]) / (1 + m_v[c_var[0]] * m_v[c_var[1]]))
-					m.addGenConstrAbs(combo[c_var], combo_1a[c_var])
-					m.addGenConstrPWL(combo[c_var], combo_2[c_var], ptu, ptf)
-					m.addConstr(math.pi / 2 - combo_2[c_var] <= final[c_var])
+					m.addConstr(combo[c_var] == combo_1a[c_var[0]] - combo_1a[c_var[1]])
+					m.addGenConstrAbs(combo_2[c_var], combo[c_var])
+					m.addConstr(final[c_var] >= combo_2[c_var] - math.pi / 2)
+					m.addConstr(final[c_var] >= - combo_2[c_var] + math.pi / 2)
 
 	def __add_bend_minimization_constraints(self, m: gp.Model, bend_vars, b_v, y):
-		if self.bend_minimization or any(ele[0] == "bend_minimization" for ele in self.hybrid_constraints):
+		if self.bend_minimization or self.fix_edge_bends or any(ele[0] == "bend_minimization" for ele in self.hybrid_constraints):
 			for b_var in bend_vars:
 				m.addConstr(2 * self.m_val * b_v[b_var] >= y[b_var[0]] + y[b_var[2]] - 2 * y[b_var[1]])
 				m.addConstr(2 * self.m_val * b_v[b_var] >= -y[b_var[0]] - y[b_var[2]] + 2 * y[b_var[1]])
 
-	def __add_hybrid_constraints(self, g: LayeredGraph, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, n_sym, e_sym, e_v_sym, ang, ang_vars, d, r, b_v):
+	def __add_hybrid_constraints(self, g: LayeredGraph, m: gp.Model, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n_h, sym_n_v, sym_n_r, sym_e_h, sym_e_v, sym_e_r, ang, ang_vars, d, r, b_v):
 		if self.hybrid_constraints:
 			for metric, bound in self.hybrid_constraints:
 				if metric == "crossings":
@@ -1492,13 +1563,18 @@ class LayeredOptimizer:
 					m.addConstr(big_c <= round(bound))
 				elif metric == "crossing_fairness" or metric == "edge_length_fairness":
 					m.addConstr(fair_var <= bound)
-				elif metric == "node_symmetry":
-					m.addConstr(n_sym.sum() <= round(bound))
-				elif metric == "edge_symmetry":
-					if self.symmetry_maximization_type in ["vertical", "rotation"]:
-						m.addConstr(e_v_sym.sum() <= round(bound))
-					else:
-						m.addConstr(e_sym.sum() <= round(bound))
+				elif metric == "horizontal_node_symmetry":
+					m.addConstr(sym_n_h.sum() <= round(bound))
+				elif metric == "vertical_node_symmetry":
+					m.addConstr(sym_n_v.sum() <= round(bound))
+				elif metric == "rotation_node_symmetry":
+					m.addConstr(sym_n_r.sum() <= round(bound))
+				elif metric == "horizontal_edge_symmetry":
+					m.addConstr(sym_e_h.sum() <= round(bound))
+				elif metric == "vertical_edge_symmetry":
+					m.addConstr(sym_e_v.sum() <= round(bound))
+				elif metric == "rotation_edge_symmetry":
+					m.addConstr(sym_e_r.sum() <= round(bound))
 				elif metric == "crossing_angle":
 					m.addQConstr(sum((ang[cv] * c[cv] for cv in ang_vars)) <= bound)
 				elif metric == "min_edges_with_crossings":
@@ -1511,19 +1587,28 @@ class LayeredOptimizer:
 					raise Exception(f"No metric with name {metric}.\nAllowed metrics: [crossings, edge_length, edge_bundles, min_max_crossings, crossing_fairness, edge_length_fairness, node_symmetry, edge_symmetry, crossing_angle, min_edges_with_crossings, planarization]")
 
 	def __we_need_c_vars(self):
-		if self.crossing_minimization or (self.fairness_constraints and self.fairness_metric == "crossings") or self.min_max_crossings or self.crossing_angle or self.min_edges_with_crossings or self.planarization or any(ele[0] == "crossings" or ele[0] == "min_max_crossings" or ele[0] == "crossing_angle" or ele[0] == "crossing_fairness" or ele[0] == "min_edges_with_crossings" for ele in self.hybrid_constraints):
-			return True
-		return False
+		return self.crossing_minimization or (self.fairness_constraints and self.fairness_metric == "crossings") or self.fix_c_vars or self.min_max_crossings or self.fix_min_max_crossings or self.crossing_angle or self.fix_crossing_angle or self.min_edges_with_crossings or self.planarization or self.fix_planarization or any(ele[0] == "crossings" or ele[0] == "min_max_crossings" or ele[0] == "crossing_angle" or ele[0] == "crossing_fairness" or ele[0] == "min_edges_with_crossings" for ele in self.hybrid_constraints)
 
 	def __we_need_y_vars(self):
-		if self.vertical_transitivity or (self.fairness_constraints and self.fairness_metric == "edge_length") or self.edge_length_minimization or self.streamline or self.stratisfimal_y_vars or self.symmetry_maximization or self.symmetry_maximization_edges or self.crossing_angle or self.bend_minimization or self.apply_node_weight_spacing or self.node_focus or (self.grouping_constraints and self.y_based_group_constraints) or any(ele[0] == "edge_length" or ele[0] == "edge_bundles" or ele[0] == "crossing_angle" or ele[0] == "edge_length_fairness" or ele[0] == "node_symmetry" or ele[0] == "edge_symmetry" or ele[0] == "bend_minimization" for ele in self.hybrid_constraints):
-			return True
-		return False
+		return self.vertical_transitivity or (self.fairness_constraints and self.fairness_metric == "edge_length") or self.edge_length_minimization or self.streamline or self.stratisfimal_y_vars or self.__is_node_symmetry_model() or self.__is_edge_symmetry_model() or self.crossing_angle or self.fix_crossing_angle or self.bend_minimization or self.fix_edge_bends or self.apply_node_weight_spacing or self.node_focus or (self.grouping_constraints and self.y_based_group_constraints) or any(ele[0] == "edge_length" or ele[0] == "edge_bundles" or ele[0] == "crossing_angle" or ele[0] == "edge_length_fairness" or ele[0] == "bend_minimization" for ele in self.hybrid_constraints)
 
 	def __we_need_b_vars(self):
-		if self.edge_length_minimization or (self.fairness_constraints and self.fairness_metric == "edge_length") or any(ele[0] == "edge_length" or ele[0] == "edge_length_fairness" for ele in self.hybrid_constraints):
-			return True
-		return False
+		return self.edge_length_minimization or (self.fairness_constraints and self.fairness_metric == "edge_length") or any(ele[0] == "edge_length" or ele[0] == "edge_length_fairness" for ele in self.hybrid_constraints)
+
+	def __is_node_symmetry_model(self):
+		return self.horizontal_node_symmetry or self.vertical_node_symmetry or self.rotation_node_symmetry or self.fix_horizontal_node_symmetry or self.fix_vertical_node_symmetry or self.fix_rotation_node_symmetry or any(ele[0] == "horizontal_node_symmetry" or ele[0] == "vertical_node_symmetry" or ele[0] == "rotation_node_symmetry" for ele in self.hybrid_constraints)
+
+	def __is_edge_symmetry_model(self):
+		return self.horizontal_edge_symmetry or self.vertical_edge_symmetry or self.rotation_edge_symmetry or self.fix_horizontal_edge_symmetry or self.fix_vertical_edge_symmetry or self.fix_rotation_edge_symmetry or any(ele[0] == "horizontal_edge_symmetry" or ele[0] == "vertical_edge_symmetry" or ele[0] == "rotation_edge_symmetry" for ele in self.hybrid_constraints)
+
+	def __is_horizontal_symmetry_model(self):
+		return self.horizontal_node_symmetry or self.horizontal_edge_symmetry or self.fix_horizontal_node_symmetry or self.fix_horizontal_edge_symmetry or any(ele[0] == "horizontal_node_symmetry" or ele[0] == "horizontal_edge_symmetry" for ele in self.hybrid_constraints)
+
+	def __is_vertical_symmetry_model(self):
+		return self.vertical_node_symmetry or self.vertical_edge_symmetry or self.fix_vertical_node_symmetry or self.fix_vertical_edge_symmetry or any(ele[0] == "vertical_node_symmetry" or ele[0] == "vertical_edge_symmetry" for ele in self.hybrid_constraints)
+
+	def __is_rotation_symmetry_model(self):
+		return self.rotation_node_symmetry or self.rotation_edge_symmetry or self.fix_rotation_node_symmetry or self.fix_rotation_edge_symmetry or any(ele[0] == "rotation_node_symmetry" or ele[0] == "rotation_edge_symmetry" for ele in self.hybrid_constraints)
 
 	def __get_x_vars(self, g: LayeredGraph):
 		x_vars = []
@@ -1604,7 +1689,7 @@ class LayeredOptimizer:
 
 		# Min-max/"local" crossing number variables. big_c is the maximum local crossing number
 		cp, cp_vars, big_c = None, None, None
-		if self.min_max_crossings or any(ele[0] == "min_max_crossings" for ele in self.hybrid_constraints):
+		if self.min_max_crossings or self.fix_min_max_crossings or any(ele[0] == "min_max_crossings" for ele in self.hybrid_constraints):
 			cp_vars = [(e.n1.id, e.n2.id) for e in g.edges if not e.n1.is_anchor_node]
 			cp = m.addVars(cp_vars, vtype=GRB.INTEGER, lb=0, name="cp")
 			big_c = m.addVar(lb=0, vtype=GRB.INTEGER, name="C")
@@ -1617,7 +1702,7 @@ class LayeredOptimizer:
 
 		# Maximal planar subgraph variable
 		r = None
-		if self.planarization or any(ele[0] == "planarization" for ele in self.hybrid_constraints):
+		if self.planarization or self.fix_planarization or any(ele[0] == "planarization" for ele in self.hybrid_constraints):
 			r_vars = [(e.n1.id, e.n2.id) for e in g.edges if not e.n1.is_anchor_node]
 			r = m.addVars(r_vars, vtype=GRB.BINARY, name="r")
 
@@ -1629,36 +1714,61 @@ class LayeredOptimizer:
 				b_aux = m.addVars(b_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val, ub=self.m_val, name="b_aux")
 
 		# Symmetry variables for node/edge symmetry, and another version for vertical symmetry. Rotation uses the vertical sym variables
-		sym_n_vars, sym_n, sym_e_vars, sym_e, sym_n_v_vars, sym_n_v, sym_e_v_vars, sym_e_v = None, None, None, None, None, None, None, None
-		if self.symmetry_maximization or self.symmetry_maximization_edges or any(ele[0] == "node_symmetry" or ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
-			if self.symmetry_maximization_type == "horizontal":
-				sym_n_vars = [v for nlist in nodes_by_layer.values() for v in itertools.combinations(nlist, 2)
+		sym_n_h_vars, sym_n_h, sym_n_v_vars, sym_n_v, sym_n_r_vars, sym_n_r, sym_e_h_vars, sym_e_h, sym_e_v_vars, sym_e_v, sym_e_r_vars, sym_e_r = None, None, None, None, None, None, None, None, None, None, None, None
+		if self.__is_node_symmetry_model() or self.__is_edge_symmetry_model():
+			if self.symmetry_vertical_axis == -1:
+				self.symmetry_vertical_axis = (g.n_layers - 1) / 2
+				self.__determine_best_vertical_symmetry_axis(g)  # only if fixing previous vert-sym result without specifying axis
+			if self.__is_horizontal_symmetry_model():
+				sym_n_h_vars = [v for nlist in nodes_by_layer.values() for v in itertools.combinations(nlist, 2)
 								if (g[v[0]].is_anchor_node and g[v[1]].is_anchor_node) or (not g[v[0]].is_anchor_node and not g[v[1]].is_anchor_node)
 							] + [(v, v) for v in g.node_ids]
-				sym_n = m.addVars(sym_n_vars, vtype=GRB.BINARY, name="sym_n")
-				if self.symmetry_maximization_edges or any(ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
-					sym_e_vars = [v for elist in edges_by_layer.values() for v in itertools.combinations(elist, 2)
+				sym_n_h = m.addVars(sym_n_h_vars, vtype=GRB.BINARY, name="sym_n_h")
+				if self.horizontal_edge_symmetry or self.fix_horizontal_edge_symmetry:
+					sym_e_h_vars = [v for elist in edges_by_layer.values() for v in itertools.combinations(elist, 2)
 									if (g[v[0][0]].is_anchor_node == g[v[1][0]].is_anchor_node) and (g[v[0][1]].is_anchor_node == g[v[1][1]].is_anchor_node)]
-					sym_e = m.addVars(sym_e_vars, vtype=GRB.BINARY, name="sym_e")
-			if self.symmetry_maximization_type in ["vertical", "rotation"]:
+					sym_e_h = m.addVars(sym_e_h_vars, vtype=GRB.BINARY, name="sym_e_h")
+			if self.__is_vertical_symmetry_model():
 				layer_pair = [round(self.symmetry_vertical_axis - 0.001), round(self.symmetry_vertical_axis + 0.001)]
 				sym_n_v_vars = [n_pair for l_i in range(min(layer_pair[0], g.n_layers - layer_pair[1]) + 1)
 									if layer_pair[0] - l_i in nodes_by_layer and layer_pair[1] + l_i in nodes_by_layer
 									for n_pair in itertools.product(nodes_by_layer[layer_pair[0] - l_i], nodes_by_layer[layer_pair[1] + l_i])
 									if g[n_pair[0]].is_anchor_node == g[n_pair[1]].is_anchor_node]
+				# next line removes duplicate (but reversed) vars if we do a product layer i * layer i
+				sym_n_v_vars = [nv for nv in sym_n_v_vars if (nv[1], nv[0]) not in sym_n_v_vars or nv[0] == nv[1] or nv[0] < nv[1]]
 				sym_n_v = m.addVars(sym_n_v_vars, vtype=GRB.BINARY, name="sym_n_v")
-				if self.symmetry_maximization_edges or any(ele[0] == "edge_symmetry" for ele in self.hybrid_constraints):
+				if self.vertical_edge_symmetry or self.fix_vertical_edge_symmetry:
 					layer_pair = [round(self.symmetry_vertical_axis - 1 + 0.001), round(self.symmetry_vertical_axis - 0.001)]
 					sym_e_v_vars = [e_pair for l_i in range(min(layer_pair[0], g.n_layers - layer_pair[1]) + 1)
 										if layer_pair[0] - l_i in edges_by_layer and layer_pair[1] + l_i in edges_by_layer
 										for e_pair in itertools.product(edges_by_layer[layer_pair[0] - l_i], edges_by_layer[layer_pair[1] + l_i])
 										if (g[e_pair[0][0]].is_anchor_node == g[e_pair[1][1]].is_anchor_node) and (g[e_pair[0][1]].is_anchor_node == g[e_pair[1][0]].is_anchor_node)]
+					# next line removes duplicate (but reversed) vars if we do a product layer i * layer i
+					sym_e_v_vars = [ev for ev in sym_e_v_vars if (ev[1], ev[0]) not in sym_e_v_vars or ev[0] == ev[1] or ev[0][0] < ev[1][0] or (ev[0][0] == ev[1][0] and ev[0][1] < ev[1][1])]
 					sym_e_v = m.addVars(sym_e_v_vars, vtype=GRB.BINARY, name="sym_e_v")
+			if self.__is_rotation_symmetry_model():
+				layer_pair = [round(self.symmetry_vertical_axis - 0.001), round(self.symmetry_vertical_axis + 0.001)]
+				sym_n_r_vars = [n_pair for l_i in range(min(layer_pair[0], g.n_layers - layer_pair[1]) + 1)
+									if layer_pair[0] - l_i in nodes_by_layer and layer_pair[1] + l_i in nodes_by_layer
+									for n_pair in itertools.product(nodes_by_layer[layer_pair[0] - l_i], nodes_by_layer[layer_pair[1] + l_i])
+									if g[n_pair[0]].is_anchor_node == g[n_pair[1]].is_anchor_node]
+				# next line removes duplicate (but reversed) vars if we do a product layer i * layer i
+				sym_n_r_vars = [nv for nv in sym_n_r_vars if (nv[1], nv[0]) not in sym_n_r_vars or nv[0] == nv[1] or nv[0] < nv[1]]
+				sym_n_r = m.addVars(sym_n_r_vars, vtype=GRB.BINARY, name="sym_n_r")
+				if self.rotation_edge_symmetry or self.fix_rotation_edge_symmetry:
+					layer_pair = [round(self.symmetry_vertical_axis - 1 + 0.001), round(self.symmetry_vertical_axis - 0.001)]
+					sym_e_r_vars = [e_pair for l_i in range(min(layer_pair[0], g.n_layers - layer_pair[1]) + 1)
+										if layer_pair[0] - l_i in edges_by_layer and layer_pair[1] + l_i in edges_by_layer
+										for e_pair in itertools.product(edges_by_layer[layer_pair[0] - l_i], edges_by_layer[layer_pair[1] + l_i])
+										if (g[e_pair[0][0]].is_anchor_node == g[e_pair[1][1]].is_anchor_node) and (g[e_pair[0][1]].is_anchor_node == g[e_pair[1][0]].is_anchor_node)]
+					# next line removes duplicate (but reversed) vars if we do a product layer i * layer i
+					sym_e_r_vars = [ev for ev in sym_e_r_vars if (ev[1], ev[0]) not in sym_e_r_vars or ev[0] == ev[1] or ev[0][0] < ev[1][0] or (ev[0][0] == ev[1][0] and ev[0][1] < ev[1][1])]
+					sym_e_r = m.addVars(sym_e_r_vars, vtype=GRB.BINARY, name="sym_e_r")
 
 		# Crossing angle variables, with necessary auxilliary variables
 		ang_m_vars, ang_m, ang_combo_vars, ang_combo, ang_combo_1a, ang_combo_2, ang_final = None, None, None, None, None, None, None
-		if self.crossing_angle or any(ele[0] == "crossing_angle" for ele in self.hybrid_constraints):
-			if self.fix_x_vars:
+		if self.crossing_angle or self.fix_crossing_angle or any(ele[0] == "crossing_angle" for ele in self.hybrid_constraints):
+			if self.fix_x_vars or self.fix_c_vars or self.fix_crossing_angle:
 				ang_combo_vars = g.edge_crossing_edges()
 				ang_m_vars = list(set([v[0] for v in ang_combo_vars] + [v[1] for v in ang_combo_vars]))
 			else:
@@ -1666,9 +1776,12 @@ class LayeredOptimizer:
 				ang_combo_vars = c_vars
 			ang_m = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val, ub=self.m_val)
 			if self.ca_use_tangent:
-				ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=100)
-				ang_combo_1a = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=-100, ub=100)
-				ang_combo_2 = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi / 2)
+				ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=-math.pi, ub=math.pi)
+				ang_combo_1a = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=-math.pi/2, ub=math.pi/2)
+				ang_combo_2 = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi)
+				ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi / 2, name="ang")
+			elif self.ca_use_minimum:
+				ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0)
 				ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, ub=math.pi / 2, name="ang")
 			else:
 				ang_final = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=0, name="ang")
@@ -1678,7 +1791,7 @@ class LayeredOptimizer:
 
 		# Minimizes the number of edge bends (direction changes on long edges)
 		bend_vars, b_v = None, None
-		if self.bend_minimization or any(ele[0] == "bend_minimization" for ele in self.hybrid_constraints):
+		if self.bend_minimization or self.fix_edge_bends or any(ele[0] == "bend_minimization" for ele in self.hybrid_constraints):
 			bend_vars = []
 			for l_e in g.get_long_edges():
 				for i in range(1, len(l_e) - 1):
@@ -1722,6 +1835,27 @@ class LayeredOptimizer:
 			for v in m.getVars():
 				v.Start = start_x_vars[v.varName]
 
+		if self.fix_c_vars:
+			self.__fix_c_vars(m, g, c_vars)
+
+		if self.fix_horizontal_node_symmetry or self.fix_vertical_node_symmetry or self.fix_rotation_node_symmetry:
+			self.__fix_node_sym_vars(m, g, sym_n_h_vars, sym_n_v_vars, sym_n_r_vars)
+
+		if self.fix_horizontal_edge_symmetry or self.fix_vertical_edge_symmetry or self.fix_rotation_edge_symmetry:
+			self.__fix_edge_sym_vars(m, g, sym_e_h_vars, sym_e_v_vars, sym_e_r_vars)
+
+		if self.fix_crossing_angle:
+			self.__fix_angle_vars(m, g, c_vars, ang_combo_vars)
+
+		if self.fix_edge_bends:
+			self.__fix_bend_vars(m, g)
+
+		if self.fix_planarization:
+			self.__fix_planarization(m, g, c_vars)
+
+		if self.fix_min_max_crossings:
+			self.__fix_min_max_crossings(m, g)
+
 		""" Set higher priority for branching on x-vars """
 		if self.xvar_branch_priority:
 			for v in m.getVars():
@@ -1738,9 +1872,9 @@ class LayeredOptimizer:
 
 		""" Set model objective function """
 		if self.crossing_angle:
-			self.__nonlinear_optimization_function(m, g, c, c_vars, None, b, b_vars, c_consts, None, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n, sym_e, sym_n_v, sym_e_v, ang_final, ang_combo_vars, d, r, b_v)
+			self.__nonlinear_optimization_function(m, g, c, c_vars, None, b, b_vars, c_consts, None, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n_h, sym_n_v, sym_n_r, sym_e_h, sym_e_v, sym_e_r, ang_final, ang_combo_vars, d, r, b_v)
 		else:
-			self.__set_optimization_function(m, g, c, c_vars, None, b, b_vars, c_consts, None, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n, sym_e, sym_n_v, sym_e_v, ang_final, ang_combo_vars, d, r, b_v)
+			self.__set_optimization_function(m, g, c, c_vars, None, b, b_vars, c_consts, None, alpha, e, e_vars, e_consts, big_c, fair_var, sym_n_h, sym_n_v, sym_n_r, sym_e_h, sym_e_v, sym_e_r, ang_final, ang_combo_vars, d, r, b_v)
 
 		""" Transitivity constraints """
 		self.__transitivity(m, g, nodes_by_layer, self.x_var_assign, x, y, z)
@@ -1779,7 +1913,7 @@ class LayeredOptimizer:
 		self.__fairness_constraints(m, g, c_vars, c, b_vars, b, fair_var)
 
 		""" Symmetry (aesthetic metric) constraints """
-		self.__add_symmetry_maximization_constraints(m, g, y, sym_n, sym_n_vars, sym_e, sym_e_vars, sym_n_v, sym_n_v_vars, sym_e_v, sym_e_v_vars)
+		self.__add_symmetry_maximization_constraints(m, g, y, sym_n_h, sym_n_h_vars, sym_n_v, sym_n_v_vars, sym_n_r, sym_n_r_vars, sym_e_h, sym_e_h_vars, sym_e_v, sym_e_v_vars, sym_e_r, sym_e_r_vars)
 
 		""" Angular resolution constraints, make crossings close to 90 degrees """
 		self.__add_crossing_angle_constraints(m, ang_m_vars, ang_m, y, ang_combo_vars, ang_combo, ang_combo_1a, ang_combo_2, ang_final)
@@ -1788,281 +1922,7 @@ class LayeredOptimizer:
 		self.__add_bend_minimization_constraints(m, bend_vars, b_v, y)
 
 		""" Hybrid model bounding constraints """
-		self.__add_hybrid_constraints(g, m, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n, sym_e, sym_e_v, ang_final, ang_combo_vars, d, r, b_v)
-
-	# def __optimize_with_subgraph_reduction(self, n_partitions, cluster, top_level_g, crosses, contacts, stack_to_nodeset, node_to_stack):  # DEPRECATED
-	# 	# TODO (later): remove all the parameters to standard_opt, replace non-top-level calls with creation of new optimizer object
-	# 	self.print_info.append("")
-	#
-	# 	subgraphs = [set(node.id for node in self.g.nodes if cluster[node.id] == i) for i in range(n_partitions)]
-	# 	top_level_subgraphs = {v: cluster[next(iter(stack_to_nodeset[v]))] for v in top_level_g.node_ids.keys()}
-	# 	# 2-subgraph optimization version
-	# 	# top_x_vars = {}
-	# 	# for node_list in top_level_g.layers.values():
-	# 	# 	for n1, n2 in itertools.combinations(node_list, 2):
-	# 	# 		set_x_var(top_x_vars, n1.name, n2.name, top_level_subgraphs[n1.name])
-	# 	# top_level_optval = top_level_g.num_edge_crossings_from_xvars_no_sl(top_x_vars)
-	# 	top_level_optval, top_x_vars = self.__optimize_layout_standard(graph_arg=top_level_g, return_x_vars=True, edge_length_minimization=False, is_subgraph=True, name="Collapsed graph", verbose=True)
-	#
-	# 	subg_x_var_colors = {}
-	# 	for top_x_var, val in top_x_vars.items():
-	# 		set_x_var(subg_x_var_colors, top_level_subgraphs[top_x_var[0]], top_level_subgraphs[top_x_var[1]], val)
-	# 		if len(subg_x_var_colors) == n_partitions * (n_partitions - 1) // 2:
-	# 			break
-	#
-	# 	# select clean graph (or random one, temporarily) - merge all other subgraphs
-	# 	fix_subg = random.choice(list(range(n_partitions)))
-	# 	if n_partitions > 2:
-	# 		for i in range(n_partitions):
-	# 			if not all(get_x_var(subg_x_var_colors, i, j) == 1 for j in itertools.chain(range(i), range(i+1, n_partitions))) and not all(get_x_var(subg_x_var_colors, i, j) == 0 for j in itertools.chain(range(i), range(i+1, n_partitions))):
-	# 				fix_subg = i
-	# 				break
-	# 	other_subg = set()
-	# 	for i in range(len(subgraphs)):
-	# 		if i != fix_subg:
-	# 			other_subg.update(subgraphs[i])
-	# 	subgraphs_merged = [other_subg, subgraphs[fix_subg]]
-	#
-	# 	t = time.time()
-	# 	vis.draw_graph(top_level_g, "interim", gravity=True, groups=top_level_subgraphs)
-	# 	vis.draw_graph(self.g, "overall", groups=cluster)
-	# 	f_subg_l = {node.layer: node.id for node in top_level_g.nodes if top_level_subgraphs[node.id] == fix_subg}
-	# 	fix_x_vars_for_merge = {}
-	# 	for x_var in top_x_vars:
-	# 		for low_n1 in stack_to_nodeset[x_var[0]]:
-	# 			for low_n2 in stack_to_nodeset[x_var[1]]:
-	# 				if cluster[low_n1] == fix_subg or cluster[low_n2] == fix_subg:
-	# 					set_x_var(self.x_var_assign, low_n1, low_n2, top_x_vars[x_var])
-	# 				elif top_level_g[x_var[0]].layer in f_subg_l and get_x_var(top_x_vars, f_subg_l[top_level_g[x_var[0]].layer], x_var[0]) != get_x_var(top_x_vars, f_subg_l[top_level_g[x_var[0]].layer], x_var[1]):
-	# 					set_x_var(fix_x_vars_for_merge, low_n1, low_n2, top_x_vars[x_var])
-	#
-	# 	sides = {}
-	# 	for contact_node in crosses:
-	# 		# if len(crosses[contact_node]) > 1
-	# 		# figure out contact_sides to pass to call of optimize. contact_sides=1 => node fixed at top
-	# 		for contact_other in crosses[contact_node]:
-	# 			if cluster[contact_node] == fix_subg or cluster[contact_other] == fix_subg:
-	# 				if node_to_stack[contact_node] + 1 in top_level_subgraphs and top_level_subgraphs[node_to_stack[contact_node]] == top_level_subgraphs[node_to_stack[contact_node] + 1]:
-	# 					sides[contact_node] = 1 - get_x_var(top_x_vars, node_to_stack[contact_node] + 1, node_to_stack[contact_other])
-	# 				if node_to_stack[contact_other] - 1 in top_level_subgraphs and top_level_subgraphs[node_to_stack[contact_other]] == top_level_subgraphs[node_to_stack[contact_other] - 1]:
-	# 					sides[contact_other] = 1 - get_x_var(top_x_vars, node_to_stack[contact_other] - 1, node_to_stack[contact_node])
-	#
-	# 	# self.g.create_double_adj_list(forward_only=True)
-	# 	layered_subg_list = []
-	# 	x_vars_opt = None
-	# 	unconstrained_opt_vals = []
-	# 	opt_vals = []
-	# 	for i, subg in enumerate(subgraphs_merged):
-	# 		g_prime = LayeredGraph()
-	# 		layered_subg_list.append(g_prime)
-	# 		sides_prime = {}
-	# 		vars_to_fix = {}
-	# 		extra_node_closest_subg = {}
-	# 		if i == 0:
-	# 			for x_var in fix_x_vars_for_merge:
-	# 				vars_to_fix[x_var] = fix_x_vars_for_merge[x_var]
-	#
-	# 		for subg_node in subg:
-	# 			g_prime.add_node(self.g[subg_node].layer, idx=self.g[subg_node].id, is_anchor=self.g[subg_node].is_anchor_node)
-	# 		for subg_node in subg:
-	# 			if subg_node in sides:
-	# 				for cnode, clist in crosses.items():
-	# 					if cnode == subg_node:
-	# 						for cadj in clist:
-	# 							if cadj not in g_prime:
-	# 								g_prime.add_node(g_prime[subg_node].layer + 1, idx=cadj, stacked=True)
-	# 								extra_node_closest_subg[cadj] = cluster[subg_node]
-	# 							g_prime.add_edge(subg_node, cadj)
-	# 							sides_prime[cadj] = sides[subg_node]
-	# 					elif subg_node in clist:
-	# 						if cnode not in g_prime:
-	# 							g_prime.add_node(g_prime[subg_node].layer - 1, idx=cnode, stacked=True)
-	# 							extra_node_closest_subg[cnode] = cluster[subg_node]
-	# 						g_prime.add_edge(cnode, subg_node)
-	# 						sides_prime[cnode] = sides[subg_node]
-	# 			for adj_node in self.g.get_double_adj_list()[subg_node]:
-	# 				if adj_node in subg:
-	# 					g_prime.add_edge(subg_node, adj_node)
-	# 		gp_layers = g_prime.get_ids_by_layer()
-	#
-	# 		for nd, clr in extra_node_closest_subg.items():  # line the extra crossing nodes up with vars_to_fix
-	# 			for other in gp_layers[g_prime[nd].layer]:
-	# 				if nd != other and not g_prime[other].stacked and clr != cluster[other]:
-	# 					set_x_var(vars_to_fix, nd, other, get_x_var(subg_x_var_colors, clr, cluster[other]))
-	# 				elif nd != other and g_prime[other].stacked and clr != extra_node_closest_subg[other]:
-	# 					set_x_var(vars_to_fix, nd, other, get_x_var(subg_x_var_colors, clr, cluster[other]))
-	#
-	# 		for contact_node, x_val in sides_prime.items():
-	# 			for node in gp_layers[g_prime[contact_node].layer]:
-	# 				# if node != contact_node and len(self.g.double_adj_list[node]) >= 1 and (contact_node, node) not in vars_to_fix and (node, contact_node) not in vars_to_fix:
-	# 				if i == 0:
-	# 					if node != contact_node and (contact_node, node) not in vars_to_fix and (node, contact_node) not in vars_to_fix and (not g_prime[node].stacked or sides_prime[node] != sides_prime[contact_node]):
-	# 						vars_to_fix[contact_node, node] = x_val
-	# 				else:
-	# 					if node != contact_node and (g_prime[node].stacked and sides_prime[node] == sides_prime[contact_node]):
-	# 						vars_to_fix[contact_node, node] = get_x_var(x_vars_opt, contact_node, node)
-	# 					elif node != contact_node:
-	# 						vars_to_fix[contact_node, node] = x_val
-	#
-	# 		unconstrained_opt_val = self.__optimize_layout_standard(graph_arg=g_prime)[1]
-	# 		opt_val, x_vars_opt = self.__optimize_layout_standard(graph_arg=g_prime, is_subgraph=True, fix_x_vars=vars_to_fix)
-	# 		if unconstrained_opt_val != opt_val:
-	# 			self.print_info.append(f"\tSubgraph {i+1} has {opt_val} crossings but could have as few as {unconstrained_opt_val}")
-	# 		else:
-	# 			self.print_info.append(f"\tSubgraph {i+1} is optimal")
-	# 		unconstrained_opt_vals.append(unconstrained_opt_val)
-	# 		opt_vals.append(opt_val)
-	# 		for x_var, val in x_vars_opt.items():
-	# 			set_x_var(self.x_var_assign, x_var[0], x_var[1], val)
-	#
-	# 		self.__sequential_br(graph_arg=g_prime, substitute_x_vars=x_vars_opt)
-	# 		vis.draw_graph(g_prime, f"interim_subg{i + 1}", groups=cluster)
-	#
-	# 	t = time.time() - t
-	#
-	# 	n_ec = self.g.num_edge_crossings_from_xvars_no_sl(self.x_var_assign)
-	# 	self.print_info.append(f"Total time to optimize and patch together subgraphs: {t}")
-	# 	self.print_info.append(f"Final edge crossing count: {n_ec}")
-	# 	self.print_info.append(f"{top_level_optval} crossings in collapsed graph, {sum(opt_vals)} in subgraphs, {n_ec - top_level_optval - sum(opt_vals)} from crossing edges")  # FIXME (later)
-	#
-	# 	self.__sequential_br()
-	# 	vis.draw_graph(self.g, "endpoints_highlight", groups=cluster)
-	#
-	# 	# LOOKAT return x_vars (or use self.x_var_assign?), n_crossings, subgraph LayeredGraph objects
-	# 	return n_ec, opt_vals, unconstrained_opt_vals, top_level_optval
-
-	# def __optimize_full_subgraph_algorithm(self):  # DEPRECATED
-	# 	t_allotted = self.cutoff_time if self.cutoff_time > 0 else 60
-	# 	t_start = time.time()
-	# 	n_partitions = 2
-	# 	best_so_far = self.x_var_assign.copy()
-	# 	best_n_cr = self.g.num_edge_crossings()
-	# 	lower_bound = 0
-	# 	# while lower_bound != best_n_cr and time.time() - t_start < t_allotted:
-	# 	for i in range(3):
-	# 		# n_rep = max(6 - n_partitions, 1)
-	# 		n_rep = 1
-	# 		cur_rep = 1
-	# 		while cur_rep <= n_rep and lower_bound != best_n_cr and time.time() - t_start < t_allotted:
-	# 			print(f"{n_partitions} partitions attempt {cur_rep}, {time.time()-t_start} elapased.")
-	# 			cluster = list(SpectralClustering(n_clusters=n_partitions, assign_labels="discretize", affinity="precomputed").fit(self.g.adjacency_matrix()).labels_)
-	# 			cluster.insert(0, 0)
-	# 			top_level_g, crosses, contacts, stack_to_nodeset, node_to_stack = self.g.stacked_graph_from_subgraph_nodes(cluster)
-	# 			n_cr, o_v, uo_v, top_ov = self.__optimize_with_subgraph_reduction(n_partitions, cluster, top_level_g, crosses, contacts, stack_to_nodeset, node_to_stack)
-	# 			if n_cr < best_n_cr:
-	# 				best_so_far = self.x_var_assign
-	# 				best_n_cr = n_cr
-	# 				print(f"New best, {n_cr} crossings")
-	# 			new_lower_bound = self.__bound_on_optimality(cluster, top_level_g, n_cr, o_v, uo_v, top_ov)
-	# 			if new_lower_bound > lower_bound:
-	# 				lower_bound = new_lower_bound
-	# 				print(f"New lower bound on optimal #crossings: {lower_bound}")
-	# 			cur_rep += 1
-	# 		n_partitions += 1
-	# 	self.__sequential_br(substitute_x_vars=best_so_far)
-	# 	if lower_bound == best_n_cr:
-	# 		# we're optimal, baby
-	# 		print("wooooo")
-	# 	else:
-	# 		print("ran out of time ;(")
-	# 	return 0
-
-	# def __optimize_locally_optimal(self):
-	# 	# step 1: calculate num partitions by increasing until size falls within predicted bound (self.cutoff_time)
-	# 	# step 2: split up partitions into layeredgraph objects (add hanger nodes)
-	# 	do_edge_length_minimization, self.edge_length_minimization = self.edge_length_minimization, False
-	# 	do_draw_graph, self.draw_graph = self.draw_graph, False
-	# 	cutoff_partitions, n_partitions = 100, 1
-	# 	cg = CollapsedGraph(self.g)
-	# 	if self.n_partitions == -1:
-	# 		while n_partitions <= cutoff_partitions:
-	# 			cluster = list(SpectralClustering(n_clusters=n_partitions, assign_labels="discretize", affinity="precomputed").fit(self.g.adjacency_matrix()).labels_)
-	# 			cg.subgraphs = cluster
-	# 			lgs = cg.create_layered_graphs_from_subgraphs_dangling_nodes()
-	# 			if max((lg.optimization_time_estimate() for lg in lgs)) < self.cutoff_time:
-	# 				print(f"Optimizing with {n_partitions} partition{'s' if n_partitions > 1 else ''}")
-	# 				print("Runtime estimates:", [lg.optimization_time_estimate() for lg in lgs])
-	# 				break
-	# 	else:
-	# 		cluster = list(SpectralClustering(n_clusters=self.n_partitions, assign_labels="discretize", affinity="precomputed").fit(self.g.adjacency_matrix()).labels_)
-	# 		cg.subgraphs = cluster
-	# 		lgs = cg.create_layered_graphs_from_subgraphs_dangling_nodes()
-	# 	cg.create_collapsed_graph_skeleton()
-	# 	# print([[idx for idx, v in enumerate(cg.subgraphs) if v == i] for i in range(max(cg.subgraphs)+1)])
-	#
-	# 	if cg.optimization_time_estimate() < self.cutoff_time / 2:
-	# 		# note: need separate opt to preserve x_var_assign
-	# 		skele_opt = LayeredOptimizer(cg)
-	# 		skele_opt.set_reasonable_params()
-	# 		skele_opt.draw_graph = True
-	# 		skele_opt.name = "collapsed_graph"
-	# 		skele_opt.optimize_layout()
-	# 		y_vs = skele_opt.__find_y_assignment_given_x(skele_opt.x_var_assign)
-	# 		for nd, y_v in y_vs.items():
-	# 			cg[nd].y = y_v
-	# 	else:
-	# 		# call bary-sift
-	# 		improved_sifting(cg)
-	#
-	# 	for cr_edge in cg.crossing_edges:  # fix nodes
-	# 		#  cn11----cn12    <- subgraph 1
-	# 		#     `----.       <- crossing edge (cn11, cn22)
-	# 		#  cn21----cn22    <- subgraph 2
-	# 		cn11y = cg[cg.node_to_stack_node[cr_edge[0]]].y
-	# 		cn12 = cg.get_collapsed_node(self.g[cr_edge[1]].layer, cg.subgraphs[cr_edge[0]])
-	# 		cn22y = cg[cg.node_to_stack_node[cr_edge[1]]].y
-	# 		cn21 = cg.get_collapsed_node(self.g[cr_edge[0]].layer, cg.subgraphs[cr_edge[1]])
-	# 		# print(cr_edge, cn12, cn21)
-	# 		if cn12 != -1 and cr_edge[1] in lgs[cg.subgraphs[cr_edge[0]]]:
-	# 			# fix node corresponding to cn22 in subg1
-	# 			# issue: cr_edge[0] may not be a node in lg2
-	# 			# solution: since iteration is over all cr_edges, can just skip if not there
-	# 			lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix = cn22y - cn12.y
-	# 			# print(lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]], lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix)
-	# 		elif cn12 == -1 and cr_edge[1] in lgs[cg.subgraphs[cr_edge[0]]]:
-	# 			lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix = cn22y
-	# 			# print(lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]], lgs[cg.subgraphs[cr_edge[0]]][cr_edge[1]].fix)
-	# 		if cn21 != -1 and cr_edge[0] in lgs[cg.subgraphs[cr_edge[1]]]:
-	# 			# fix node corresponding to cn11 in subg2
-	# 			lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix = cn11y - cn21.y
-	# 			# print(lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]], lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix)
-	# 		elif cn21 == -1 and cr_edge[0] in lgs[cg.subgraphs[cr_edge[1]]]:
-	# 			lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix = cn11y
-	# 			# print(lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]], lgs[cg.subgraphs[cr_edge[1]]][cr_edge[0]].fix)
-	#
-	# 	# step 3: multiprocessing pool, optimize normally all layeredgraphs
-	# 	manager = mp.Manager()
-	# 	lgs_out = manager.list()
-	# 	jobs = []
-	# 	for lg in lgs:
-	# 		p = mp.Process(target=self.optimize_target, args=(lg, lgs_out))
-	# 		jobs.append(p)
-	# 		p.start()
-	# 	for proc in jobs:
-	# 		proc.join()
-	#
-	# 	# step 4: extract node positions from optimized subgraphs
-	# 	print("before", self.g.num_edge_crossings())
-	# 	max_height = max((v.y for lg in lgs_out for v in lg.nodes))
-	# 	for lg in lgs_out:
-	# 		for nd in lg.nodes:
-	# 			if cg.subgraphs[nd.id] == lg.subg_id:
-	# 				self.g[nd.id].y = cg[cg.node_to_stack_node[nd.id]].y * max_height + nd.y
-	# 	# self.g.check_position_validity()
-	# 	self.__assign_x_given_y()
-	# 	print("after", self.g.num_edge_crossings())
-	#
-	# 	for i in range(len(lgs_out)):
-	# 		vis.draw_graph(lgs_out[i], f"example{i + 1}", groups=[0 if nd.fix == 0 else 1 for nd in lgs_out[i].nodes])
-	#
-	# 	# step 5: apply neighborhood_sift
-	#
-	# 	if do_edge_length_minimization:
-	# 		self.__sequential_br()
-	# 	if do_draw_graph:
-	# 		vis.draw_graph(self.g, self.name, groups=cg.subgraphs)
-	#
-	# 	return self.g.num_edge_crossings()
+		self.__add_hybrid_constraints(g, m, c, c_vars, c_consts, b, alpha, big_c, fair_var, sym_n_h, sym_n_v, sym_n_r, sym_e_h, sym_e_v, sym_e_r, ang_final, ang_combo_vars, d, r, b_v)
 
 	def __fix_x_var(self, m: gp.Model, k, v, y_var=False, c_var=False, y_tol=0.001):
 		if y_var:
@@ -2116,6 +1976,131 @@ class LayeredOptimizer:
 					self.__fix_x_var(m, ((e1.n1.id, e1.n2.id), (e2.n1.id, e2.n2.id)), 1, c_var=True)
 				else:
 					self.__fix_x_var(m, ((e1.n1.id, e1.n2.id), (e2.n1.id, e2.n2.id)), 0, c_var=True)
+
+	def __fix_c_vars(self, m: gp.Model, g: LayeredGraph, cvars):
+		cvset = set(cvars)
+		e_b_l = g.get_edges_by_layer()
+		for e_list in e_b_l.values():
+			for e1, e2 in itertools.combinations(e_list, 2):
+				if e1.n1.id == e2.n1.id or e1.n2.id == e2.n2.id:
+					continue
+				cv = get_c_var(cvset, (e1.n1.id, e1.n2.id), (e2.n1.id, e2.n2.id))
+				mvar = m.getVarByName(f"c[({cv[0][0]}, {cv[0][1]}),({cv[1][0]}, {cv[1][1]})]")
+				is_cr = False
+				if e1.same_layer_edge and e2.same_layer_edge:
+					u1, w1, u2, w2 = e1.n1.y, e1.n2.y, e2.n1.y, e2.n2.y
+					if (u1 > u2 > w1 > w2) or (u1 > w2 > w1 > u2) or (w1 > u2 > u1 > w2) or (w1 > w2 > u1 > u2) or (u2 > u1 > w2 > w1) or (u2 > w1 > w2 > u1) or (w2 > u1 > u2 > w1) or (w2 > w1 > u2 > u1):
+						is_cr = True
+				elif e1.same_layer_edge:
+					if (e1.n1.y > e2.n1.y > e1.n1.y) or (e1.n2.y > e2.n1.y > e1.n1.y):
+						is_cr = True
+				elif e2.same_layer_edge:
+					if (e2.n1.y > e1.n1.y > e2.n2.y) or (e2.n2.y > e1.n1.y > e2.n1.y):
+						is_cr = True
+				elif (e1.n1.y > e2.n1.y and e1.n2.y < e2.n2.y) or (e1.n1.y < e2.n1.y and e1.n2.y > e2.n2.y):
+					is_cr = True
+				mvar.lb, mvar.ub = 1 if is_cr else 0, 1 if is_cr else 0
+
+	def __determine_best_vertical_symmetry_axis(self, g: LayeredGraph):
+		if self.fix_vertical_edge_symmetry:
+			_, self.symmetry_vertical_axis = metrics.vertical_edge_symmetry(g, return_sym_pairs_and_axis=True)
+		elif self.fix_rotation_edge_symmetry:
+			_, _, self.symmetry_vertical_axis = metrics.rotation_edge_symmetry(g, return_sym_pairs_and_axis=True)
+		elif self.fix_vertical_node_symmetry:
+			_, self.symmetry_vertical_axis = metrics.vertical_node_symmetry(g, return_sym_pairs_and_axis=True)
+		elif self.fix_rotation_node_symmetry:
+			_, _, self.symmetry_vertical_axis = metrics.rotation_node_symmetry(g, return_sym_pairs_and_axis=True)
+
+	def __fix_node_sym_vars(self, m: gp.Model, g: LayeredGraph, sym_n_h_vars, sym_n_v_vars, sym_n_r_vars):
+		if self.fix_horizontal_node_symmetry:
+			sym_pairs, _ = metrics.horizontal_node_symmetry(g, return_sym_pairs_and_axis=True)
+			for sym_v in sym_n_h_vars:
+				modelvar = m.getVarByName(f"sym_n_h[{sym_v[0]},{sym_v[1]}]")
+				if sym_v in sym_pairs or (sym_v[1], sym_v[0]) in sym_pairs:
+					modelvar.lb, modelvar.ub = 0, 0
+				else:
+					modelvar.lb, modelvar.ub = 1, 1
+		if self.fix_vertical_node_symmetry:
+			sym_pairs, _ = metrics.vertical_node_symmetry(g, return_sym_pairs_and_axis=True, v_axis=self.symmetry_vertical_axis)
+			for sym_v in sym_n_v_vars:
+				modelvar = m.getVarByName(f"sym_n_v[{sym_v[0]},{sym_v[1]}]")
+				if sym_v in sym_pairs or (sym_v[1], sym_v[0]) in sym_pairs:
+					modelvar.lb, modelvar.ub = 0, 0
+				else:
+					modelvar.lb, modelvar.ub = 1, 1
+		if self.fix_rotation_node_symmetry:
+			sym_pairs, _, _ = metrics.rotation_node_symmetry(g, return_sym_pairs_and_axis=True, v_axis=self.symmetry_vertical_axis)
+			for sym_v in sym_n_r_vars:
+				modelvar = m.getVarByName(f"sym_n_r[{sym_v[0]},{sym_v[1]}]")
+				if sym_v in sym_pairs or (sym_v[1], sym_v[0]) in sym_pairs:
+					modelvar.lb, modelvar.ub = 0, 0
+				else:
+					modelvar.lb, modelvar.ub = 1, 1
+
+	def __fix_edge_sym_vars(self, m: gp.Model, g: LayeredGraph, sym_e_h_vars, sym_e_v_vars, sym_e_r_vars):
+		if self.fix_horizontal_edge_symmetry:
+			sym_pairs, _ = metrics.horizontal_edge_symmetry(g, return_sym_pairs_and_axis=True)
+			for sym_v in sym_e_h_vars:
+				modelvar = m.getVarByName(f"sym_e_h[({sym_v[0][0]}, {sym_v[0][1]}),({sym_v[1][0]}, {sym_v[1][1]})]")
+				if sym_v in sym_pairs or (sym_v[1], sym_v[0]) in sym_pairs:
+					modelvar.lb, modelvar.ub = 0, 0
+				else:
+					modelvar.lb, modelvar.ub = 1, 1
+		if self.fix_vertical_edge_symmetry:
+			sym_pairs, _ = metrics.vertical_edge_symmetry(g, return_sym_pairs_and_axis=True, v_axis=self.symmetry_vertical_axis)
+			for sym_v in sym_e_v_vars:
+				modelvar = m.getVarByName(f"sym_e_v[({sym_v[0][0]}, {sym_v[0][1]}),({sym_v[1][0]}, {sym_v[1][1]})]")
+				if sym_v in sym_pairs or (sym_v[1], sym_v[0]) in sym_pairs:
+					modelvar.lb, modelvar.ub = 0, 0
+				else:
+					modelvar.lb, modelvar.ub = 1, 1
+		if self.fix_rotation_edge_symmetry:
+			sym_pairs, _, _ = metrics.rotation_edge_symmetry(g, return_sym_pairs_and_axis=True, v_axis=self.symmetry_vertical_axis)
+			for sym_v in sym_e_r_vars:
+				modelvar = m.getVarByName(f"sym_e_r[({sym_v[0][0]}, {sym_v[0][1]}),({sym_v[1][0]}, {sym_v[1][1]})]")
+				if sym_v in sym_pairs or (sym_v[1], sym_v[0]) in sym_pairs:
+					modelvar.lb, modelvar.ub = 0, 0
+				else:
+					modelvar.lb, modelvar.ub = 1, 1
+
+	def __fix_angle_vars(self, m: gp.Model, g: LayeredGraph, c_vars, ang_final_vars):
+		# fix c-vars first. then fix the final angle vars
+		self.__fix_c_vars(m, g, c_vars)
+		if self.ca_use_tangent:
+			crossing_angles = metrics.crossing_angle(g, return_angles=True)
+		elif self.ca_use_minimum:
+			crossing_angles = metrics.crossing_angle(g, use_min_approx=True, return_angles=True)
+		else:
+			crossing_angles = metrics.crossing_angle(g, use_approximation=True, return_angles=True)
+
+		for cv in crossing_angles:
+			if cv in ang_final_vars:
+				modelvar = m.getVarByName(f"ang[({cv[0][0]}, {cv[0][1]}),({cv[1][0]}, {cv[1][1]})]")
+			else:
+				modelvar = m.getVarByName(f"ang[({cv[1][0]}, {cv[1][1]}),({cv[0][0]}, {cv[0][1]})]")
+			modelvar.lb, modelvar.ub = crossing_angles[cv], crossing_angles[cv]
+
+	def __fix_bend_vars(self, m: gp.Model, g: LayeredGraph):
+		edge_bends = metrics.bend_minimization(g, return_bends=True)
+		for ebv, val in edge_bends.items():
+			modelvar = m.getVarByName(f"bend_v[{ebv[0]},{ebv[1]},{ebv[2]}]")
+			modelvar.lb, modelvar.ub = val, val
+
+	def __fix_planarization(self, m: gp.Model, g: LayeredGraph, c_vars):
+		if self.fix_planarization_removals:
+			for var, val in self.fix_planarization_removals.items():
+				modelvar = m.getVarByName(f"r[{var[0]},{var[1]}]")
+				modelvar.lb, modelvar.ub = val, val
+		else:
+			print("Cannot find previous planarization solution. Fixing all crossings instead.")
+			self.__fix_c_vars(c_vars)
+
+	def __fix_min_max_crossings(self, m: gp.Model, g: LayeredGraph):
+		cr_counts = metrics.min_max_crossings(g, return_counts_per_edge=True)
+		for e in g.edges:
+			if not e.n1.is_anchor_node:
+				modelvar = m.getVarByName(f"cp[{e.n1.id},{e.n2.id}]")
+				modelvar.lb, modelvar.ub = int(cr_counts[e.n1.id, e.n2.id]), int(cr_counts[e.n1.id, e.n2.id])
 
 	def __incremetal_opt(self, graph: LayeredGraph, subgraph: list, m: gp.Model, cv_set, nbhd_width=0):
 		# TODO (future): make it re-fix all vars used after optimizing, and only unfix subgraph node vars
@@ -2457,10 +2442,13 @@ class LayeredOptimizer:
 		self.crossing_minimization = kwargs.get("crossing_minimization", False)
 		self.edge_length_minimization = kwargs.get("edge_length_minimization", False)
 		self.crossing_angle = kwargs.get("crossing_angle", False)
-		self.symmetry_maximization = kwargs.get("symmetry_maximization", False)
-		self.symmetry_maximization_edges = kwargs.get("symmetry_maximization_edges", False)
-		self.symmetry_maximization_type = kwargs.get("symmetry_maximization_type", "horizontal")
-		self.symmetry_vertical_axis = kwargs.get("symmetry_vertical_axis", (self.g.n_layers - 1) / 2)
+		self.horizontal_node_symmetry = kwargs.get("horizontal_node_symmetry", False)
+		self.vertical_node_symmetry = kwargs.get("vertical_node_symmetry", False)
+		self.rotation_node_symmetry = kwargs.get("rotation_node_symmetry", False)
+		self.horizontal_edge_symmetry = kwargs.get("horizontal_edge_symmetry", False)
+		self.vertical_edge_symmetry = kwargs.get("vertical_edge_symmetry", False)
+		self.rotation_edge_symmetry = kwargs.get("rotation_edge_symmetry", False)
+		self.symmetry_vertical_axis = kwargs.get("symmetry_vertical_axis", -1)
 		self.symmetry_tolerance = kwargs.get("symmetry_tolerance", 0.03)
 		self.min_max_crossings = kwargs.get("min_max_crossings", False)
 		self.min_edges_with_crossings = kwargs.get("min_edges_with_crossings", False)
@@ -2495,11 +2483,23 @@ class LayeredOptimizer:
 		self.gamma_bundle = kwargs.get("gamma_bundle", 1)
 		self.gamma_fair = kwargs.get("gamma_fair", 1)
 		self.edge_bundling_pos_restrict = kwargs.get("edge_bundling_pos_restrict", False)
+		self.ca_use_tangent = kwargs.get("ca_use_tangent", True)
+		self.ca_use_minimum = kwargs.get("ca_use_minimum", False)
 		self.m_val = kwargs.get("m_val", round(1.5 * self.node_gap * max(len(lr) for lr in self.g.layers.values())))
 		self.fix_x_vars = kwargs.get("fix_x_vars", False)
 		self.start_xy_vars = kwargs.get("start_xy_vars", False)
 		self.fix_nodes = kwargs.get("fix_nodes", False)
-		self.ca_use_tangent = kwargs.get("ca_use_tangent", False)
+		self.fix_c_vars = kwargs.get("fix_c_vars", False)
+		self.fix_horizontal_node_symmetry = kwargs.get("fix_horizontal_node_symmetry", False)
+		self.fix_vertical_node_symmetry = kwargs.get("fix_vertical_node_symmetry", False)
+		self.fix_rotation_node_symmetry = kwargs.get("fix_rotation_node_symmetry", False)
+		self.fix_horizontal_edge_symmetry = kwargs.get("fix_horizontal_edge_symmetry", False)
+		self.fix_vertical_edge_symmetry = kwargs.get("fix_vertical_edge_symmetry", False)
+		self.fix_rotation_edge_symmetry = kwargs.get("fix_rotation_edge_symmetry", False)
+		self.fix_crossing_angle = kwargs.get("fix_crossing_angle", False)
+		self.fix_edge_bends = kwargs.get("fix_edge_bends", False)
+		self.fix_planarization = kwargs.get("fix_planarization", False)
+		self.fix_min_max_crossings = kwargs.get("fix_min_max_crossings", False)
 
 		# Speedup Techniques
 		self.do_subg_reduction = kwargs.get("do_subg_reduction", False)

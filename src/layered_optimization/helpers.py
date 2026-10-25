@@ -31,7 +31,7 @@ def get_c_var(c_vars_set, e1, e2):
 	elif (e2, e1) in c_vars_set:
 		return e2, e1
 	else:
-		raise Exception(f"Edges {e1} and {e2} are not a crossing variable in this model")
+		raise Exception(f"Edges {e1} and {e2} are not a crossing variable in provided set of c-vars")
 
 
 def optimization_time_estimate(c_vars_count):

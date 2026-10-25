@@ -26,7 +26,7 @@ if __name__ == '__main__':
 	# result = optimizer.optimize_layout(crossing_minimization=True)
 	# optimizer.optimize_layout(
 	# 	crossing_angle=True,  # also make crossing angles as close as possible to 90 degrees
-	# 	symmetry_maximization=True,  # maximize node symmetry
+	# 	horizontal_node_symmetry=True,  # maximize node symmetry
 	# 	hybrid_constraints=["crossings", result.objval.crossings]  # keep the crossing number optimal
 	# )
 	# draw_graph(graph2, "rome-30-layout")
@@ -49,21 +49,21 @@ if __name__ == '__main__':
 	
 	opt3 = LayeredOptimizer(graph4)
 	rs1 = opt3.optimize_layout(crossing_minimization=True)
-	rs2 = opt3.optimize_layout(fix_x_vars=True, symmetry_maximization_edges=True, edge_length_minimization=True)
+	rs2 = opt3.optimize_layout(fix_x_vars=True, horizontal_edge_symmetry=True, edge_length_minimization=True)
 	print("SEQ", rs1.metrics, rs2.metrics)
 	print("SEQ TOTAL", rs1.metrics.crossings + rs2.metrics.edge_symmetry + rs2.metrics.length)
 	draw_graph(opt3.g, "un1_seq")
 
 	opt2 = LayeredOptimizer(graph4)
 	rh1 = opt2.optimize_layout(crossing_minimization=True)
-	rh2 = opt2.optimize_layout(symmetry_maximization_edges=True, fix_x_vars=True)
-	rh3 = opt2.optimize_layout(edge_length_minimization=True, fix_x_vars=True, hybrid_constraints=[("edge_symmetry", rh2.metrics.edge_symmetry * 1)])
+	rh2 = opt2.optimize_layout(horizontal_edge_symmetry=True, fix_x_vars=True)
+	rh3 = opt2.optimize_layout(edge_length_minimization=True, fix_x_vars=True, hybrid_constraints=[("horizontal_edge_symmetry", rh2.metrics.horizontal_edge_symmetry * 1)])
 	print("HYBRID", rh3.metrics)
 	print("HYBRID TOTAL", rh1.metrics.crossings + rh3.metrics.edge_symmetry + rh3.metrics.length)
 	draw_graph(opt2.g, "un1_hybrid")
 
 	opt1 = LayeredOptimizer(graph4)
-	rc1 = opt1.optimize_layout(crossing_minimization=True, symmetry_maximization_edges=True, edge_length_minimization=True)
+	rc1 = opt1.optimize_layout(crossing_minimization=True, horizontal_edge_symmetry=True, edge_length_minimization=True)
 	print("COMBO", rc1.metrics)
 	print("COMBO TOTAL", rc1.metrics.crossings + rc1.metrics.edge_symmetry + rc1.metrics.length)
 	draw_graph(opt1.g, "un1_combo")
