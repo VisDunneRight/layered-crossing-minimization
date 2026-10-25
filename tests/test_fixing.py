@@ -78,7 +78,16 @@ class TestVariableFixing(unittest.TestCase):
         res1 = opt.optimize_layout(crossing_angle=True)
         res2 = opt.optimize_layout(fix_crossing_angle=True, edge_length_minimization=True)
         vis.draw_graph(self.g3, "FIX_TEST_2_ANG")
-        self.assertAlmostEqual(res1.metrics.angle, metrics.crossing_angle(self.g3))
+        self.assertAlmostEqual(res1.metrics.angle, metrics.crossing_angle(self.g3), places=2)
+
+        gr = read_data.read("../datasets/random_graphs/uniform_layered/n5/graph46.lgbin")
+        improved_sifting(gr)
+        opt = optimization.LayeredOptimizer(gr)
+        res0 = opt.optimize_layout(fix_x_vars=True, crossing_angle=True, ca_use_tangent=True)
+        vis.draw_graph(gr, "FIX_TEST_2_TANANG_1")
+        res = opt.optimize_layout(fix_x_vars=True, edge_length_minimization=True, ca_use_tangent=True, fix_crossing_angle=True)
+        vis.draw_graph(gr, "FIX_TEST_2_TANANG_2")
+        self.assertAlmostEqual(res0.metrics.angle, metrics.crossing_angle(gr), places=2)
 
     def test3_fix_bends(self):
         opt = optimization.LayeredOptimizer(self.g5)

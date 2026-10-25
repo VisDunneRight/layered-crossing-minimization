@@ -1785,7 +1785,7 @@ class LayeredOptimizer:
 			else:
 				ang_m_vars = list(g.edge_ids.keys())
 				ang_combo_vars = c_vars
-			ang_m = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val / self.layer_gap, ub=self.m_val / self.layer_gap)
+			ang_m = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=-self.m_val / self.layer_gap, ub=self.m_val / self.layer_gap, name="m_v")
 			if self.ca_use_tangent:
 				# ang_combo = m.addVars(ang_combo_vars, vtype=GRB.CONTINUOUS, lb=2*np.arctan(-self.m_val / self.layer_gap), ub=2*np.arctan(self.m_val / self.layer_gap))
 				# ang_combo_1a = m.addVars(ang_m_vars, vtype=GRB.CONTINUOUS, lb=np.arctan(-self.m_val / self.layer_gap), ub=np.arctan(self.m_val / self.layer_gap))
@@ -1861,7 +1861,7 @@ class LayeredOptimizer:
 			self.__fix_edge_sym_vars(m, g, sym_e_h_vars, sym_e_v_vars, sym_e_r_vars)
 
 		if self.fix_crossing_angle:
-			self.__fix_angle_vars(m, g, c_vars, ang_combo_vars)
+			self.__fix_angle_vars(m, g, c_vars)
 
 		if self.fix_edge_bends:
 			self.__fix_bend_vars(m, g)
@@ -2079,22 +2079,14 @@ class LayeredOptimizer:
 				else:
 					modelvar.lb, modelvar.ub = 1, 1
 
-	def __fix_angle_vars(self, m: gp.Model, g: LayeredGraph, c_vars, ang_final_vars):
+	def __fix_angle_vars(self, m: gp.Model, g: LayeredGraph, c_vars):
 		# fix c-vars first. then fix the final angle vars
 		self.__fix_c_vars(m, g, c_vars)
-		if self.ca_use_tangent:
-			crossing_angles = metrics.crossing_angle(g, return_angles=True)
-		elif self.ca_use_minimum:
-			crossing_angles = metrics.crossing_angle(g, use_min_approx=True, return_angles=True)
-		else:
-			crossing_angles = metrics.crossing_angle(g, use_approximation=True, return_angles=True)
+		crossing_edge_slopes = metrics.crossing_angle(g, return_slopes=True)
 
-		for cv in crossing_angles:
-			if cv in ang_final_vars:
-				modelvar = m.getVarByName(f"ang[({cv[0][0]}, {cv[0][1]}),({cv[1][0]}, {cv[1][1]})]")
-			else:
-				modelvar = m.getVarByName(f"ang[({cv[1][0]}, {cv[1][1]}),({cv[0][0]}, {cv[0][1]})]")
-			modelvar.lb, modelvar.ub = crossing_angles[cv], crossing_angles[cv]
+		for ed in crossing_edge_slopes:
+			modelvar = m.getVarByName(f"m_v[{ed[0]},{ed[1]}]")
+			modelvar.lb, modelvar.ub = crossing_edge_slopes[ed], crossing_edge_slopes[ed]
 
 	def __fix_bend_vars(self, m: gp.Model, g: LayeredGraph):
 		edge_bends = metrics.bend_minimization(g, return_bends=True)

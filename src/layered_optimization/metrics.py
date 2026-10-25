@@ -32,13 +32,16 @@ def edge_length(g: LayeredGraph):
 	return t_length
 
 
-def crossing_angle(g: LayeredGraph, layer_dist=1.5, use_approximation=False, use_min_approx=False, return_angles=False):
+def crossing_angle(g: LayeredGraph, layer_dist=1.5, use_approximation=False, use_min_approx=False, return_angles=False, return_slopes=False):
 	t_angle_radians = 0
 	crossed_edges = g.edge_crossing_edges()
 	angles = {}
+	slopes = {}
 	for ed1, ed2 in crossed_edges:
 		e1m = (g[ed1[0]].y - g[ed1[1]].y) / layer_dist
 		e2m = (g[ed2[0]].y - g[ed2[1]].y) / layer_dist
+		if return_slopes:
+			slopes[ed1], slopes[ed2] = e1m, e2m
 		if use_approximation:
 			t_angle_radians += abs(1 + e1m * e2m)
 			# print(e1m, e2m, ed1, ed2)
@@ -55,6 +58,8 @@ def crossing_angle(g: LayeredGraph, layer_dist=1.5, use_approximation=False, use
 				angles[ed1, ed2] = np.pi / 2 - np.arctan(abs((e1m - e2m) / (1 + e1m * e2m))) if 1 + e1m * e2m != 0 else 0
 	if return_angles:
 		return angles
+	if return_slopes:
+		return slopes
 	return t_angle_radians
 
 
