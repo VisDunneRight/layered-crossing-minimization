@@ -21,8 +21,11 @@ class TestBendMinimization(unittest.TestCase):
         opt.optimize_layout(crossing_minimization=True)
         opt.optimize_layout(edge_length_minimization=True, bend_minimization=True, fix_x_vars=True, gamma_edgelength=0.5)
         vis.draw_graph(self.g2, "BENDMIN_TEST_2")
-        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True, gamma_edgelength=0.5)
-        vis.draw_graph(self.g2, "BENDMIN_TEST_2b")
+        opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True, gamma_edgelength=0.5, streamline=True, anchor_proximity=0.5)
+        nadd = self.g2.add_node(self.g2[25].layer + 1)
+        nadd.y = self.g2[55].y - 1
+        self.g2.add_edge(25, nadd.id)
+        vis.draw_graph(self.g2, "BENDMIN_TEST_2b", label_nodes=False)
 
     def test3_fixed_x_solo(self):
         opt = optimization.LayeredOptimizer(self.g2)

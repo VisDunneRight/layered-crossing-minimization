@@ -118,3 +118,18 @@ class TestVariableFixing(unittest.TestCase):
         res3 = opt.optimize_layout(fix_c_vars=True, fix_min_max_crossings=True, edge_length_minimization=True)
         vis.draw_graph(self.g5, "FIX_TEST_5_MINMAX")
         self.assertEqual(res1.metrics.minmax, res2.metrics.minmax, res3.metrics.minmax)
+
+    def test7_problematic_angle(self):
+        gr = read_data.read("../datasets/random_graphs/uniform_layered/n25/graph95.lgbin")
+        opt = optimization.LayeredOptimizer(gr)
+        CASE_STUDY_TLIMIT = 1000
+        r1 = opt.optimize_layout(planarization=True, min_max_crossings=True, crossing_minimization=True, cutoff_time=CASE_STUDY_TLIMIT)
+        r2 = opt.optimize_layout(fix_c_vars=True, edge_length_minimization=True, crossing_angle=True, ca_use_tangent=True, gamma_edgelength=0.05, streamline=True, anchor_proximity=0.5, cutoff_time=CASE_STUDY_TLIMIT)
+        print(r2.metrics)
+        r3 = opt.optimize_layout(fix_crossing_angle=True, ca_use_tangent=True, bend_minimization=True, horizontal_edge_symmetry=True, hybrid_constraints=[("edge_length", r2.metrics.length * 1.05)], streamline=True, anchor_proximity=0.5, cutoff_time=CASE_STUDY_TLIMIT)
+        print(r3.metrics)
+        r4 = opt.optimize_layout(fix_x_vars=True, fix_edge_bends=True, fix_crossing_angle=True, ca_use_tangent=True, edge_length_minimization=True, hybrid_constraints=[("horizontal_edge_symmetry", r3.metrics.horizontal_edge_symmetry)], streamline=True, anchor_proximity=0.5, cutoff_time=CASE_STUDY_TLIMIT)
+        print(r4.metrics)
+        vis.draw_graph(gr, "FIX_TEST_7_PROBA")
+        self.assertAlmostEqual(r2.metrics.angle, metrics.crossing_angle(gr))
+

@@ -60,7 +60,7 @@ def crossing_angle(g: LayeredGraph, layer_dist=1.5, use_approximation=False, use
 		return angles
 	if return_slopes:
 		return slopes
-	return t_angle_radians
+	return float(t_angle_radians)
 
 
 def min_max_crossings(g: LayeredGraph, return_minmax_edge=False, return_counts_per_edge=False):
@@ -431,7 +431,7 @@ def fairness(g: LayeredGraph, fairness_metric="crossings"):
 
 def planarization(g: LayeredGraph, return_counts_per_edge=True):
 	print("Warning: Planarization is unverifiable. Run optimization algorithm for maximal planar edge set.\nThis function can only be used to return the total number of crossings per edge in the input graph.")
-	counts_per_edge = {(ed.n1.id, ed.n2.id): 0 for ed in g.edges if not e.n1.is_anchor_node}
+	counts_per_edge = {(ed.n1.id, ed.n2.id): 0 for ed in g.edges if not ed.n1.is_anchor_node}
 	e_by_layer = g.get_edges_by_layer()
 	for ed in counts_per_edge:
 		if g[ed[1]].is_anchor_node:  # long edge
@@ -473,5 +473,58 @@ def planarization(g: LayeredGraph, return_counts_per_edge=True):
 	return None
 
 
-def planarization(g: LayeredGraph):
-	raise Exception("Maximal planar subgraph is unverifiable. Run optimization algorithm for maximal planar edge set.")
+def planarization_opt(g: LayeredGraph):
+	from layered_optimization.optimization import LayeredOptimizer
+
+	opt = LayeredOptimizer(g)
+	res = opt.optimize_layout(planarization=True, fix_x_vars=True, fix_c_vars=True)
+	return res.metrics.planar
+
+
+def get_all_metrics(g: LayeredGraph):
+	cr = edge_crossings(g)
+	el = edge_length(g)
+	ag = crossing_angle(g)
+	hs = horizontal_edge_symmetry(g, return_act_sym=True)
+	# vs = vertical_edge_symmetry(g, return_act_sym=True)
+	# rs = rotation_edge_symmetry(g, return_act_sym=True)
+	mm = min_max_crossings(g)
+	bm = bend_minimization(g)
+	pl = planarization_opt(g)
+	return [cr, el, ag, hs, mm, pl, bm]
+
+
+def flip_symmetry(metric_scores_by_technique, symmetry_indices=[3], max_sim=None):
+	max_sim_per_index = [max(s[sid] for s in metric_scores_by_technique) for sid in symmetry_indices] if not max_sim else max_sim
+	for s in metric_scores_by_technique:
+		for i, sid in enumerate(symmetry_indices):
+			s[sid] = -s[sid] + max_sim_per_index[i]  # negate act_sym so that lowest is best, add max score to ensure it's positive
+	return max_sim_per_index
+
+
+def combine_symmetry(metric_scores_by_technique, symmetry_indices=[3, 4, 5]):
+	for i, s in enumerate(metric_scores_by_technique):
+		best_sym = min(s[si] for si in symmetry_indices)
+		metric_scores_by_technique[i] = [v for ix, v in enumerate(s) if ix not in symmetry_indices] + [best_sym]
+		# remove the symmetry scores, replacing with the best one
+
+
+def normalized_average_metric_score(metric_scores_by_technique, normalized_to=None):
+	# combine_symmetry(metric_scores_by_technique)
+	n_metrics = len(metric_scores_by_technique[0])
+	if normalized_to is None:
+		flip_symmetry(metric_scores_by_technique)
+		max_scores = [max(s[i] for s in metric_scores_by_technique) for i in range(n_metrics)]
+		return [sum(s[i] / max_scores[i] if max_scores[i] != 0 else 1 for i in range(n_metrics)) / n_metrics for s in metric_scores_by_technique]
+	else:
+		ms = flip_symmetry(metric_scores_by_technique)
+		flip_symmetry([normalized_to], max_sim=ms)
+		print(normalized_to)
+		return [sum(s[i] / normalized_to[i] if normalized_to[i] != 0 else 1 for i in range(n_metrics)) / n_metrics for s in metric_scores_by_technique]
+
+def normalized_metric_scores(metric_scores_by_technique):
+	n_metrics = len(metric_scores_by_technique[0])
+	flip_symmetry(metric_scores_by_technique)
+	max_scores = [max(s[i] for s in metric_scores_by_technique) for i in range(n_metrics)]
+	return [[s[i] / max_scores[i] if max_scores[i] != 0 else 1 for i in range(n_metrics)] for s in metric_scores_by_technique]
+

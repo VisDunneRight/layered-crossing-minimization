@@ -1,5 +1,5 @@
 import unittest
-from layered_optimization import read_data, optimization, vis
+from layered_optimization import read_data, optimization, vis, metrics
 
 
 class TestMaxPlanarSubgraph(unittest.TestCase):
@@ -27,3 +27,8 @@ class TestMaxPlanarSubgraph(unittest.TestCase):
         opt.optimize_layout(crossing_minimization=True, hybrid_constraints=[("planarization", res.objval)])
         opt.optimize_layout(edge_length_minimization=True, fix_x_vars=True)
         vis.draw_graph(self.g2, "PLANAR_TEST_3")
+
+    def test_metric_calc(self):
+        opt = optimization.LayeredOptimizer(self.g2)
+        res = opt.optimize_layout(planarization=True)
+        self.assertEqual(res.metrics.planar, metrics.planarization(self.g2))

@@ -109,3 +109,13 @@ class TestAngularOptimization(unittest.TestCase):
         res0 = opt.optimize_layout(fix_x_vars=True, crossing_angle=True, ca_use_tangent=True)
         res = opt.optimize_layout(fix_x_vars=True, edge_length_minimization=True, ca_use_tangent=True, hybrid_constraints=[("crossing_angle", res0.objval + 0.0001)])
         vis.draw_graph(gr, "ANG_TEST_PROB")
+
+    def test12_problematic_results(self):
+        gr = read_data.read("../datasets/random_graphs/uniform_layered/n5/graph144.lgbin")
+        opt = optimization.LayeredOptimizer(gr)
+        res = opt.optimize_layout(crossing_angle=True, ca_use_tangent=True, crossing_minimization=True)
+        print(res.metrics)
+
+        res2 = opt.optimize_layout(crossing_minimization=True)
+        res3 = opt.optimize_layout(crossing_angle=True, ca_use_tangent=True, fix_c_vars=True, start_xy_vars=True)
+        print(res3.metrics)

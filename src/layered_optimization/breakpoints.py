@@ -1,20 +1,20 @@
 """
 Adaptive breakpoints for a piecewise-linear (PWL) approximation of
 phi = arctan(s), for use with Gurobi's addGenConstrPWL.
- 
+
 Each piece is made as long as possible while keeping the exact worst-case
 angle error at or below eps. Pieces therefore come out long where arctan is
 nearly linear (around s = 0) and short where it bends (the steep ends), so
 you hit a given accuracy with far fewer breakpoints than uniform spacing.
 """
- 
+
 import numpy as np
- 
- 
+
+
 def chord_max_error(s1, s2):
     """Exact max |chord - arctan| on [s1, s2], with the chord through the
     two endpoints on the curve.
- 
+
     The error e(s) = chord(s) - arctan(s) is zero at both endpoints, and its
     derivative m - 1/(1+s^2) vanishes only at s = +/- sqrt(1/m - 1), where m
     is the chord slope. So the max is at one of those points if it lies
@@ -32,8 +32,8 @@ def chord_max_error(s1, s2):
         if s1 < c < s2:
             err = max(err, abs(p1 + m * (c - s1) - np.arctan(c)))
     return err
- 
- 
+
+
 def adaptive_breakpoints(s_min, s_max, eps):
     """Greedy breakpoints on [s_min, s_max] with max angle error <= eps (rad).
  
@@ -58,8 +58,8 @@ def adaptive_breakpoints(s_min, s_max, eps):
         pts.append(lo)
         a = lo
     return np.array(pts)
- 
- 
+
+
 def uniform_angle_breakpoints(s_min, s_max, K):
     """K breakpoints evenly spaced in angle (the previous approach)."""
     return np.tan(np.linspace(np.arctan(s_min), np.arctan(s_max), K))
@@ -96,12 +96,12 @@ if __name__ == "__main__":
         print(f"tol {tol_deg:>5} deg per line: adaptive K = {len(ad):>3}, "
               f"uniform-angle K = {K:>3}  "
               f"(adaptive max err {np.degrees(max_error(ad)):.4f} deg)")
- 
+
     # Show where the breakpoints land, in degrees.
     ad = adaptive_breakpoints(s_min, s_max, np.radians(0.1))
     print("\nBreakpoint angles for 0.1 deg tolerance:")
     print(np.round(np.degrees(np.arctan(ad)), 1))
- 
+
     # Gurobi usage sketch:
     # import gurobipy as gp
     # m = gp.Model()

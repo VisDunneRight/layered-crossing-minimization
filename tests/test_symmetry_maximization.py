@@ -79,3 +79,26 @@ class TestSymmetryMaximization(unittest.TestCase):
         res2 = opt2.optimize_layout(rotation_node_symmetry=True, rotation_edge_symmetry=True, streamline=True)
         self.assertEqual(res2.metrics.rotation_edge_symmetry, metrics.rotation_edge_symmetry(self.g3))
         self.assertEqual(res2.metrics.rotation_node_symmetry, metrics.rotation_node_symmetry(self.g3))
+
+    def test_hybrid_symmetry(self):
+        opt = optimization.LayeredOptimizer(self.g2)
+        res0 = opt.optimize_layout(horizontal_edge_symmetry=True)
+        res = opt.optimize_layout(crossing_minimization=True, hybrid_constraints=[("horizontal_edge_symmetry", round(res0.objval))])
+        print(res.metrics)
+        self.assertEqual(res0.metrics.horizontal_edge_symmetry, res.metrics.horizontal_edge_symmetry)
+
+        res0 = opt.optimize_layout(vertical_edge_symmetry=True)
+        res = opt.optimize_layout(crossing_minimization=True, hybrid_constraints=[("vertical_edge_symmetry", round(res0.objval))])
+        print(res.metrics)
+        self.assertEqual(res0.metrics.vertical_edge_symmetry, res.metrics.vertical_edge_symmetry)
+
+        res0 = opt.optimize_layout(rotation_edge_symmetry=True)
+        res = opt.optimize_layout(crossing_minimization=True, hybrid_constraints=[("rotation_edge_symmetry", round(res0.objval))])
+        print(res.metrics)
+        self.assertEqual(res0.metrics.rotation_edge_symmetry, res.metrics.rotation_edge_symmetry)
+    
+    def test_vsym_oddness(self):
+        gr = read_data.read("../datasets/random_graphs/uniform_layered/n5/graph290.lgbin")
+        opt = optimization.LayeredOptimizer(gr)
+        res = opt.optimize_layout(vertical_edge_symmetry=True, crossing_minimization=True)
+        print(res.metrics)
